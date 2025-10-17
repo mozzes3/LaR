@@ -8,11 +8,11 @@ const lessonSchema = new mongoose.Schema({
   description: String,
   videoId: {
     type: String,
-    required: true,
+    required: false,
   },
   videoUrl: {
     type: String,
-    required: true,
+    required: false,
   },
   duration: Number, // in seconds
   order: Number,
@@ -20,13 +20,25 @@ const lessonSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  resources: [
-    {
-      title: String,
-      url: String,
-      type: String, // pdf, link, file
-    },
-  ],
+  resources: {
+    type: [
+      {
+        title: {
+          type: String,
+          required: false,
+        },
+        url: {
+          type: String,
+          required: false,
+        },
+        type: {
+          type: String,
+          required: false,
+        },
+      },
+    ],
+    default: [],
+  },
 });
 
 const sectionSchema = new mongoose.Schema({
@@ -79,7 +91,8 @@ const courseSchema = new mongoose.Schema(
     // Media
     thumbnail: {
       type: String,
-      required: true,
+      required: false, //
+      default: "", //
     },
     previewVideo: {
       videoId: String,
@@ -110,25 +123,23 @@ const courseSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
-        "NFT Creation",
+        "Blockchain Development",
+        "NFT & Digital Art",
+        "DeFi & Trading",
+        "Web3 Marketing",
         "Smart Contracts",
-        "Marketing",
-        "Community Building",
-        "DeFi",
-        "Web3 Development",
         "Tokenomics",
-        "Design",
+        "Community Building",
+        "Cryptocurrency",
         "Other",
       ],
     },
-    subcategory: String,
-    tags: [String],
 
     // Level
     level: {
       type: String,
-      enum: ["Beginner", "Intermediate", "Advanced", "All Levels"],
-      default: "All Levels",
+      enum: ["beginner", "intermediate", "advanced", "all"], // ← lowercase!
+      default: "beginner",
     },
 
     // Requirements

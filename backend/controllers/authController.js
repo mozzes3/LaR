@@ -141,11 +141,14 @@ const verifyAndLogin = async (req, res) => {
         id: user._id,
         walletAddress: user.walletAddress,
         username: user.username,
+        displayName: user.displayName || user.username,
         avatar: user.avatar,
         role: user.role,
         isInstructor: user.isInstructor,
         level: user.level,
         experience: user.experience,
+        bio: user.bio, // ← ADD THIS TOO
+        socialLinks: user.socialLinks,
       },
     });
   } catch (error) {
@@ -161,7 +164,39 @@ const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-__v");
 
-    res.json({ user });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        username: user.username,
+        displayName: user.displayName || user.username, // ← ADD THIS
+        walletAddress: user.walletAddress,
+        avatar: user.avatar,
+        bio: user.bio,
+        email: user.email,
+        socialLinks: user.socialLinks,
+        isInstructor: user.isInstructor,
+        instructorVerified: user.instructorVerified,
+        instructorBio: user.instructorBio,
+        expertise: user.expertise,
+        badge: user.badge,
+        level: user.level,
+        experience: user.experience,
+        coursesEnrolled: user.coursesEnrolled,
+        coursesCompleted: user.coursesCompleted,
+        certificatesEarned: user.certificatesEarned,
+        learningPoints: user.learningPoints,
+        totalStudents: user.totalStudents,
+        totalCoursesCreated: user.totalCoursesCreated,
+        averageRating: user.averageRating,
+        role: user.role,
+        lastUsernameChange: user.lastUsernameChange,
+      },
+    });
   } catch (error) {
     console.error("Get me error:", error);
     res.status(500).json({ error: "Failed to fetch user data" });

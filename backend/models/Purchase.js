@@ -18,7 +18,7 @@ const purchaseSchema = new mongoose.Schema(
     // Payment details
     paymentMethod: {
       type: String,
-      enum: ["fdr", "usd", "crypto"],
+      enum: ["fdr", "usdt", "usdc", "eth", "btc", "sol"],
       required: true,
     },
     amount: {
@@ -61,6 +61,12 @@ const purchaseSchema = new mongoose.Schema(
       default: 0,
       min: 0,
       max: 100,
+    },
+
+    totalWatchTime: {
+      type: Number,
+      default: 0,
+      // Total watch time in seconds
     },
     completedLessons: [
       {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { courseApi } from "@services/api";
+import { courseApi, reviewApi } from "@services/api";
 import {
   Star,
   Clock,
@@ -46,7 +46,13 @@ const CourseDetailPage = () => {
   const [selectedPayment, setSelectedPayment] = useState("usdt");
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [isInstructor, setIsInstructor] = useState(false);
-
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [userReview, setUserReview] = useState(null); // ← ADD THIS LINE
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
+  const [previewVideoLoading, setPreviewVideoLoading] = useState(false);
   // Mock crypto prices (in production, fetch from API)
   const cryptoPrices = {
     eth: 3500,
@@ -202,6 +208,36 @@ const CourseDetailPage = () => {
     }
   }, [slug, navigate]);
 
+  useEffect(() => {
+    const loadReviews = async () => {
+      if (!course) return;
+
+      try {
+        setReviewsLoading(true);
+        const response = await reviewApi.getCourseReviews(course.id, {
+          page: 1,
+          limit: 10,
+          sort: "helpful",
+        });
+        setReviews(response.data.reviews);
+
+        // Check if user already reviewed
+        if (user) {
+          const myReview = response.data.reviews.find(
+            (r) => r.user._id === user.id || r.user.username === user.username
+          );
+          setUserReview(myReview);
+        }
+      } catch (error) {
+        console.error("Error loading reviews:", error);
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    loadReviews();
+  }, [course, user]);
+
   // Helper function
   const formatDuration = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -237,11 +273,31 @@ const CourseDetailPage = () => {
     toast.success(isInWishlist ? "Removed from wishlist" : "Added to wishlist");
   };
 
-  const handlePreviewLesson = (lesson) => {
-    if (lesson.isPreview) {
-      setCurrentPreviewVideo(lesson);
-      setShowVideoPreview(true);
-    } else if (!hasPurchased) {
+  const handlePreviewLesson = async (lesson) => {
+    if (lesson.isPreview || hasPurchased) {
+      try {
+        setPreviewVideoLoading(true);
+        setShowVideoPreview(true);
+
+        // Get signed video URL from backend
+        const response = await courseApi.getLessonVideo(
+          course.slug,
+          lesson._id
+        );
+
+        setCurrentPreviewVideo({
+          ...lesson,
+          videoUrl: response.data.videoUrl, // Use signed URL
+        });
+
+        setPreviewVideoLoading(false);
+      } catch (error) {
+        console.error("Error loading preview:", error);
+        toast.error("Failed to load video preview");
+        setShowVideoPreview(false);
+        setPreviewVideoLoading(false);
+      }
+    } else {
       toast.error("Please enroll to watch this lesson");
     }
   };
@@ -415,29 +471,44 @@ const CourseDetailPage = () => {
               <div className="sticky top-24">
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 overflow-hidden shadow-xl">
                   {/* Preview Video */}
+                  {/* Preview Video */}
                   <div className="relative aspect-video bg-gray-200 dark:bg-gray-800">
                     <img
                       src={course.thumbnail}
                       alt={course.title}
                       className="w-full h-full object-cover"
                     />
-                    <button
-                      onClick={() => {
-                        setCurrentPreviewVideo({
-                          title: "Course Preview",
-                          videoUrl: course.previewVideoUrl,
-                        });
-                        setShowVideoPreview(true);
-                      }}
-                      className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/50 transition group"
-                    >
-                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center group-hover:scale-110 transition shadow-xl">
-                        <Play className="w-8 h-8 text-black ml-1" />
-                      </div>
-                      <span className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/80 backdrop-blur-sm text-white text-sm font-medium rounded-lg">
-                        Preview this course
-                      </span>
-                    </button>
+                    {course.sections?.[0]?.lessons?.[0] && (
+                      <button
+                        onClick={() => {
+                          // Get first preview lesson or first lesson if instructor
+                          const firstPreviewLesson = course.sections
+                            .flatMap((s) => s.lessons)
+                            .find((l) => l.isPreview);
+
+                          if (
+                            firstPreviewLesson ||
+                            hasPurchased ||
+                            isInstructor
+                          ) {
+                            handlePreviewLesson(
+                              firstPreviewLesson ||
+                                course.sections[0].lessons[0]
+                            );
+                          } else {
+                            toast.error("No preview available for this course");
+                          }
+                        }}
+                        className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/50 transition group"
+                      >
+                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center group-hover:scale-110 transition shadow-xl">
+                          <Play className="w-8 h-8 text-black ml-1" />
+                        </div>
+                        <span className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/80 backdrop-blur-sm text-white text-sm font-medium rounded-lg">
+                          Preview this course
+                        </span>
+                      </button>
+                    )}
                   </div>
                   <div className="p-6">
                     {/* Unified Payment Box */}
@@ -959,104 +1030,159 @@ const CourseDetailPage = () => {
             )}
             {/* Reviews Tab */}
             {activeTab === "reviews" && (
-              <div>
-                <div className="mb-8 p-8 bg-gray-50 dark:bg-gray-900 rounded-2xl">
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <div className="text-center">
-                      <div className="text-6xl font-bold text-gray-900 dark:text-white mb-2">
-                        {course.rating}
-                      </div>
-                      <div className="flex items-center justify-center mb-2">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className="w-6 h-6 text-primary-400 fill-primary-400"
-                          />
-                        ))}
-                      </div>
-                      <div className="text-gray-600 dark:text-gray-400">
-                        {(course?.totalRatings || 0).toLocaleString()} ratings
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {[5, 4, 3, 2, 1].map((rating) => {
-                        const count = course.ratingDistribution[rating];
-                        const percentage = (count / course.totalRatings) * 100;
-                        return (
-                          <div
-                            key={rating}
-                            className="flex items-center space-x-3"
-                          >
-                            <span className="text-sm w-12">{rating} stars</span>
-                            <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-primary-400"
-                                style={{ width: `${percentage}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
-                              {percentage.toFixed(0)}%
-                            </span>
+              <div className="space-y-6">
+                {/* Rating Summary */}
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div>
+                      <div className="flex items-center space-x-3 mb-2">
+                        <span className="text-5xl font-bold">
+                          {course.rating?.toFixed(1) || "0.0"}
+                        </span>
+                        <div>
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-6 h-6 ${
+                                  i < Math.floor(course.rating || 0)
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "text-gray-300"
+                                }`}
+                              />
+                            ))}
                           </div>
-                        );
-                      })}
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {course.totalRatings || 0} ratings
+                          </p>
+                        </div>
+                      </div>
                     </div>
+
+                    {(hasPurchased || isInstructor) && !userReview && (
+                      <button
+                        onClick={() => setShowReviewModal(true)}
+                        className="px-6 py-3 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition"
+                      >
+                        Write a Review
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Rating Distribution */}
+                  <div className="mt-6 space-y-2">
+                    {[5, 4, 3, 2, 1].map((stars) => {
+                      const count = course.ratingDistribution?.[stars] || 0;
+                      const percentage =
+                        course.totalRatings > 0
+                          ? (count / course.totalRatings) * 100
+                          : 0;
+
+                      return (
+                        <div
+                          key={stars}
+                          className="flex items-center space-x-3"
+                        >
+                          <span className="text-sm w-16 text-gray-600 dark:text-gray-400">
+                            {stars} star
+                          </span>
+                          <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-yellow-400 transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
+                            {count}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <div className="space-y-6">
-                  {course.reviews.map((review) => (
-                    <div
-                      key={review.id}
-                      className="pb-6 border-b border-gray-200 dark:border-gray-800"
-                    >
-                      <div className="flex items-start space-x-4">
-                        <img
-                          src={review.user.avatar}
-                          alt={review.user.name}
-                          className="w-12 h-12 rounded-full"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
+
+                {/* Reviews List */}
+                {reviewsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="w-8 h-8 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  </div>
+                ) : reviews.length > 0 ? (
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <div
+                        key={review._id}
+                        className="border border-gray-200 dark:border-gray-800 rounded-xl p-6 hover:border-primary-400/30 transition"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center space-x-3">
+                            <img
+                              src={
+                                review.user?.avatar ||
+                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${review.user?.username}`
+                              }
+                              alt={review.user?.username}
+                              className="w-12 h-12 rounded-full"
+                            />
                             <div>
-                              <div className="flex items-center space-x-2">
-                                <span className="font-bold">
-                                  {review.user.name}
-                                </span>
-                                {review.user.verified && (
-                                  <Award className="w-4 h-4 text-primary-400" />
-                                )}
-                              </div>
-                              <div className="flex items-center space-x-2 mt-1">
+                              <p className="font-bold text-gray-900 dark:text-white">
+                                {review.user?.username}
+                              </p>
+                              <div className="flex items-center space-x-2 text-sm text-gray-500">
                                 <div className="flex">
                                   {[...Array(5)].map((_, i) => (
                                     <Star
                                       key={i}
                                       className={`w-4 h-4 ${
                                         i < review.rating
-                                          ? "text-primary-400 fill-primary-400"
-                                          : "text-gray-300 dark:text-gray-700"
+                                          ? "fill-yellow-400 text-yellow-400"
+                                          : "text-gray-300"
                                       }`}
                                     />
                                   ))}
                                 </div>
-                                <span className="text-sm text-gray-500">
-                                  {review.date}
+                                <span>•</span>
+                                <span>
+                                  {new Date(
+                                    review.createdAt
+                                  ).toLocaleDateString()}
                                 </span>
                               </div>
                             </div>
                           </div>
-                          <p className="text-gray-700 dark:text-gray-300 mb-3">
-                            {review.comment}
-                          </p>
-                          <button className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-400 transition">
+                        </div>
+
+                        <h4 className="font-bold text-gray-900 dark:text-white mb-2">
+                          {review.title}
+                        </h4>
+                        <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
+                          {review.comment}
+                        </p>
+
+                        <div className="flex items-center space-x-4 text-sm">
+                          <button className="flex items-center space-x-1 text-gray-600 dark:text-gray-400 hover:text-primary-400 transition">
                             <ThumbsUp className="w-4 h-4" />
-                            <span>Helpful ({review.helpful})</span>
+                            <span>Helpful ({review.helpfulCount || 0})</span>
                           </button>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                    <Star className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                      No reviews yet
+                    </p>
+                    {hasPurchased && (
+                      <button
+                        onClick={() => setShowReviewModal(true)}
+                        className="px-6 py-3 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition"
+                      >
+                        Be the first to review
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1064,12 +1190,13 @@ const CourseDetailPage = () => {
         </div>
       </div>
       {/* Video Preview Modal */}
-      {showVideoPreview && currentPreviewVideo && (
+      {/* Video Preview Modal */}
+      {showVideoPreview && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-5xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-2xl font-bold text-white">
-                {currentPreviewVideo.title}
+                {currentPreviewVideo?.title || "Loading..."}
               </h3>
               <button
                 onClick={() => {
@@ -1082,13 +1209,23 @@ const CourseDetailPage = () => {
               </button>
             </div>
             <div className="relative pt-[56.25%] bg-black rounded-xl overflow-hidden">
-              <iframe
-                className="absolute inset-0 w-full h-full"
-                src={currentPreviewVideo.videoUrl}
-                title={currentPreviewVideo.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              ></iframe>
+              {previewVideoLoading || !currentPreviewVideo?.videoUrl ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-white">Loading video...</p>
+                  </div>
+                </div>
+              ) : (
+                <iframe
+                  className="absolute inset-0 w-full h-full"
+                  src={currentPreviewVideo.videoUrl}
+                  title={currentPreviewVideo.title}
+                  referrerPolicy="strict-origin-when-cross-origin" // ADD THIS
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              )}
             </div>
           </div>
         </div>

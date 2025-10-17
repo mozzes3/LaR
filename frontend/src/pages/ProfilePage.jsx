@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import AvatarUpload from "@components/AvatarUpload";
 import {
   User,
   Mail,
@@ -27,60 +28,39 @@ import {
   Loader,
 } from "lucide-react";
 import { useWallet } from "@contexts/WalletContext";
+import { userApi } from "@services/api";
 import toast from "react-hot-toast";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-  const { user, walletAddress } = useWallet();
+  const { user, walletAddress, refreshUser } = useWallet();
   const [activeTab, setActiveTab] = useState("profile");
   const [saving, setSaving] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
-
-  // Mock user data for demonstration
-  const mockUser = {
-    username: "CryptoNinja",
-    email: "ninja@example.com",
-    bio: "Web3 enthusiast and lifelong learner.",
-    website: "https://cryptoninja.dev",
-    social: {
-      twitter: "@cryptoninja",
-      linkedin: "linkedin.com/in/cryptoninja",
-      github: "github.com/cryptoninja",
-      instagram: "",
-    },
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoNinja",
-    isInstructor: true,
-    instructorProfile: {
-      displayName: "CryptoMaverick",
-      tagline: "Web3 Marketing Expert & NFT Consultant",
-      bio: "Helping projects build thriving communities in the Web3 space. 10+ years of experience in digital marketing and community growth.",
-      expertise: ["NFT Marketing", "Community Building", "Discord Growth"],
-      badge: "KOL",
-      isPublic: true,
-    },
-  };
+  const [loading, setLoading] = useState(true);
+  const [avatarPreview, setAvatarPreview] = useState(null);
 
   // Profile data
   const [profileData, setProfileData] = useState({
-    username: mockUser?.username || "",
-    email: mockUser?.email || "",
-    bio: mockUser?.bio || "",
-    website: mockUser?.website || "",
-    twitter: mockUser?.social?.twitter || "",
-    linkedin: mockUser?.social?.linkedin || "",
-    github: mockUser?.social?.github || "",
-    instagram: mockUser?.social?.instagram || "",
+    username: "",
+    displayName: "",
+    email: "",
+    bio: "",
+    website: "",
+    twitter: "",
+    linkedin: "",
+    github: "",
+    instagram: "",
     avatar: null,
   });
 
   // Instructor specific data
   const [instructorData, setInstructorData] = useState({
-    displayName: mockUser?.instructorProfile?.displayName || "",
-    tagline: mockUser?.instructorProfile?.tagline || "",
-    bio: mockUser?.instructorProfile?.bio || "",
-    expertise: mockUser?.instructorProfile?.expertise || [],
-    badge: mockUser?.instructorProfile?.badge || "Creator",
-    isPublic: mockUser?.instructorProfile?.isPublic || true,
+    displayName: "",
+    tagline: "",
+    bio: "",
+    expertise: [],
+    badge: "Creator",
+    isPublic: true,
   });
 
   // Notification settings
@@ -92,24 +72,72 @@ const ProfilePage = () => {
     marketing: false,
   });
 
+  // Load user data on mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user) {
+        navigate("/");
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Load full profile data
+        const response = await userApi.getProfile(user.username);
+        const userData = response.data.user;
+
+        console.log("📥 Loaded user data:", userData);
+
+        // Set profile data
+        setProfileData({
+          username: userData.username || "",
+          displayName: userData.displayName || "",
+          email: userData.email || "",
+          bio: userData.bio || "",
+          website: userData.socialLinks?.website || "",
+          twitter: userData.socialLinks?.twitter || "",
+          linkedin: userData.socialLinks?.linkedin || "",
+          github: userData.socialLinks?.github || "",
+          instagram: userData.socialLinks?.instagram || "",
+          avatar: null,
+        });
+
+        // Set avatar preview
+        setAvatarPreview(
+          userData.avatar ||
+            `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`
+        );
+
+        // Set instructor data if user is instructor
+        if (userData.isInstructor) {
+          setInstructorData({
+            displayName: userData.displayName || userData.username || "",
+            tagline: userData.expertise?.[0] || "",
+            bio: userData.instructorBio || userData.bio || "",
+            expertise: userData.expertise || [],
+            badge: userData.badge || "Creator",
+            isPublic: true,
+          });
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading user data:", error);
+        toast.error("Failed to load profile data");
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [user, navigate]);
+
   const badges = [
     { id: "creator", label: "Creator", icon: Sparkles, color: "primary" },
     { id: "kol", label: "KOL", icon: Award, color: "purple" },
     { id: "professional", label: "Professional", icon: Shield, color: "blue" },
     { id: "expert", label: "Expert", icon: Award, color: "green" },
   ];
-
-  const handleAvatarUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result);
-        setProfileData({ ...profileData, avatar: file });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handleProfileChange = (field, value) => {
     setProfileData({ ...profileData, [field]: value });
@@ -142,11 +170,69 @@ const ProfilePage = () => {
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
-      // API call to save profile
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      console.log("🚀 Current profileData:", profileData);
+
+      // Prepare update data
+      const updateData = {
+        displayName: profileData.displayName,
+        bio: profileData.bio,
+        socialLinks: {
+          website: profileData.website,
+          twitter: profileData.twitter,
+          linkedin: profileData.linkedin,
+          github: profileData.github,
+        },
+      };
+
+      // Only include username if it changed
+      if (profileData.username !== user.username) {
+        updateData.username = profileData.username;
+      }
+
+      console.log("💾 Sending update data:", updateData);
+
+      // Update profile data
+      const response = await userApi.updateProfile(updateData);
+
+      console.log("✅ Response from server:", response.data);
+
+      // Upload avatar if changed
+
       toast.success("Profile updated successfully!");
+
+      // Refresh user in context
+      await refreshUser();
+
+      // Reload the data without full page refresh
+      const freshData = await userApi.getProfile(
+        updateData.username || user.username
+      );
+      const userData = freshData.data.user;
+
+      console.log("🔄 Fresh data loaded:", userData);
+
+      // Update local state
+      setProfileData({
+        username: userData.username || "",
+        displayName: userData.displayName || userData.username || "",
+        email: userData.email || "",
+        bio: userData.bio || "",
+        website: userData.socialLinks?.website || "",
+        twitter: userData.socialLinks?.twitter || "",
+        linkedin: userData.socialLinks?.linkedin || "",
+        github: userData.socialLinks?.github || "",
+        instagram: userData.socialLinks?.instagram || "",
+        avatar: null,
+      });
+
+      setAvatarPreview(
+        userData.avatar ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.username}`
+      );
     } catch (error) {
-      toast.error("Failed to update profile");
+      console.error("❌ Update error:", error);
+      console.error("Error response:", error.response?.data);
+      toast.error(error.response?.data?.error || "Failed to update profile");
     } finally {
       setSaving(false);
     }
@@ -155,10 +241,17 @@ const ProfilePage = () => {
   const handleSaveInstructor = async () => {
     setSaving(true);
     try {
-      // API call to save instructor profile
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Update instructor-specific data
+      await userApi.updateProfile({
+        displayName: instructorData.displayName,
+        instructorBio: instructorData.bio,
+        expertise: instructorData.expertise.filter((e) => e.trim()),
+      });
+
       toast.success("Instructor profile updated!");
+      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
+      console.error("Update error:", error);
       toast.error("Failed to update instructor profile");
     } finally {
       setSaving(false);
@@ -168,6 +261,7 @@ const ProfilePage = () => {
   const handleSaveNotifications = async () => {
     setSaving(true);
     try {
+      // TODO: Add notification preferences API endpoint
       await new Promise((resolve) => setTimeout(resolve, 1000));
       toast.success("Notification preferences saved!");
     } catch (error) {
@@ -190,8 +284,21 @@ const ProfilePage = () => {
   ];
 
   const visibleTabs = tabs.filter(
-    (tab) => !tab.requireInstructor || mockUser?.isInstructor
+    (tab) => !tab.requireInstructor || user?.isInstructor
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading settings...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-8">
@@ -256,33 +363,37 @@ const ProfilePage = () => {
                     <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">
                       Profile Picture
                     </label>
-                    <div className="flex items-center space-x-6">
-                      <div className="relative">
-                        <img
-                          src={avatarPreview || mockUser?.avatar}
-                          alt="Avatar"
-                          className="w-24 h-24 rounded-full object-cover border-4 border-gray-200 dark:border-gray-800"
-                        />
-                        <label className="absolute bottom-0 right-0 p-2 bg-primary-400 text-black rounded-full cursor-pointer hover:bg-primary-500 transition shadow-lg">
-                          <Camera className="w-4 h-4" />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleAvatarUpload}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          Upload a new profile picture
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          JPG, PNG or GIF. Max size 2MB.
-                        </p>
-                      </div>
-                    </div>
+                    <AvatarUpload
+                      currentAvatar={avatarPreview}
+                      onUploadSuccess={(url) => {
+                        setAvatarPreview(url);
+                        // Refresh user data
+                        refreshUser();
+                      }}
+                    />
                   </div>
+
+                  {/* Display Name */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                      Display Name
+                    </label>
+                    <input
+                      type="text"
+                      value={profileData.displayName}
+                      onChange={(e) =>
+                        handleProfileChange("displayName", e.target.value)
+                      }
+                      placeholder="Your display name"
+                      maxLength={50}
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      This is how your name appears to others. Can be changed
+                      anytime.
+                    </p>
+                  </div>
+
                   {/* Username */}
                   <div>
                     <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
@@ -297,7 +408,17 @@ const ProfilePage = () => {
                       placeholder="Your username"
                       className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      ⚠️ Username can only be changed once every 30 days
+                    </p>
+                    {user?.lastUsernameChange && (
+                      <p className="text-xs text-orange-500 mt-1">
+                        Last changed:{" "}
+                        {new Date(user.lastUsernameChange).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
+
                   {/* Email */}
                   <div>
                     <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
@@ -331,10 +452,11 @@ const ProfilePage = () => {
                       }
                       placeholder="Tell us about yourself..."
                       rows={4}
+                      maxLength={200}
                       className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition resize-none"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Brief description for your profile. Max 200 characters.
+                      {profileData.bio.length}/200 characters
                     </p>
                   </div>
                   {/* Social Links */}
@@ -436,7 +558,7 @@ const ProfilePage = () => {
                 </div>
               )}
               {/* Instructor Profile Tab */}
-              {activeTab === "instructor" && mockUser?.isInstructor && (
+              {activeTab === "instructor" && user?.isInstructor && (
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -608,7 +730,7 @@ const ProfilePage = () => {
                     </h3>
                     <div className="flex items-start space-x-4">
                       <img
-                        src={avatarPreview || mockUser?.avatar}
+                        src={avatarPreview}
                         alt="Avatar"
                         className="w-16 h-16 rounded-full"
                       />
@@ -705,7 +827,7 @@ const ProfilePage = () => {
                         />
                       </button>
                     </div>
-                    {mockUser?.isInstructor && (
+                    {user?.isInstructor && (
                       <>
                         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                           <div>

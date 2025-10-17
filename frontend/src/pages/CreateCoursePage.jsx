@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { courseApi, userApi, uploadApi } from "@services/api";
+import { useWallet } from "@contexts/WalletContext";
+import ThumbnailUpload from "@components/ThumbnailUpload";
+import VideoUpload from "@components/VideoUpload";
+import ResourceUpload from "@components/ResourceUpload";
+import ThumbnailUploadDraft from "@components/ThumbnailUploadDraft";
+import VideoUploadDraft from "@components/VideoUploadDraft";
+import ResourceUploadDraft from "@components/ResourceUploadDraft";
 import {
   ArrowLeft,
   Save,
@@ -31,11 +39,13 @@ import toast from "react-hot-toast";
 
 const CreateCoursePage = () => {
   const navigate = useNavigate();
-  const { courseId } = useParams();
-  const isEditing = !!courseId;
+  const { slug } = useParams();
+  const { user: currentUser } = useWallet();
+  const isEditing = !!slug;
   const [activeTab, setActiveTab] = useState("basics");
   const [saving, setSaving] = useState(false);
-  const [expandedModule, setExpandedModule] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [expandedSection, setExpandedSection] = useState(null);
 
   // Course data state
   const [courseData, setCourseData] = useState({
@@ -45,93 +55,133 @@ const CreateCoursePage = () => {
     category: "",
     level: "beginner",
     language: "english",
-    thumbnail: null,
-    thumbnailPreview: null,
-    price: "",
-    acceptedPayments: ["usdt", "usdc", "eth"],
+    thumbnailFile: null,
+    thumbnailPreview: null, // ← Only declare once
+    originalThumbnailUrl: null, // NEW: Add this
+    price: { usd: "", fdr: "" },
+    acceptedPayments: ["usdt", "usdc"],
     escrowSettings: {
       refundPeriodDays: 14,
       minWatchPercentage: 20,
       maxWatchTime: 120,
     },
-    modules: [],
+    sections: [],
     requirements: [""],
+    whatYouWillLearn: [""],
     learningOutcomes: [""],
     targetAudience: [""],
-    whatYouWillLearn: [""],
   });
   const [errors, setErrors] = useState({});
 
+  // Check if user is instructor
+  useEffect(() => {
+    if (!currentUser?.isInstructor) {
+      toast.error("You must be an instructor to create courses");
+      navigate("/");
+    }
+  }, [currentUser, navigate]);
+
   // Load course data when editing
   useEffect(() => {
-    if (isEditing && courseId) {
-      loadCourseData(courseId);
-    }
-  }, [courseId, isEditing]);
+    const loadCourseForEditing = async () => {
+      if (slug && currentUser?.isInstructor) {
+        try {
+          setLoading(true);
+          toast.loading("Loading course for editing...");
 
-  const loadCourseData = async (id) => {
-    try {
-      // Mock data - replace with actual API call later
-      // In production: const response = await api.get(`/courses/${id}`);
+          const response = await courseApi.getBySlug(slug);
+          const course = response.data.course;
 
-      const mockCourse = {
-        title: "NFT Marketing Masterclass: 0 to 10K Discord Members",
-        subtitle: "Master the art of building thriving Web3 communities",
-        description:
-          "Learn proven strategies to grow your Discord server from zero to 10,000+ engaged members. This course covers everything from setup to advanced community management techniques used by successful NFT projects.",
-        category: "Web3 Marketing",
-        level: "intermediate",
-        language: "english",
-        thumbnailPreview:
-          "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=225&fit=crop",
-        price: "299",
-        acceptedPayments: ["usdt", "usdc", "eth"],
-        escrowSettings: {
-          refundPeriodDays: 14,
-          minWatchPercentage: 20,
-          maxWatchTime: 120,
-        },
-        modules: [
-          {
-            id: 1,
-            title: "Getting Started with Discord",
-            description: "Learn the fundamentals",
-            lessons: [
-              {
-                id: 1,
-                title: "Introduction to Discord",
-                type: "video",
-                duration: "10:30",
-              },
-              {
-                id: 2,
-                title: "Server Setup Basics",
-                type: "video",
-                duration: "15:20",
-              },
-            ],
-          },
-        ],
-        requirements: ["Basic understanding of Discord", "NFT project or idea"],
-        learningOutcomes: [
-          "Build a Discord server from scratch",
-          "Grow to 10K+ members",
-        ],
-        targetAudience: ["NFT project founders", "Community managers"],
-        whatYouWillLearn: [
-          "Discord server setup",
-          "Community growth strategies",
-        ],
-      };
+          console.log("📝 Loading course for edit:", course);
 
-      setCourseData(mockCourse);
-      toast.success("Course data loaded");
-    } catch (error) {
-      toast.error("Failed to load course data");
-      console.error(error);
-    }
-  };
+          // Check if user owns this course - handle both string and populated instructor
+          const instructorId =
+            typeof course.instructor === "string"
+              ? course.instructor
+              : course.instructor?._id || course.instructor;
 
+          const currentUserId = currentUser?._id || currentUser?.id;
+
+          console.log("🔍 Instructor ID:", instructorId);
+          console.log("🔍 Current User ID:", currentUserId);
+
+          if (instructorId !== currentUserId) {
+            toast.dismiss();
+            toast.error("You don't have permission to edit this course");
+            navigate("/instructor");
+            return;
+          }
+
+          setCourseData({
+            title: course.title || "",
+            subtitle: course.subtitle || "",
+            description: course.description || "",
+            category: course.category || "",
+            level: course.level || "beginner",
+            language: course.language || "english",
+
+            // Keep existing thumbnail, no file
+            thumbnailFile: null,
+            thumbnailPreview: course.thumbnail || null,
+            originalThumbnailUrl: course.thumbnail || null, // NEW: Keep original URL
+
+            price: {
+              usd: course.price?.usd?.toString() || "",
+              fdr: course.price?.fdr?.toString() || "",
+            },
+            acceptedPayments: course.acceptedPayments || ["usdt", "usdc"],
+            escrowSettings: course.escrowSettings || {
+              refundPeriodDays: 14,
+              minWatchPercentage: 20,
+              maxWatchTime: 120,
+            },
+
+            // Load sections with proper IDs
+            sections: (course.sections || []).map((section) => ({
+              ...section,
+              id: section._id, // Use MongoDB ID as temp ID
+              lessons: (section.lessons || []).map((lesson) => ({
+                ...lesson,
+                id: lesson._id, // Use MongoDB ID as temp ID
+                // Keep existing video/resource, no new files
+                videoFile: null,
+                resourceFile: null,
+                originalVideoId: lesson.videoId,
+              })),
+            })),
+
+            requirements:
+              course.requirements?.length > 0 ? course.requirements : [""],
+            whatYouWillLearn:
+              course.whatYouWillLearn?.length > 0
+                ? course.whatYouWillLearn
+                : [""],
+            learningOutcomes:
+              course.learningOutcomes?.length > 0
+                ? course.learningOutcomes
+                : [""],
+            targetAudience:
+              course.targetAudience?.length > 0 ? course.targetAudience : [""],
+          });
+
+          toast.dismiss();
+          toast.success("Course loaded for editing");
+          setLoading(false);
+        } catch (error) {
+          console.error("Load course error:", error);
+          toast.dismiss();
+          toast.error("Failed to load course");
+          navigate("/instructor");
+          setLoading(false);
+        }
+      } else if (!slug) {
+        // Creating new course, not editing
+        setLoading(false);
+      }
+    };
+
+    loadCourseForEditing();
+  }, [slug, currentUser, navigate]);
   const categories = [
     "Blockchain Development",
     "NFT & Digital Art",
@@ -144,6 +194,7 @@ const CreateCoursePage = () => {
     "Other",
   ];
 
+  // ADD THIS:
   const paymentOptions = [
     { id: "usdt", name: "USDT", icon: "₮" },
     { id: "usdc", name: "USDC", icon: "$" },
@@ -153,28 +204,6 @@ const CreateCoursePage = () => {
     { id: "fdr", name: "$FDR", icon: "F" },
   ];
 
-  const handleInputChange = (field, value) => {
-    setCourseData({ ...courseData, [field]: value });
-    if (errors[field]) {
-      setErrors({ ...errors, [field]: null });
-    }
-  };
-
-  const handleThumbnailUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCourseData({
-          ...courseData,
-          thumbnail: file,
-          thumbnailPreview: reader.result,
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handlePaymentToggle = (paymentId) => {
     const current = courseData.acceptedPayments;
     const updated = current.includes(paymentId)
@@ -183,76 +212,102 @@ const CreateCoursePage = () => {
     setCourseData({ ...courseData, acceptedPayments: updated });
   };
 
-  const addModule = () => {
-    const newModule = {
-      id: Date.now(),
+  const handleInputChange = (field, value) => {
+    setCourseData({ ...courseData, [field]: value });
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: null });
+    }
+  };
+
+  const handlePriceChange = (currency, value) => {
+    setCourseData({
+      ...courseData,
+      price: { ...courseData.price, [currency]: value },
+    });
+  };
+
+  const addSection = () => {
+    const newSection = {
+      id: `temp-${Date.now()}`,
       title: "",
       description: "",
       lessons: [],
     };
     setCourseData({
       ...courseData,
-      modules: [...courseData.modules, newModule],
+      sections: [...courseData.sections, newSection],
     });
-    setExpandedModule(newModule.id);
+    setExpandedSection(newSection.id);
   };
 
-  const updateModule = (moduleId, field, value) => {
-    const updated = courseData.modules.map((module) =>
-      module.id === moduleId ? { ...module, [field]: value } : module
+  const updateSection = (sectionId, field, value) => {
+    const updated = courseData.sections.map((section) =>
+      section.id === sectionId || section._id === sectionId
+        ? { ...section, [field]: value }
+        : section
     );
-    setCourseData({ ...courseData, modules: updated });
+    setCourseData({ ...courseData, sections: updated });
   };
 
-  const deleteModule = (moduleId) => {
+  const deleteSection = (sectionId) => {
     setCourseData({
       ...courseData,
-      modules: courseData.modules.filter((m) => m.id !== moduleId),
+      sections: courseData.sections.filter(
+        (s) => s.id !== sectionId && s._id !== sectionId
+      ),
     });
   };
 
-  const addLesson = (moduleId) => {
+  const addLesson = (sectionId) => {
     const newLesson = {
-      id: Date.now(),
+      id: `temp-${Date.now()}`,
       title: "",
-      type: "video",
-      duration: "",
-      videoUrl: "",
-      description: "",
+      videoFile: null, // NEW: Store video File object
+      videoId: null,
+      videoUrl: "", // For display/reference
+      resourceFile: null, // NEW: Store resource File object
       resources: [],
+      duration: 0,
+      description: "",
+      isPreview: false,
+      resources: [], // Array of resource objects
     };
-    const updated = courseData.modules.map((module) =>
-      module.id === moduleId
-        ? { ...module, lessons: [...module.lessons, newLesson] }
-        : module
+    const updated = courseData.sections.map((section) =>
+      section.id === sectionId || section._id === sectionId
+        ? { ...section, lessons: [...(section.lessons || []), newLesson] }
+        : section
     );
-    setCourseData({ ...courseData, modules: updated });
+    setCourseData({ ...courseData, sections: updated });
   };
 
-  const updateLesson = (moduleId, lessonId, field, value) => {
-    const updated = courseData.modules.map((module) =>
-      module.id === moduleId
+  const updateLesson = (sectionId, lessonId, field, value) => {
+    const updated = courseData.sections.map((section) =>
+      section.id === sectionId || section._id === sectionId
         ? {
-            ...module,
-            lessons: module.lessons.map((lesson) =>
-              lesson.id === lessonId ? { ...lesson, [field]: value } : lesson
+            ...section,
+            lessons: (section.lessons || []).map((lesson) =>
+              lesson.id === lessonId || lesson._id === lessonId
+                ? { ...lesson, [field]: value }
+                : lesson
             ),
           }
-        : module
+        : section
     );
-    setCourseData({ ...courseData, modules: updated });
+    setCourseData({ ...courseData, sections: updated });
   };
 
-  const deleteLesson = (moduleId, lessonId) => {
-    const updated = courseData.modules.map((module) =>
-      module.id === moduleId
+  const deleteLesson = (sectionId, lessonId) => {
+    const updated = courseData.sections.map((section) =>
+      section.id === sectionId || section._id === sectionId
         ? {
-            ...module,
-            lessons: module.lessons.filter((l) => l.id !== lessonId),
+            ...section,
+            lessons: (section.lessons || []).filter(
+              (l) => l.id !== lessonId && l._id !== lessonId
+            ),
           }
-        : module
+        : section
     );
-    setCourseData({ ...courseData, modules: updated });
+    setCourseData({ ...courseData, sections: updated });
   };
 
   const addArrayItem = (field) => {
@@ -275,6 +330,240 @@ const CreateCoursePage = () => {
     });
   };
 
+  const uploadAllFiles = async (courseSlug) => {
+    try {
+      let uploadedCount = 0;
+      let totalUploads = 0;
+
+      // Count thumbnail only if there's a new file
+      if (courseData.thumbnailFile) {
+        totalUploads++;
+      }
+
+      // Count videos and resources that have new files
+      courseData.sections.forEach((section) => {
+        (section.lessons || []).forEach((lesson) => {
+          if (lesson.videoFile) totalUploads++;
+          if (lesson.resourceFile) totalUploads++;
+        });
+      });
+
+      console.log(`📤 Starting upload of ${totalUploads} files...`);
+
+      if (totalUploads === 0) {
+        console.log(`ℹ️ No new files to upload`);
+
+        // Still need to save sections even if no new uploads
+        const cleanSections = courseData.sections
+          .map((section, sIdx) => ({
+            title: section.title,
+            description: section.description || "",
+            order: section.order || sIdx,
+            lessons: (section.lessons || [])
+              .filter((lesson) => {
+                // ✅ FIX: Check for videoFile OR videoId
+                const hasTitle = lesson.title && lesson.title.trim() !== "";
+                const hasVideo =
+                  lesson.videoFile ||
+                  (lesson.videoId && lesson.videoId.trim() !== "");
+
+                if (!hasTitle) {
+                  console.warn(
+                    `⚠️ Skipping lesson without title in section: ${section.title}`
+                  );
+                }
+                if (!hasVideo) {
+                  console.warn(
+                    `⚠️ Skipping lesson without video in section: ${section.title}`
+                  );
+                }
+
+                return hasTitle && hasVideo;
+              })
+              .map((lesson, lIdx) => ({
+                title: lesson.title.trim(),
+                description: lesson.description || "",
+                videoId: lesson.videoId || "",
+                videoUrl: lesson.videoUrl || "",
+                duration: lesson.duration || 0,
+                order: lesson.order || lIdx,
+                isPreview: lesson.isPreview || false,
+                resources: Array.isArray(lesson.resources)
+                  ? lesson.resources
+                  : [],
+              })),
+          }))
+          .filter((section) => section.lessons.length > 0);
+
+        console.log(`📋 Saving ${cleanSections.length} sections`);
+        await courseApi.update(courseSlug, { sections: cleanSections });
+
+        return true;
+      }
+
+      // 1. Upload Thumbnail (only if new file selected)
+      if (courseData.thumbnailFile) {
+        uploadedCount++;
+        toast.loading(
+          `Uploading thumbnail... (${uploadedCount}/${totalUploads})`
+        );
+
+        const response = await uploadApi.uploadThumbnail(
+          courseData.thumbnailFile
+        );
+
+        console.log(`✅ Thumbnail uploaded: ${response.data.url}`);
+
+        await courseApi.update(courseSlug, {
+          thumbnail: response.data.url,
+        });
+
+        // Delete old thumbnail if exists
+        if (
+          courseData.originalThumbnailUrl &&
+          !courseData.originalThumbnailUrl.includes("placeholder")
+        ) {
+          try {
+            await uploadApi.deleteThumbnail(courseData.originalThumbnailUrl);
+            console.log(`✅ Deleted old thumbnail from CDN`);
+          } catch (error) {
+            console.warn("⚠️ Could not delete old thumbnail:", error.message);
+          }
+        }
+      }
+
+      // 2. Upload Videos and Resources
+      for (
+        let sectionIndex = 0;
+        sectionIndex < courseData.sections.length;
+        sectionIndex++
+      ) {
+        const section = courseData.sections[sectionIndex];
+
+        for (
+          let lessonIndex = 0;
+          lessonIndex < (section.lessons || []).length;
+          lessonIndex++
+        ) {
+          const lesson = section.lessons[lessonIndex];
+
+          // Upload NEW video if selected
+          if (lesson.videoFile) {
+            uploadedCount++;
+            toast.loading(
+              `Uploading video: ${lesson.title}... (${uploadedCount}/${totalUploads})`
+            );
+
+            const oldVideoId = lesson.originalVideoId || lesson.videoId || null;
+
+            const videoResponse = await uploadApi.uploadVideo(
+              lesson.videoFile,
+              {
+                title: lesson.title || "Untitled Lesson",
+                courseSlug: courseSlug,
+                oldVideoId: oldVideoId,
+              }
+            );
+
+            // ✅ Update lesson with new video data
+            courseData.sections[sectionIndex].lessons[lessonIndex].videoId =
+              videoResponse.data.videoId;
+            courseData.sections[sectionIndex].lessons[
+              lessonIndex
+            ].videoUrl = `https://iframe.mediadelivery.net/embed/${videoResponse.data.libraryId}/${videoResponse.data.videoId}`;
+
+            console.log(`✅ Video uploaded: ${videoResponse.data.videoId}`);
+
+            delete courseData.sections[sectionIndex].lessons[lessonIndex]
+              .videoFile;
+          }
+
+          // Upload NEW resource if selected
+          if (lesson.resourceFile) {
+            uploadedCount++;
+            toast.loading(
+              `Uploading resource... (${uploadedCount}/${totalUploads})`
+            );
+
+            const oldResourceUrl = lesson.resources?.[0]?.url || null;
+
+            if (oldResourceUrl) {
+              try {
+                await uploadApi.deleteResource(oldResourceUrl);
+                console.log(`✅ Deleted old resource`);
+              } catch (error) {
+                console.warn(
+                  "⚠️ Could not delete old resource:",
+                  error.message
+                );
+              }
+            }
+
+            const resourceResponse = await uploadApi.uploadResource(
+              lesson.resourceFile
+            );
+
+            const resourceData = [
+              {
+                title: lesson.resourceFile.name,
+                url: resourceResponse.data.url,
+                type: lesson.resourceFile.name.split(".").pop(),
+              },
+            ];
+
+            courseData.sections[sectionIndex].lessons[lessonIndex].resources =
+              resourceData;
+
+            console.log(`✅ Resource uploaded`);
+
+            delete courseData.sections[sectionIndex].lessons[lessonIndex]
+              .resourceFile;
+          }
+        }
+      }
+
+      // 3. Save all sections
+      const cleanSections = courseData.sections
+        .map((section, sIdx) => ({
+          title: section.title,
+          description: section.description || "",
+          order: section.order || sIdx,
+          lessons: (section.lessons || [])
+            .filter((lesson) => {
+              const hasTitle = lesson.title && lesson.title.trim() !== "";
+              const hasVideo = lesson.videoId && lesson.videoId.trim() !== "";
+
+              return hasTitle && hasVideo;
+            })
+            .map((lesson, lIdx) => ({
+              title: lesson.title.trim(),
+              description: lesson.description || "",
+              videoId: lesson.videoId || "",
+              videoUrl: lesson.videoUrl || "",
+              duration: lesson.duration || 0,
+              order: lesson.order || lIdx,
+              isPreview: lesson.isPreview || false,
+              resources: Array.isArray(lesson.resources)
+                ? lesson.resources
+                : [],
+            })),
+        }))
+        .filter((section) => section.lessons.length > 0);
+
+      console.log(`📋 Saving ${cleanSections.length} sections`);
+
+      await courseApi.update(courseSlug, { sections: cleanSections });
+
+      toast.dismiss();
+      console.log(`✅ All ${totalUploads} files uploaded successfully!`);
+      return true;
+    } catch (error) {
+      console.error("❌ Upload error:", error);
+      toast.dismiss();
+      throw error;
+    }
+  };
+
   const validateCourse = () => {
     const newErrors = {};
 
@@ -284,12 +573,12 @@ const CreateCoursePage = () => {
     if (!courseData.description.trim())
       newErrors.description = "Description is required";
     if (!courseData.category) newErrors.category = "Category is required";
-    if (!courseData.price) newErrors.price = "Price is required";
-    if (courseData.acceptedPayments.length === 0)
-      newErrors.acceptedPayments = "Select at least one payment method";
-    if (!courseData.thumbnail) newErrors.thumbnail = "Thumbnail is required";
-    if (courseData.modules.length === 0)
-      newErrors.modules = "Add at least one module";
+    if (!courseData.price.usd) newErrors.price = "Price is required";
+    if (!courseData.thumbnailPreview)
+      newErrors.thumbnail = "Thumbnail is required";
+    if (courseData.sections.length === 0)
+      newErrors.sections = "Add at least one section";
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -297,29 +586,215 @@ const CreateCoursePage = () => {
   const handleSaveDraft = async () => {
     setSaving(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      toast.success("Course saved as draft!");
+      const formData = new FormData();
+
+      // Basic info
+      formData.append("title", courseData.title);
+      formData.append("subtitle", courseData.subtitle);
+      formData.append("description", courseData.description);
+      formData.append("category", courseData.category);
+      formData.append("level", courseData.level);
+      formData.append("price", JSON.stringify(courseData.price));
+
+      // Arrays
+      formData.append(
+        "requirements",
+        JSON.stringify(courseData.requirements.filter((r) => r.trim()))
+      );
+      formData.append(
+        "whatYouWillLearn",
+        JSON.stringify(courseData.whatYouWillLearn.filter((w) => w.trim()))
+      );
+      formData.append(
+        "targetAudience",
+        JSON.stringify(courseData.targetAudience.filter((t) => t.trim()))
+      );
+
+      // Thumbnail
+      if (courseData.thumbnail) {
+        formData.append("thumbnail", courseData.thumbnail);
+      }
+
+      let response;
+      if (isEditing) {
+        response = await courseApi.update(slug, formData);
+      } else {
+        response = await courseApi.create(formData);
+      }
+
+      toast.success(
+        `Course ${isEditing ? "updated" : "created"} successfully!`
+      );
       navigate("/instructor");
     } catch (error) {
-      toast.error("Failed to save draft");
+      console.error("Save error:", error);
+      toast.error(error.response?.data?.error || "Failed to save course");
     } finally {
       setSaving(false);
     }
   };
 
   const handlePublish = async () => {
+    // Step 1: Validate basic course information
     if (!validateCourse()) {
       toast.error("Please fill in all required fields");
       return;
     }
 
+    // Step 2: Check for incomplete lessons
+    const incompleteLessons = [];
+    const emptyTitleLessons = [];
+    const noVideoLessons = [];
+
+    courseData.sections.forEach((section, sIdx) => {
+      section.lessons?.forEach((lesson, lIdx) => {
+        const hasTitle = lesson.title && lesson.title.trim() !== "";
+        // ✅ FIX: Check for EITHER videoFile (new upload) OR videoId (existing)
+        const hasVideo =
+          lesson.videoFile || (lesson.videoId && lesson.videoId.trim() !== "");
+
+        if (!hasTitle && hasVideo) {
+          emptyTitleLessons.push(
+            `Section "${section.title}" → Lesson ${lIdx + 1}`
+          );
+        }
+
+        if (hasTitle && !hasVideo) {
+          noVideoLessons.push(
+            `"${lesson.title}" in section "${section.title}"`
+          );
+        }
+
+        if (!hasTitle && !hasVideo) {
+          incompleteLessons.push(
+            `Section "${section.title}" → Lesson ${
+              lIdx + 1
+            } (no title or video)`
+          );
+        }
+      });
+    });
+
+    // Step 3: Show appropriate error/warning messages
+    if (emptyTitleLessons.length > 0) {
+      toast.error(
+        `❌ These lessons have videos but no titles. Please add titles:\n\n${emptyTitleLessons.join(
+          "\n"
+        )}`,
+        { duration: 6000 }
+      );
+      return;
+    }
+
+    if (noVideoLessons.length > 0) {
+      toast.error(
+        `❌ These lessons have titles but no videos. Please upload videos:\n\n${noVideoLessons.join(
+          "\n"
+        )}`,
+        { duration: 6000 }
+      );
+      return;
+    }
+
+    if (incompleteLessons.length > 0) {
+      const proceed = window.confirm(
+        `⚠️ These incomplete lessons will be skipped:\n\n${incompleteLessons.join(
+          "\n"
+        )}\n\nContinue?`
+      );
+
+      if (!proceed) {
+        return;
+      }
+    }
+
+    // Step 4: Check if there are any valid lessons
+    const validLessonsCount = courseData.sections.reduce((count, section) => {
+      return (
+        count +
+        (section.lessons?.filter((lesson) => {
+          const hasTitle = lesson.title?.trim();
+          const hasVideo = lesson.videoFile || lesson.videoId?.trim();
+          return hasTitle && hasVideo;
+        }).length || 0)
+      );
+    }, 0);
+
+    if (validLessonsCount === 0) {
+      toast.error(
+        "❌ You need at least one complete lesson (with title and video) to publish the course"
+      );
+      return;
+    }
+
     setSaving(true);
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      toast.success("Course published successfully!");
-      navigate("/instructor");
+      console.log("🚀 Publishing course...");
+
+      // Step 5: First, save basic course info and get slug
+      let courseSlug = slug;
+
+      if (!isEditing) {
+        // Create new course first
+        const basicCourseData = {
+          title: courseData.title,
+          subtitle: courseData.subtitle,
+          description: courseData.description,
+          category: courseData.category,
+          level: courseData.level,
+          price: courseData.price,
+          requirements: courseData.requirements.filter((r) => r.trim()),
+          whatYouWillLearn: courseData.whatYouWillLearn.filter((w) => w.trim()),
+          targetAudience: courseData.targetAudience.filter((t) => t.trim()),
+          acceptedPayments: courseData.acceptedPayments,
+          escrowSettings: courseData.escrowSettings,
+        };
+
+        console.log("📝 Creating new course...");
+        const createResponse = await courseApi.create(basicCourseData);
+        courseSlug = createResponse.data.course.slug;
+        console.log(`✅ Course created with slug: ${courseSlug}`);
+      } else {
+        // Update existing course info
+        console.log("📝 Updating course info...");
+        await courseApi.update(courseSlug, {
+          title: courseData.title,
+          subtitle: courseData.subtitle,
+          description: courseData.description,
+          category: courseData.category,
+          level: courseData.level,
+          price: courseData.price,
+          requirements: courseData.requirements.filter((r) => r.trim()),
+          whatYouWillLearn: courseData.whatYouWillLearn.filter((w) => w.trim()),
+          targetAudience: courseData.targetAudience.filter((t) => t.trim()),
+          acceptedPayments: courseData.acceptedPayments,
+          escrowSettings: courseData.escrowSettings,
+        });
+      }
+
+      // Step 6: Upload all files (thumbnail, videos, resources)
+      await uploadAllFiles(courseSlug);
+
+      // Step 7: Publish the course
+      await courseApi.publish(courseSlug);
+
+      toast.success("🎉 Course published successfully!");
+
+      // Step 8: Redirect to course page
+      setTimeout(() => {
+        navigate(`/courses/${courseSlug}`);
+      }, 1500);
     } catch (error) {
-      toast.error("Failed to publish course");
+      console.error("Publish error:", error);
+      console.error("Error response:", error.response?.data);
+
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Failed to publish course";
+
+      toast.error(`❌ ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -327,10 +802,21 @@ const CreateCoursePage = () => {
 
   const tabs = [
     { id: "basics", label: "Basic Info", icon: FileText },
-    { id: "pricing", label: "Pricing & Payments", icon: DollarSign },
+    { id: "pricing", label: "Pricing", icon: DollarSign },
     { id: "curriculum", label: "Curriculum", icon: Video },
     { id: "details", label: "Course Details", icon: Target },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-16 h-16 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading course...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-8">
@@ -354,13 +840,15 @@ const CreateCoursePage = () => {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <button
-              onClick={() => navigate("/courses/preview")}
-              className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition font-medium flex items-center space-x-2"
-            >
-              <Eye className="w-4 h-4" />
-              <span>Preview</span>
-            </button>
+            {isEditing && (
+              <button
+                onClick={() => navigate(`/courses/${slug}`)}
+                className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition font-medium flex items-center space-x-2"
+              >
+                <Eye className="w-4 h-4" />
+                <span>Preview</span>
+              </button>
+            )}
             <button
               onClick={handleSaveDraft}
               disabled={saving}
@@ -521,61 +1009,19 @@ const CreateCoursePage = () => {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                  Course Thumbnail *
-                </label>
-                <div
-                  className={`border-2 border-dashed rounded-xl p-8 text-center ${
-                    errors.thumbnail
-                      ? "border-red-500"
-                      : "border-gray-300 dark:border-gray-700"
-                  }`}
-                >
-                  {courseData.thumbnailPreview ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={courseData.thumbnailPreview}
-                        alt="Thumbnail preview"
-                        className="max-h-64 rounded-lg"
-                      />
-                      <button
-                        onClick={() =>
-                          setCourseData({
-                            ...courseData,
-                            thumbnail: null,
-                            thumbnailPreview: null,
-                          })
-                        }
-                        className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600 dark:text-gray-400 mb-2">
-                        Upload course thumbnail (16:9 ratio recommended)
-                      </p>
-                      <label className="inline-block px-6 py-3 bg-primary-400 text-black rounded-xl font-bold cursor-pointer hover:bg-primary-500 transition">
-                        Choose Image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleThumbnailUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  )}
-                </div>
-                {errors.thumbnail && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.thumbnail}
-                  </p>
-                )}
-              </div>
+              <ThumbnailUploadDraft
+                currentFile={courseData.thumbnailFile}
+                currentPreview={courseData.thumbnailPreview}
+                onFileSelect={(file, preview) => {
+                  setCourseData({
+                    ...courseData,
+                    thumbnailFile: file,
+                    thumbnailPreview: preview,
+                    // originalThumbnailUrl stays the same - we need it for deletion!
+                  });
+                }}
+                error={errors.thumbnail}
+              />
             </div>
           )}
 
@@ -590,8 +1036,8 @@ const CreateCoursePage = () => {
                   <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="number"
-                    value={courseData.price}
-                    onChange={(e) => handleInputChange("price", e.target.value)}
+                    value={courseData.price.usd} // ✅ CORRECT - access .usd
+                    onChange={(e) => handlePriceChange("usd", e.target.value)}
                     placeholder="299"
                     className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl bg-white dark:bg-black ${
                       errors.price
@@ -604,6 +1050,29 @@ const CreateCoursePage = () => {
                   <p className="text-red-500 text-sm mt-1">{errors.price}</p>
                 )}
               </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                  Course Price ($FDR){" "}
+                  <span className="text-gray-500">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
+                    F
+                  </span>
+                  <input
+                    type="number"
+                    value={courseData.price.fdr}
+                    onChange={(e) => handlePriceChange("fdr", e.target.value)}
+                    placeholder="0"
+                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty to only accept USD
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">
                   Accepted Payment Methods *
@@ -716,41 +1185,43 @@ const CreateCoursePage = () => {
                     Course Curriculum
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Organize your course into modules and lessons
+                    Organize your course into sections and lessons
                   </p>
                 </div>
                 <button
-                  onClick={addModule}
+                  onClick={addSection}
                   className="px-4 py-2 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition flex items-center space-x-2"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Add Module</span>
+                  <span>Add Section</span>
                 </button>
               </div>
-              {errors.modules && (
+
+              {errors.sections && (
                 <div className="p-4 bg-red-500/10 border-2 border-red-500/20 rounded-xl flex items-start space-x-3">
                   <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-red-500 text-sm">{errors.modules}</p>
+                  <p className="text-red-500 text-sm">{errors.sections}</p>
                 </div>
               )}
-              {courseData.modules.length === 0 ? (
+
+              {courseData.sections.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl">
                   <Video className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500 mb-4">
-                    No modules yet. Start building your course!
+                    No sections yet. Start building your course!
                   </p>
                   <button
-                    onClick={addModule}
+                    onClick={addSection}
                     className="px-6 py-3 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition"
                   >
-                    Add Your First Module
+                    Add Your First Section
                   </button>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {courseData.modules.map((module) => (
+                  {courseData.sections.map((section, sectionIndex) => (
                     <div
-                      key={module.id}
+                      key={section.id || section._id}
                       className="border-2 border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden"
                     >
                       <div className="bg-gray-50 dark:bg-gray-800 p-4">
@@ -758,113 +1229,210 @@ const CreateCoursePage = () => {
                           <GripVertical className="w-5 h-5 text-gray-400" />
                           <input
                             type="text"
-                            value={module.title}
+                            value={section.title}
                             onChange={(e) =>
-                              updateModule(module.id, "title", e.target.value)
+                              updateSection(
+                                section.id || section._id,
+                                "title",
+                                e.target.value
+                              )
                             }
-                            placeholder="Module Title (e.g., Getting Started)"
+                            placeholder="Section Title (e.g., Getting Started)"
                             className="flex-1 px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 font-bold"
                           />
                           <button
                             onClick={() =>
-                              setExpandedModule(
-                                expandedModule === module.id ? null : module.id
+                              setExpandedSection(
+                                expandedSection === (section.id || section._id)
+                                  ? null
+                                  : section.id || section._id
                               )
                             }
                             className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition"
                           >
-                            {expandedModule === module.id ? (
+                            {expandedSection === (section.id || section._id) ? (
                               <ChevronUp className="w-5 h-5" />
                             ) : (
                               <ChevronDown className="w-5 h-5" />
                             )}
                           </button>
                           <button
-                            onClick={() => deleteModule(module.id)}
+                            onClick={() =>
+                              deleteSection(section.id || section._id)
+                            }
                             className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition"
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
                         </div>
-                        {expandedModule === module.id && (
+
+                        {expandedSection === (section.id || section._id) && (
                           <div className="space-y-4">
                             <textarea
-                              value={module.description}
+                              value={section.description}
                               onChange={(e) =>
-                                updateModule(
-                                  module.id,
+                                updateSection(
+                                  section.id || section._id,
                                   "description",
                                   e.target.value
                                 )
                               }
-                              placeholder="Module description (optional)"
+                              placeholder="Section description (optional)"
                               rows={2}
                               className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm resize-none"
                             />
-                            <div className="space-y-2">
-                              {module.lessons.map((lesson) => (
-                                <div
-                                  key={lesson.id}
-                                  className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
-                                >
-                                  <div className="flex items-center space-x-3 mb-3">
-                                    <Video className="w-4 h-4 text-gray-400" />
-                                    <input
-                                      type="text"
-                                      value={lesson.title}
+
+                            {/* Lessons */}
+                            <div className="space-y-3">
+                              {(section.lessons || []).map(
+                                (lesson, lessonIndex) => (
+                                  <div
+                                    key={lesson.id || lesson._id}
+                                    className="bg-white dark:bg-gray-900 p-4 rounded-lg border-2 border-gray-200 dark:border-gray-700"
+                                  >
+                                    {/* Lesson Header */}
+                                    <div className="flex items-center space-x-3 mb-3">
+                                      <Video className="w-4 h-4 text-gray-400" />
+                                      <input
+                                        type="text"
+                                        value={lesson.title}
+                                        onChange={(e) =>
+                                          updateLesson(
+                                            section.id || section._id,
+                                            lesson.id || lesson._id,
+                                            "title",
+                                            e.target.value
+                                          )
+                                        }
+                                        placeholder="Lesson title *" // Add asterisk to show it's required
+                                        className={`flex-1 px-3 py-2 border rounded-lg bg-white dark:bg-gray-900 text-sm font-medium ${
+                                          !lesson.title ||
+                                          lesson.title.trim() === ""
+                                            ? "border-red-500" // Red border if empty
+                                            : "border-gray-200 dark:border-gray-700"
+                                        }`}
+                                        required
+                                      />
+                                      {!lesson.title && (
+                                        <p className="text-xs text-red-500 mt-1">
+                                          Title is required
+                                        </p>
+                                      )}
+                                      <button
+                                        onClick={() =>
+                                          deleteLesson(
+                                            section.id || section._id,
+                                            lesson.id || lesson._id
+                                          )
+                                        }
+                                        className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+
+                                    {/* Lesson Description */}
+                                    <textarea
+                                      value={lesson.description}
                                       onChange={(e) =>
                                         updateLesson(
-                                          module.id,
-                                          lesson.id,
-                                          "title",
+                                          section.id || section._id,
+                                          lesson.id || lesson._id,
+                                          "description",
                                           e.target.value
                                         )
                                       }
-                                      placeholder="Lesson title"
-                                      className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm"
+                                      placeholder="Lesson description (optional)"
+                                      rows={2}
+                                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm mb-3 resize-none"
                                     />
-                                    <input
-                                      type="text"
-                                      value={lesson.duration}
-                                      onChange={(e) =>
-                                        updateLesson(
-                                          module.id,
-                                          lesson.id,
-                                          "duration",
-                                          e.target.value
-                                        )
-                                      }
-                                      placeholder="5:30"
-                                      className="w-20 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm"
-                                    />
-                                    <button
-                                      onClick={() =>
-                                        deleteLesson(module.id, lesson.id)
-                                      }
-                                      className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
+
+                                    {/* Video Upload */}
+                                    {/* Video Upload */}
+                                    <div className="mb-3">
+                                      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">
+                                        Lesson Video
+                                      </label>
+                                      <VideoUploadDraft
+                                        lessonTitle={
+                                          lesson.title || "Untitled Lesson"
+                                        }
+                                        currentFile={lesson.videoFile}
+                                        currentVideoUrl={lesson.videoUrl}
+                                        onFileSelect={(file) => {
+                                          updateLesson(
+                                            section.id || section._id,
+                                            lesson.id || lesson._id,
+                                            "videoFile",
+                                            file
+                                          );
+                                        }}
+                                      />
+                                    </div>
+
+                                    {/* Preview Toggle */}
+                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg mb-3">
+                                      <div className="flex items-center space-x-2">
+                                        <Eye className="w-4 h-4 text-gray-400" />
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                          Free Preview
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                          (Allow non-enrolled students to watch)
+                                        </span>
+                                      </div>
+                                      <button
+                                        onClick={() =>
+                                          updateLesson(
+                                            section.id || section._id,
+                                            lesson.id || lesson._id,
+                                            "isPreview",
+                                            !lesson.isPreview
+                                          )
+                                        }
+                                        className={`relative w-12 h-6 rounded-full transition ${
+                                          lesson.isPreview
+                                            ? "bg-primary-400"
+                                            : "bg-gray-300 dark:bg-gray-700"
+                                        }`}
+                                      >
+                                        <div
+                                          className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                                            lesson.isPreview
+                                              ? "translate-x-6"
+                                              : ""
+                                          }`}
+                                        />
+                                      </button>
+                                    </div>
+
+                                    {/* Resources */}
+                                    <div>
+                                      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">
+                                        Lesson Resources (Optional)
+                                      </label>
+                                      <ResourceUploadDraft
+                                        currentFile={lesson.resourceFile}
+                                        currentResource={lesson.resources?.[0]}
+                                        onFileSelect={(file) => {
+                                          updateLesson(
+                                            section.id || section._id,
+                                            lesson.id || lesson._id,
+                                            "resourceFile",
+                                            file
+                                          );
+                                        }}
+                                      />
+                                    </div>
                                   </div>
-                                  <input
-                                    type="text"
-                                    value={lesson.videoUrl}
-                                    onChange={(e) =>
-                                      updateLesson(
-                                        module.id,
-                                        lesson.id,
-                                        "videoUrl",
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Video URL or upload link"
-                                    className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm"
-                                  />
-                                </div>
-                              ))}
+                                )
+                              )}
+
                               <button
-                                onClick={() => addLesson(module.id)}
-                                className="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-primary-400 transition text-sm font-medium text-gray-500 hover:text-primary-400 flex items-center justify-center space-x-2"
+                                onClick={() =>
+                                  addLesson(section.id || section._id)
+                                }
+                                className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-primary-400 transition text-sm font-medium text-gray-500 hover:text-primary-400 flex items-center justify-center space-x-2"
                               >
                                 <Plus className="w-4 h-4" />
                                 <span>Add Lesson</span>

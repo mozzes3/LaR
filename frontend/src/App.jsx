@@ -20,6 +20,8 @@ import CourseLearningPage from "@pages/CourseLearningPage";
 import CreateCoursePage from "@pages/CreateCoursePage";
 import CourseAnalyticsPage from "@pages/CourseAnalyticsPage";
 import StudentsManagementPage from "@pages/StudentsManagementPage";
+import UserProfilePage from "@pages/UserProfilePage";
+import InstructorProfilePage from "@pages/InstructorProfilePage";
 import AllStudentsPage from "@pages/AllStudentsPage";
 import BecomeInstructorPage from "@pages/BecomeInstructorPage";
 import NotFoundPage from "@pages/NotFoundPage";
@@ -30,9 +32,7 @@ import ProtectedRoute from "@components/common/ProtectedRoute";
 
 function App() {
   useEffect(() => {
-    // Add click listener to dismiss toasts
     const handleToastClick = (e) => {
-      // Check if click is on toast or its children
       const toastElement =
         e.target.closest('[role="status"]') ||
         e.target.closest(".go2072408551") ||
@@ -46,6 +46,7 @@ function App() {
     document.addEventListener("click", handleToastClick);
     return () => document.removeEventListener("click", handleToastClick);
   }, []);
+
   return (
     <ThemeProvider>
       <WalletProvider>
@@ -69,6 +70,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Instructor Routes */}
             <Route
               path="instructor"
               element={
@@ -78,32 +81,6 @@ function App() {
               }
             />
             <Route
-              path="profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="checkout/:courseId"
-              element={
-                <ProtectedRoute>
-                  <CheckoutPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="courses/:courseSlug/learn"
-              element={
-                <ProtectedRoute>
-                  <CourseLearningPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
               path="instructor/create-course"
               element={
                 <ProtectedRoute requireInstructor>
@@ -112,7 +89,7 @@ function App() {
               }
             />
             <Route
-              path="instructor/courses/:courseId/edit"
+              path="instructor/edit-course/:slug"
               element={
                 <ProtectedRoute requireInstructor>
                   <CreateCoursePage />
@@ -151,7 +128,29 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/checkout/:slug" element={<CheckoutPage />} />
+
+            {/* Profile Routes */}
+            <Route path="profile/:username" element={<UserProfilePage />} />
+            <Route
+              path="instructor/:username"
+              element={<InstructorProfilePage />}
+            />
+            <Route path="settings" element={<ProfilePage />} />
+
+            {/* Course Learning */}
+            <Route
+              path="courses/:courseSlug/learn"
+              element={
+                <ProtectedRoute>
+                  <CourseLearningPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Checkout */}
+            <Route path="checkout/:slug" element={<CheckoutPage />} />
+
+            {/* Certificates */}
             <Route
               path="certificates"
               element={
@@ -168,6 +167,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Progress */}
             <Route
               path="progress"
               element={

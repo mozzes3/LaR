@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import { purchaseApi, userApi } from "@services/api";
 import { Link, useNavigate } from "react-router-dom";
-import { purchaseApi } from "@services/api";
 import { useWallet } from "@contexts/WalletContext";
+
 import toast from "react-hot-toast";
 import {
   Play,
@@ -58,8 +59,9 @@ const DashboardPage = () => {
   });
 
   // Load enrolled courses from API
+  // Load enrolled courses from API
   useEffect(() => {
-    const loadEnrolledCourses = async () => {
+    const loadDashboardData = async () => {
       if (!walletUser) {
         setLoading(false);
         return;
@@ -68,72 +70,73 @@ const DashboardPage = () => {
       try {
         setLoading(true);
 
-        // Real API call
-        const response = await purchaseApi.getMyPurchases();
+        // Load enrolled courses
+        const coursesResponse = await purchaseApi.getMyPurchases();
 
-        // Transform data
-        const transformedCourses = response.data.purchases.map((purchase) => ({
-          id: purchase.course._id,
-          slug: purchase.course.slug,
-          title: purchase.course.title,
-          instructor: purchase.course.instructor?.username || "Unknown",
-          instructorAvatar:
-            purchase.course.instructor?.avatar ||
-            `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.course._id}`,
-          thumbnail: purchase.course.thumbnail,
-          progress: purchase.progress || 0,
-          currentLesson: purchase.lastAccessedLesson || "Start learning",
-          totalLessons: purchase.course.totalLessons || 0,
-          completedLessons: purchase.completedLessons?.length || 0,
-          lastWatched: formatLastWatched(purchase.lastAccessedAt),
-          rating: purchase.course.averageRating || 0,
-          status: purchase.isCompleted ? "completed" : "in-progress",
-          timeLeft: calculateTimeLeft(
-            purchase.course.totalDuration,
-            purchase.progress
-          ),
-          certificateUrl: purchase.certificateId
-            ? `/certificates/${purchase.certificateId}`
-            : null,
-        }));
+        // Load dashboard stats from new endpoint
+        const statsResponse = await userApi.getDashboardStats();
+        const apiStats = statsResponse.data.stats;
+
+        console.log("📊 Dashboard stats from API:", apiStats);
+
+        // Transform courses
+        const transformedCourses = coursesResponse.data.purchases
+          .filter((purchase) => purchase.course)
+          .map((purchase) => ({
+            id: purchase.course._id,
+            slug: purchase.course.slug,
+            title: purchase.course.title,
+            instructor: purchase.course.instructor?.username || "Unknown",
+            instructorAvatar:
+              purchase.course.instructor?.avatar ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.course._id}`,
+            thumbnail: purchase.course.thumbnail,
+            progress: purchase.progress || 0,
+            currentLesson: purchase.lastAccessedLesson || "Start learning",
+            totalLessons: purchase.course.totalLessons || 0,
+            completedLessons: purchase.completedLessons?.length || 0,
+            lastWatched: formatLastWatched(purchase.lastAccessedAt),
+            lastAccessedAt: purchase.lastAccessedAt, // ← ADD THIS for sorting
+            rating: purchase.course.averageRating || 0,
+            status: purchase.isCompleted ? "completed" : "in-progress",
+            timeLeft: calculateTimeLeft(
+              purchase.course.totalDuration,
+              purchase.progress
+            ),
+            certificateUrl: purchase.certificateId
+              ? `/certificates/${purchase.certificateId}`
+              : null,
+          }));
 
         setEnrolledCourses(transformedCourses);
 
-        // Calculate stats
-        const completedCount = transformedCourses.filter(
-          (c) => c.status === "completed"
-        ).length;
-        const inProgressCount = transformedCourses.filter(
-          (c) => c.status === "in-progress"
-        ).length;
-
+        // Set user stats from API
         setUser({
-          username: walletUser?.username || "CryptoNinja",
+          username: walletUser?.username || "User",
           avatar:
             walletUser?.avatar ||
-            "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoNinja",
-          totalCourses: transformedCourses.length,
-          completedCourses: completedCount,
-          inProgressCourses: inProgressCount,
-          totalWatchTime: walletUser?.totalWatchTime || 0,
-          certificatesEarned: walletUser?.certificatesEarned || completedCount,
-          currentStreak: walletUser?.currentStreak || 0,
-          fdrEarned: walletUser?.fdrBalance || 0,
-          level: walletUser?.level || 1,
-          xp: walletUser?.experience || 0,
-          nextLevelXp: calculateNextLevelXp(walletUser?.level || 1),
+            `https://api.dicebear.com/7.x/avataaars/svg?seed=${walletUser?.username}`,
+          totalCourses: apiStats.totalCourses,
+          completedCourses: apiStats.completedCourses,
+          inProgressCourses: apiStats.inProgressCourses,
+          totalWatchTime: apiStats.totalWatchTimeMinutes,
+          certificatesEarned: apiStats.certificatesEarned,
+          currentStreak: apiStats.currentStreak,
+          fdrEarned: apiStats.fdrEarned,
+          level: apiStats.level,
+          xp: apiStats.experience,
+          nextLevelXp: calculateNextLevelXp(apiStats.level),
         });
 
         setLoading(false);
       } catch (error) {
-        console.error("Error loading enrolled courses:", error);
-        // Use mock data as fallback
+        console.error("Error loading dashboard:", error);
         setEnrolledCourses([]);
         setLoading(false);
       }
     };
 
-    loadEnrolledCourses();
+    loadDashboardData();
   }, [walletUser]);
 
   // Helper functions
@@ -364,13 +367,68 @@ const DashboardPage = () => {
           </div>
 
           {/* Activity Feed */}
+          {/* Activity Feed */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
               Recent Activity
             </h3>
             <div className="space-y-4">
-              {/* Keep your activity feed items */}
-              {/* ... */}
+              {enrolledCourses.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">No recent activity</p>
+                </div>
+              ) : (
+                enrolledCourses
+                  .filter((c) => c.lastAccessedAt)
+                  .sort((a, b) => {
+                    // Sort by most recent first
+                    const dateA = new Date(a.lastWatched);
+                    const dateB = new Date(b.lastWatched);
+                    return dateB - dateA;
+                  })
+                  .slice(0, 5) // Show only last 5
+                  .map((course, index) => (
+                    <div
+                      key={course.id}
+                      className="flex items-start space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition cursor-pointer"
+                      onClick={() => navigate(`/learn/${course.slug}`)}
+                    >
+                      <div className="w-10 h-10 bg-primary-400/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        {course.status === "completed" ? (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        ) : (
+                          <Play className="w-5 h-5 text-primary-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                          {course.status === "completed"
+                            ? "Completed"
+                            : "Watched"}{" "}
+                          {course.title}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {course.lastWatched}
+                        </p>
+                      </div>
+                      {course.status === "in-progress" && (
+                        <div className="text-xs font-bold text-primary-400">
+                          {course.progress}%
+                        </div>
+                      )}
+                    </div>
+                  ))
+              )}
+
+              {enrolledCourses.length > 5 && (
+                <button
+                  onClick={() => setActiveTab("courses")}
+                  className="w-full py-2 text-sm text-primary-400 hover:text-primary-500 font-medium"
+                >
+                  View all activity →
+                </button>
+              )}
             </div>
           </div>
         </div>

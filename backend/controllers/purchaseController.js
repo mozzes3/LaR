@@ -127,7 +127,9 @@ const completeLesson = async (req, res) => {
   try {
     const { purchaseId, lessonId } = req.body;
 
-    const purchase = await Purchase.findById(purchaseId);
+    // IMPORTANT: Populate course to get totalLessons
+    const purchase = await Purchase.findById(purchaseId).populate("course");
+
     if (!purchase) {
       return res.status(404).json({ error: "Purchase not found" });
     }
@@ -136,9 +138,47 @@ const completeLesson = async (req, res) => {
       return res.status(403).json({ error: "Not authorized" });
     }
 
-    await purchase.completeLesson(lessonId);
+    // Add lesson to completed if not already there
+    if (!purchase.completedLessons.includes(lessonId)) {
+      purchase.completedLessons.push(lessonId);
+    }
 
-    // TODO: Calculate progress percentage based on total lessons
+    purchase.lastAccessedLesson = lessonId;
+    purchase.lastAccessedAt = new Date();
+
+    // Calculate progress using the populated course
+    const totalLessons = purchase.course.totalLessons || 0;
+    const completedCount = purchase.completedLessons.length;
+
+    console.log("📊 Progress calculation:");
+    console.log("  - Total lessons:", totalLessons);
+    console.log("  - Completed lessons:", completedCount);
+
+    if (totalLessons > 0) {
+      purchase.progress = Math.min(
+        100,
+        Math.round((completedCount / totalLessons) * 100)
+      );
+    } else {
+      purchase.progress = 0;
+    }
+
+    console.log("  - Calculated progress:", purchase.progress);
+
+    // Check if course is completed
+    if (purchase.progress === 100 && !purchase.isCompleted) {
+      purchase.isCompleted = true;
+      purchase.completedAt = new Date();
+
+      // Update user stats
+      await User.findByIdAndUpdate(req.userId, {
+        $inc: { coursesCompleted: 1, certificatesEarned: 1 },
+      });
+    }
+
+    await purchase.save();
+
+    console.log("✅ Progress saved:", purchase.progress);
 
     res.json({ success: true, purchase });
   } catch (error) {

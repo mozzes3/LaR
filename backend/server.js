@@ -3,7 +3,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const connectDB = require("./config/database");
-
+const uploadRoutes = require("./routes/upload");
 const app = express();
 
 // Connect to MongoDB
@@ -16,8 +16,8 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" })); // ← Increase limit
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Request logging (development)
 if (process.env.NODE_ENV === "development") {
@@ -46,6 +46,7 @@ app.use("/api/purchases", require("./routes/purchases"));
 app.use("/api/reviews", require("./routes/reviews"));
 app.use("/api/certificates", require("./routes/certificates")); // ← ADD THIS
 app.use("/api/enrollments", require("./routes/enrollments")); // ← ADD THIS
+app.use("/api/upload", uploadRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -69,6 +70,8 @@ app.use((err, req, res, next) => {
     error: err.message || "Internal Server Error",
   });
 });
+
+app.use("/api/upload", require("./routes/upload"));
 
 // 404 handler
 app.use((req, res) => {

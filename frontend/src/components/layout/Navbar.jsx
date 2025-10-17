@@ -21,7 +21,7 @@ import toast from "react-hot-toast";
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [showSearchModal, setShowSearchModal] = useState(false); // ADD THIS
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
   const {
     isConnected,
@@ -56,7 +56,7 @@ const Navbar = () => {
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-lg flex items-center justify-center font-bold text-black transform group-hover:scale-110 transition">
-                LA {/* or 🦎 emoji */}
+                LA
               </div>
               <span className="text-xl font-bold hidden sm:block">
                 Lizard Academy
@@ -102,7 +102,7 @@ const Navbar = () => {
                 )}
               </button>
 
-              {/* Search - UPDATED */}
+              {/* Search */}
               <button
                 onClick={() => setShowSearchModal(true)}
                 className="hidden md:block p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
@@ -169,7 +169,16 @@ const Navbar = () => {
                           )}
 
                           <Link
-                            to="/profile"
+                            to={`/profile/${user?.username}`}
+                            className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                            onClick={() => setUserMenuOpen(false)}
+                          >
+                            <User className="w-4 h-4" />
+                            <span className="text-sm">Profile</span>
+                          </Link>
+
+                          <Link
+                            to="/settings"
                             className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                             onClick={() => setUserMenuOpen(false)}
                           >
@@ -238,13 +247,29 @@ const Navbar = () => {
                 Become Instructor
               </Link>
               {isConnected && (
-                <Link
-                  to="/dashboard"
-                  className="block py-2 text-sm font-medium hover:text-primary-400"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  My Learning
-                </Link>
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="block py-2 text-sm font-medium hover:text-primary-400"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    My Learning
+                  </Link>
+                  <Link
+                    to={`/profile/${user?.username}`}
+                    className="block py-2 text-sm font-medium hover:text-primary-400"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Profile
+                  </Link>
+                  <Link
+                    to="/settings"
+                    className="block py-2 text-sm font-medium hover:text-primary-400"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Settings
+                  </Link>
+                </>
               )}
 
               {!isConnected && (
@@ -267,7 +292,7 @@ const Navbar = () => {
         )}
       </nav>
 
-      {/* Search Modal - ADD THIS AT THE END */}
+      {/* Search Modal */}
       {showSearchModal && (
         <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-20 px-4"

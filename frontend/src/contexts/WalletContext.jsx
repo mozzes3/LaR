@@ -48,7 +48,7 @@ export const WalletProvider = ({ children }) => {
     if (token && !user) {
       fetchUser();
     }
-  }, [token]);
+  }, [token, user]);
 
   const handleAccountsChanged = (accounts) => {
     if (accounts.length === 0) {
@@ -72,6 +72,20 @@ export const WalletProvider = ({ children }) => {
         }
       } catch (error) {
         console.error("Error checking connection:", error);
+      }
+    }
+  };
+
+  const fetchUser = async () => {
+    try {
+      const { data } = await api.get("/auth/me");
+      setUser(data.user);
+      localStorage.setItem("user", JSON.stringify(data.user));
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      // If token is invalid, clear it
+      if (error.response?.status === 401) {
+        disconnect();
       }
     }
   };
@@ -113,6 +127,7 @@ export const WalletProvider = ({ children }) => {
       setToken(loginData.token);
       setUser(loginData.user);
       localStorage.setItem("token", loginData.token);
+      localStorage.setItem("user", JSON.stringify(loginData.user));
 
       toast.success(
         loginData.isNewUser ? "Welcome to Lizard Academy!" : "Welcome back!"
@@ -124,6 +139,7 @@ export const WalletProvider = ({ children }) => {
       setIsConnecting(false);
     }
   };
+
   const disconnect = () => {
     setAccount(null);
     setProvider(null);
@@ -131,24 +147,13 @@ export const WalletProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     toast.success("Wallet disconnected");
-  };
-
-  const fetchUser = async () => {
-    try {
-      const { data } = await api.get("/auth/me");
-      setUser(data.user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      // If token is invalid, clear it
-      if (error.response?.status === 401) {
-        disconnect();
-      }
-    }
   };
 
   const value = {
     account,
+    walletAddress: account,
     provider,
     signer,
     user,

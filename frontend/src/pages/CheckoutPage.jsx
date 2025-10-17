@@ -26,7 +26,11 @@ import { useWallet } from "@contexts/WalletContext";
 import toast from "react-hot-toast";
 
 const CheckoutPage = () => {
+  console.log("🚀 CheckoutPage MOUNTED");
+  console.log("📍 Slug from params:", useParams());
+
   const { slug } = useParams();
+
   const location = useLocation();
   const navigate = useNavigate();
   const { isConnected, account: walletAddress, connectWallet } = useWallet();
@@ -161,20 +165,21 @@ const CheckoutPage = () => {
       try {
         setLoading(true);
 
-        console.log("Loading course with slug:", slug); // Debug log
+        console.log("🔍 Frontend: Loading course with slug:", slug);
 
         // Real API call to get course details
         const response = await courseApi.getBySlug(slug);
 
-        console.log("API response:", response); // Debug log
+        console.log("✅ Frontend: API response received:", response);
+        console.log("📦 Frontend: Response data:", response.data);
 
         const courseData = {
           ...response.data.course,
           id: response.data.course._id,
           students: response.data.course.enrollmentCount || 0,
           rating: response.data.course.averageRating || 0,
-          price: response.data.course.price || { usd: 299 }, // Add price
-          duration: response.data.course.duration || "12h 30m", // Add duration
+          price: response.data.course.price || { usd: 299 },
+          duration: response.data.course.duration || "12h 30m",
           totalLessons: response.data.course.totalLessons || 0,
           instructor: {
             ...response.data.course.instructor,
@@ -192,21 +197,19 @@ const CheckoutPage = () => {
           },
         };
 
-        console.log("Transformed course data:", courseData); // Debug log
+        console.log("🎯 Frontend: Transformed course data:", courseData);
 
         setCourse(courseData);
         setLoading(false);
+
+        console.log("✅ Frontend: Course set successfully");
       } catch (error) {
-        console.error("Error loading course:", error);
-        console.error("Error details:", error.response?.data); // More detailed error
+        console.error("❌ Frontend: Error loading course:", error);
+        console.error("❌ Frontend: Error response:", error.response?.data);
 
-        // Use mock data as fallback instead of redirecting
-        toast.error("Using demo data");
-        setCourse(mockCourse);
+        toast.error("Failed to load course");
+        setCourse(mockCourse); // Use mock as fallback
         setLoading(false);
-
-        // Don't redirect, let user continue with mock data
-        // navigate("/courses");
       }
     };
 
@@ -268,7 +271,7 @@ const CheckoutPage = () => {
       setTransactionHash(mockTxHash);
 
       // Send to backend API
-      const response = await purchaseApi.purchaseCourse({
+      const response = await purchaseApi.purchase({
         courseId: course.id,
         paymentMethod: selectedPayment,
         transactionHash: mockTxHash,

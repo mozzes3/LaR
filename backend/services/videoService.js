@@ -1,57 +1,32 @@
-const bunnyService = require("../config/bunny");
-const fs = require("fs").promises;
-const path = require("path");
+const bunnyService = require("./bunnyService");
 
 class VideoService {
-  async uploadVideo(fileBuffer, fileName, title) {
-    try {
-      const tempDir = path.join(__dirname, "../temp");
-      await fs.mkdir(tempDir, { recursive: true });
-
-      const tempPath = path.join(tempDir, fileName);
-      await fs.writeFile(tempPath, fileBuffer);
-
-      const videoData = await bunnyService.uploadVideo(
-        tempPath,
-        fileName,
-        title
-      );
-
-      await fs.unlink(tempPath);
-
-      return videoData;
-    } catch (error) {
-      console.error("Video upload error:", error);
-      throw new Error("Failed to upload video");
-    }
+  /**
+   * Upload video and return signed streaming URL
+   */
+  async uploadVideo(title, fileBuffer) {
+    return await bunnyService.uploadVideo(title, fileBuffer);
   }
 
-  async uploadImage(fileBuffer, fileName) {
-    try {
-      const tempDir = path.join(__dirname, "../temp");
-      await fs.mkdir(tempDir, { recursive: true });
-
-      const tempPath = path.join(tempDir, fileName);
-      await fs.writeFile(tempPath, fileBuffer);
-
-      const imageUrl = await bunnyService.uploadImage(tempPath, fileName);
-
-      await fs.unlink(tempPath);
-
-      return imageUrl;
-    } catch (error) {
-      console.error("Image upload error:", error);
-      throw new Error("Failed to upload image");
-    }
-  }
-
+  /**
+   * Delete video
+   */
   async deleteVideo(videoId) {
-    try {
-      await bunnyService.deleteVideo(videoId);
-    } catch (error) {
-      console.error("Video deletion error:", error);
-      throw new Error("Failed to delete video");
-    }
+    return await bunnyService.deleteVideo(videoId);
+  }
+
+  /**
+   * Get signed video URL for playback (token-gated)
+   */
+  getSignedVideoUrl(videoId, expiresIn = 14400) {
+    return bunnyService.generateVideoUrl(videoId, expiresIn);
+  }
+
+  /**
+   * Get video info
+   */
+  async getVideoInfo(videoId) {
+    return await bunnyService.getVideoInfo(videoId);
   }
 }
 

@@ -52,10 +52,16 @@ export const courseApi = {
   delete: (slug) => api.delete(`/courses/${slug}`),
   publish: (slug) => api.post(`/courses/${slug}/publish`),
   getInstructorCourses: () => api.get("/courses/instructor/my-courses"),
+  getByInstructor: (username) => api.get(`/courses/instructor/${username}`),
+  getInstructorCoursesWithStats: () =>
+    api.get("/courses/instructor/my-courses-stats"),
+  getLessonVideo: (courseSlug, lessonId) =>
+    api.get(`/courses/${courseSlug}/lessons/${lessonId}/video`),
 };
 
 // Purchase endpoints
 export const purchaseApi = {
+  purchaseCourse: (data) => api.post("/purchases", data), // ← ADD THIS LINE
   purchase: (data) => api.post("/purchases", data),
   getMyPurchases: () => api.get("/purchases/my-purchases"),
   getPurchase: (courseId) => api.get(`/purchases/${courseId}`),
@@ -72,6 +78,75 @@ export const reviewApi = {
   vote: (reviewId, vote) => api.post(`/reviews/${reviewId}/vote`, { vote }),
 };
 
+// Upload endpoints
+// Upload endpoints
+export const uploadApi = {
+  // Avatar upload
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    return api.post("/upload/avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  // Thumbnail upload - ACCEPTS FILE DIRECTLY
+  uploadThumbnail: (file) => {
+    const formData = new FormData();
+    formData.append("thumbnail", file);
+    return api.post("/upload/thumbnail", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  // Video upload
+  // Video upload
+  uploadVideo: (file, data, onUploadProgress) => {
+    const formData = new FormData();
+    formData.append("video", file);
+    formData.append("title", data.title);
+
+    if (data.courseSlug) {
+      formData.append("courseSlug", data.courseSlug);
+    }
+
+    // IMPORTANT: Make sure oldVideoId is sent
+    if (data.oldVideoId) {
+      formData.append("oldVideoId", data.oldVideoId);
+      console.log(`📤 Sending oldVideoId to backend: ${data.oldVideoId}`);
+    }
+
+    return api.post("/upload/video", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress,
+    });
+  },
+
+  // Get signed video URL
+  getVideoUrl: (videoId) => api.get(`/upload/video/${videoId}/url`),
+
+  // Get video info
+  getVideoInfo: (videoId) => api.get(`/upload/video/${videoId}/info`),
+
+  // Delete video
+  deleteVideo: (videoId) => api.delete(`/upload/video/${videoId}`),
+
+  // Upload resource
+  uploadResource: (file) => {
+    const formData = new FormData();
+    formData.append("resource", file);
+    return api.post("/upload/resource", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  deleteThumbnail: (thumbnailUrl) =>
+    api.delete("/upload/thumbnail", { data: { url: thumbnailUrl } }),
+
+  deleteResource: (resourceUrl) =>
+    api.delete("/upload/resource", { data: { url: resourceUrl } }),
+};
+
 // User endpoints
 export const userApi = {
   getProfile: (username) => api.get(`/users/${username}`),
@@ -81,6 +156,11 @@ export const userApi = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
   getStats: () => api.get("/users/stats/me"),
+  getDashboardStats: () => api.get("/users/dashboard/stats"), // ← ADD THIS
+  getInstructorDashboardStats: () =>
+    api.get("/users/instructor/dashboard-stats"),
+  getInstructorRecentActivity: (limit = 10) =>
+    api.get(`/users/instructor/recent-activity?limit=${limit}`),
 };
 
 // Instructor endpoints

@@ -28,6 +28,17 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    displayName: {
+      // ← ADD THIS ENTIRE BLOCK
+      type: String,
+      trim: true,
+      maxlength: 50,
+    },
+    lastUsernameChange: {
+      // ← ADD THIS TOO IF NOT THERE
+      type: Date,
+      default: null,
+    },
     role: {
       type: String,
       enum: ["student", "instructor", "admin"],

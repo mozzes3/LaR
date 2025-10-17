@@ -60,6 +60,67 @@ const seedCourses = async () => {
         ],
         tags: ["NFT", "Discord", "Marketing", "Community"],
         publishedAt: new Date(),
+        sections: [
+          {
+            title: "Getting Started with NFT Marketing",
+            description: "Introduction to NFT marketing fundamentals",
+            order: 1,
+            lessons: [
+              {
+                title: "Welcome to the Course",
+                description: "Course overview and what you'll learn",
+                videoId: "intro-video-1",
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                duration: 330, // 5:30 in seconds
+                order: 1,
+                isPreview: true,
+              },
+              {
+                title: "Understanding NFT Communities",
+                description: "Deep dive into NFT community dynamics",
+                videoId: "lesson-video-2",
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                duration: 765, // 12:45
+                order: 2,
+                isPreview: true,
+              },
+              {
+                title: "Setting Up Your Discord Server",
+                description: "Step-by-step Discord server setup",
+                videoId: "lesson-video-3",
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                duration: 1100, // 18:20
+                order: 3,
+                isPreview: false,
+              },
+            ],
+          },
+          {
+            title: "Marketing Strategies",
+            description: "Advanced marketing techniques for Web3",
+            order: 2,
+            lessons: [
+              {
+                title: "Content Strategy for Web3",
+                description: "Creating engaging Web3 content",
+                videoId: "lesson-video-4",
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                duration: 1515, // 25:15
+                order: 1,
+                isPreview: false,
+              },
+              {
+                title: "Twitter Marketing Tactics",
+                description: "Leveraging Twitter for NFT growth",
+                videoId: "lesson-video-5",
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                duration: 1845, // 30:45
+                order: 2,
+                isPreview: false,
+              },
+            ],
+          },
+        ],
       },
       {
         title: "Solidity Smart Contracts: Build Your First DeFi Protocol",
@@ -87,6 +148,33 @@ const seedCourses = async () => {
         targetAudience: ["Developers", "Blockchain engineers"],
         tags: ["Solidity", "Smart Contracts", "DeFi", "Development"],
         publishedAt: new Date(),
+        sections: [
+          {
+            title: "Solidity Fundamentals",
+            description: "Learn the basics of Solidity programming",
+            order: 1,
+            lessons: [
+              {
+                title: "Introduction to Solidity",
+                description: "Getting started with Solidity",
+                videoId: "solidity-intro",
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                duration: 900, // 15:00
+                order: 1,
+                isPreview: true,
+              },
+              {
+                title: "Variables and Data Types",
+                description: "Understanding Solidity data types",
+                videoId: "solidity-types",
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                duration: 1200, // 20:00
+                order: 2,
+                isPreview: false,
+              },
+            ],
+          },
+        ],
       },
       {
         title: "Web3 Full Stack Development: Build dApps from Scratch",
@@ -115,9 +203,26 @@ const seedCourses = async () => {
         targetAudience: ["Web developers", "Full-stack developers"],
         tags: ["React", "Web3", "dApp", "Development"],
         publishedAt: new Date(),
+        sections: [
+          {
+            title: "Web3 Basics",
+            description: "Introduction to Web3 development",
+            order: 1,
+            lessons: [
+              {
+                title: "What is Web3?",
+                description: "Understanding Web3 fundamentals",
+                videoId: "web3-intro",
+                videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                duration: 600, // 10:00
+                order: 1,
+                isPreview: true,
+              },
+            ],
+          },
+        ],
       },
     ];
-
     const courses = await Course.insertMany(sampleCourses);
     console.log(`✅ ${courses.length} courses created`);
 

@@ -1,12 +1,15 @@
 const Course = require("../models/Course");
 const User = require("../models/User");
 const Purchase = require("../models/Purchase");
+const Review = require("../models/Review");
 const videoService = require("../services/videoService");
 
 // Create new course
 const createCourse = async (req, res) => {
   try {
     const { title, subtitle, description, category, level, price } = req.body;
+
+    console.log("📥 Received course data:", req.body);
 
     if (!req.user.isInstructor || !req.user.instructorVerified) {
       return res
@@ -33,10 +36,13 @@ const createCourse = async (req, res) => {
       description,
       category,
       level,
-      price: { usd: price.usd || 0, fdr: price.fdr || 0 },
+      price: {
+        usd: parseFloat(price.usd) || 0,
+        fdr: parseFloat(price.fdr) || 0,
+      },
       instructor: req.userId,
       status: "draft",
-      thumbnail: "https://via.placeholder.com/400x225",
+      thumbnail: "", // ← Empty string instead of placeholder!
     });
 
     await User.findByIdAndUpdate(req.userId, {
@@ -45,7 +51,8 @@ const createCourse = async (req, res) => {
 
     res.status(201).json({ success: true, course });
   } catch (error) {
-    console.error("Create course error:", error);
+    console.error("❌ Create course error:", error);
+    console.error("❌ Error message:", error.message);
     res.status(500).json({ error: "Failed to create course" });
   }
 };
@@ -102,19 +109,31 @@ const getCourses = async (req, res) => {
 };
 
 // Get single course
+// Get single course
 const getCourse = async (req, res) => {
   try {
     const { slug } = req.params;
 
+    console.log("=== getCourse START ===");
+    console.log("1. Slug received:", slug);
+    console.log("2. User ID:", req.userId);
+
     const course = await Course.findOne({ slug }).populate(
       "instructor",
-      "username avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks" // Added more fields
+      "username avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks"
     );
 
+    console.log("3. Course found:", course ? "YES" : "NO");
+
     if (!course) {
+      console.log("4. Sending 404 - Course not found");
       return res.status(404).json({ error: "Course not found" });
     }
 
+    console.log("5. Course title:", course.title);
+    console.log("6. Course status:", course.status);
+
+    // Check if user has purchased
     let hasPurchased = false;
     if (req.userId) {
       const purchase = await Purchase.findOne({
@@ -125,38 +144,74 @@ const getCourse = async (req, res) => {
       hasPurchased = !!purchase;
     }
 
+    console.log("7. Has purchased:", hasPurchased);
+
+    // Check authorization for unpublished courses
     if (course.status !== "published") {
+      console.log("8. Course not published, checking authorization...");
       if (
         !req.userId ||
         req.userId.toString() !== course.instructor._id.toString()
       ) {
+        console.log("9. Sending 403 - Not authorized");
         return res.status(403).json({ error: "Course not available" });
       }
     }
 
     const courseData = course.toObject();
 
+    // Calculate total lessons correctly
+    const totalLessons = courseData.sections.reduce((total, section) => {
+      return total + (section.lessons?.length || 0);
+    }, 0);
+
+    console.log(`📊 Total lessons calculated: ${totalLessons}`);
+
+    // Calculate total duration
+    const totalDuration = courseData.sections.reduce((total, section) => {
+      const sectionDuration = section.lessons.reduce((sum, lesson) => {
+        return sum + (lesson.duration || 0);
+      }, 0);
+      return total + sectionDuration;
+    }, 0);
+
+    console.log(`⏱️ Total duration calculated: ${totalDuration}s`);
+
     // Hide lesson videos if not purchased (except previews)
-    if (
-      !hasPurchased &&
-      req.userId?.toString() !== course.instructor._id.toString()
-    ) {
+    const isInstructor =
+      req.userId?.toString() === course.instructor._id.toString();
+
+    if (!hasPurchased && !isInstructor) {
       courseData.sections = courseData.sections.map((section) => ({
         ...section,
         lessons: section.lessons.map((lesson) => ({
           ...lesson,
           videoUrl: lesson.isPreview ? lesson.videoUrl : null,
+          videoId: lesson.isPreview ? lesson.videoId : null, // Also hide videoId
         })),
       }));
     }
 
+    console.log("10. Sending response with course data");
+
     res.json({
-      course: courseData,
+      course: {
+        ...courseData,
+        totalLessons: totalLessons,
+        totalDuration: totalDuration,
+      },
       hasPurchased,
-      isInstructor: req.userId?.toString() === course.instructor._id.toString(),
+      isInstructor: isInstructor,
     });
+
+    console.log("11. Response sent successfully");
+    console.log(`    - Total Lessons: ${totalLessons}`);
+    console.log(`    - Total Duration: ${totalDuration}s`);
+    console.log(`    - Has Purchased: ${hasPurchased}`);
+    console.log(`    - Is Instructor: ${isInstructor}`);
+    console.log("=== getCourse END ===");
   } catch (error) {
-    console.error("Get course error:", error);
+    console.error("ERROR in getCourse:", error);
     res.status(500).json({ error: "Failed to fetch course" });
   }
 };
@@ -165,10 +220,19 @@ const getCourse = async (req, res) => {
 const updateCourse = async (req, res) => {
   try {
     const { slug } = req.params;
+
+    console.log("📝 Updating course:", slug);
+    console.log("📝 Raw body:", JSON.stringify(req.body, null, 2));
+
     const course = await Course.findOne({ slug });
 
-    if (!course) return res.status(404).json({ error: "Course not found" });
+    if (!course) {
+      console.log("❌ Course not found");
+      return res.status(404).json({ error: "Course not found" });
+    }
+
     if (course.instructor.toString() !== req.userId.toString()) {
+      console.log("❌ Not authorized");
       return res.status(403).json({ error: "Not authorized" });
     }
 
@@ -184,20 +248,89 @@ const updateCourse = async (req, res) => {
       "whatYouWillLearn",
       "targetAudience",
       "tags",
+      "thumbnail",
+      "sections",
     ];
 
     allowedUpdates.forEach((field) => {
-      if (req.body[field] !== undefined) course[field] = req.body[field];
+      if (req.body[field] !== undefined) {
+        let value = req.body[field];
+
+        // Special handling for sections
+        if (field === "sections") {
+          console.log("🔍 Sections type:", typeof value);
+          console.log("🔍 Sections value:", JSON.stringify(value, null, 2));
+
+          // If it's a string, parse it
+          if (typeof value === "string") {
+            try {
+              value = JSON.parse(value);
+              console.log("✅ Parsed sections from string");
+            } catch (e) {
+              console.error("❌ Failed to parse sections:", e);
+            }
+          }
+
+          // Ensure all resources in lessons are arrays
+          if (Array.isArray(value)) {
+            value = value.map((section) => ({
+              ...section,
+              lessons: (section.lessons || []).map((lesson) => {
+                let resources = lesson.resources || [];
+
+                // If resources is a string, parse it
+                if (typeof resources === "string") {
+                  try {
+                    resources = JSON.parse(resources);
+                    console.log(
+                      "✅ Parsed resources from string for lesson:",
+                      lesson.title
+                    );
+                  } catch (e) {
+                    console.error(
+                      "❌ Failed to parse resources for lesson:",
+                      lesson.title,
+                      e
+                    );
+                    resources = [];
+                  }
+                }
+
+                // Ensure it's an array
+                if (!Array.isArray(resources)) {
+                  console.warn(
+                    "⚠️ Resources is not an array, converting to empty array"
+                  );
+                  resources = [];
+                }
+
+                return {
+                  ...lesson,
+                  resources: resources,
+                };
+              }),
+            }));
+          }
+        }
+
+        console.log(`✏️ Updating ${field}`);
+        course[field] = value;
+      }
     });
 
     await course.save();
+
+    console.log("✅ Course updated successfully");
+    console.log("📋 New thumbnail:", course.thumbnail);
+    console.log("📋 Sections count:", course.sections?.length);
+
     res.json({ success: true, course });
   } catch (error) {
-    console.error("Update course error:", error);
+    console.error("❌ Update course error:", error);
+    console.error("❌ Error details:", error.message);
     res.status(500).json({ error: "Failed to update course" });
   }
 };
-
 // Delete course
 const deleteCourse = async (req, res) => {
   try {
@@ -244,6 +377,90 @@ const getInstructorCourses = async (req, res) => {
   }
 };
 
+/**
+ * Get courses by instructor
+ */
+const getCoursesByInstructor = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    // Find instructor by username
+    const instructor = await User.findOne({ username, isInstructor: true });
+
+    if (!instructor) {
+      return res.status(404).json({ error: "Instructor not found" });
+    }
+
+    // Get all courses by this instructor
+    const courses = await Course.find({
+      instructor: instructor._id,
+      status: "published", // ← CHANGE FROM isPublished to status
+    })
+      .populate("instructor", "username avatar instructorVerified")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      courses,
+      total: courses.length,
+    });
+  } catch (error) {
+    console.error("Get instructor courses error:", error);
+    res.status(500).json({ error: "Failed to get instructor courses" });
+  }
+};
+
+/**
+ * Get instructor's courses with detailed stats
+ */
+const getInstructorCoursesWithStats = async (req, res) => {
+  try {
+    const instructorId = req.userId;
+
+    const courses = await Course.find({ instructor: instructorId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Get stats for each course
+    const coursesWithStats = await Promise.all(
+      courses.map(async (course) => {
+        // Get purchase count
+        const purchases = await Purchase.find({
+          course: course._id,
+          status: "active",
+        });
+
+        const students = purchases.length;
+        const revenue = students * (course.price?.usd || 0);
+
+        // Get completion rate
+        const completedCount = purchases.filter((p) => p.isCompleted).length;
+        const completionRate =
+          students > 0 ? Math.round((completedCount / students) * 100) : 0;
+
+        // Get review count
+        const reviews = await Review.countDocuments({ course: course._id });
+
+        return {
+          ...course,
+          students,
+          revenue: Math.round(revenue * 100) / 100,
+          reviews,
+          completionRate,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      courses: coursesWithStats,
+    });
+  } catch (error) {
+    console.error("Get instructor courses with stats error:", error);
+    res.status(500).json({ error: "Failed to get courses" });
+  }
+};
 // Publish course
 const publishCourse = async (req, res) => {
   try {
@@ -255,16 +472,46 @@ const publishCourse = async (req, res) => {
       return res.status(403).json({ error: "Not authorized" });
     }
 
-    // Validation
-    if (!course.thumbnail || course.thumbnail.includes("placeholder")) {
+    console.log("🔍 Publishing course:", slug);
+    console.log("📋 Thumbnail:", course.thumbnail);
+    console.log("📋 Sections:", course.sections?.length);
+
+    // Validation - check for empty, placeholder, or invalid URLs
+    if (
+      !course.thumbnail ||
+      course.thumbnail === "" ||
+      course.thumbnail.includes("placeholder") ||
+      course.thumbnail.includes("via.placeholder")
+    ) {
+      console.log("❌ Thumbnail validation failed:", course.thumbnail);
       return res.status(400).json({ error: "Please upload a thumbnail" });
     }
+
     if (course.sections.length === 0) {
+      console.log("❌ No sections");
       return res.status(400).json({ error: "Add at least one section" });
     }
-    if (course.totalLessons === 0) {
+
+    const hasLessons = course.sections.some(
+      (s) => s.lessons && s.lessons.length > 0
+    );
+    if (!hasLessons) {
+      console.log("❌ No lessons");
       return res.status(400).json({ error: "Add at least one lesson" });
     }
+
+    const allLessonsHaveVideos = course.sections.every((section) =>
+      section.lessons.every((lesson) => lesson.videoId && lesson.videoUrl)
+    );
+
+    if (!allLessonsHaveVideos) {
+      console.log("❌ Some lessons missing videos");
+      return res
+        .status(400)
+        .json({ error: "All lessons must have videos uploaded" });
+    }
+
+    console.log("✅ All validations passed");
 
     course.status = "published";
     course.publishedAt = new Date();
@@ -281,8 +528,11 @@ module.exports = {
   createCourse,
   getCourses,
   getCourse,
+  getBySlug: getCourse,
   updateCourse,
   deleteCourse,
   getInstructorCourses,
+  getCoursesByInstructor,
+  getInstructorCoursesWithStats,
   publishCourse,
 };
