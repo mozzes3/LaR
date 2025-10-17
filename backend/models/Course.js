@@ -69,6 +69,10 @@ const courseSchema = new mongoose.Schema(
       index: true,
     },
 
+    certificateTemplate: {
+      type: String,
+      default: null, // URL to custom certificate template for this course
+    },
     // Content
     sections: [sectionSchema],
 

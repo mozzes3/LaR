@@ -159,7 +159,43 @@
 .toast-info {
   @apply bg-blue-500 text-white;
 }
+/* Make toasts clickable and dismissible */
+/* Toast slide-out animation */
+[data-hot-toast] {
+  cursor: pointer !important;
+}
 
+/* Override default toast animation */
+@keyframes toast-enter {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-exit {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Apply animations */
+[data-hot-toast][data-visible="true"] {
+  animation: toast-enter 0.3s ease-out;
+}
+
+[data-hot-toast][data-visible="false"] {
+  animation: toast-exit 0.3s ease-in;
+}
 /* Modal Overlay */
 .modal-overlay {
   @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50;

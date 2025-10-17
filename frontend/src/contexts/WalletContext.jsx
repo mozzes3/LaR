@@ -96,29 +96,53 @@ export const WalletProvider = ({ children }) => {
       setSigner(signer);
       setAccount(address);
 
-      // Get nonce from backend
-      const { data } = await api.post("/auth/nonce", {
+      // TEMPORARY: Mock data for testing (remove when backend is ready)
+      const mockUser = {
+        id: 1,
+        username: "CryptoMaverick",
         walletAddress: address,
-      });
+        email: null,
+        isInstructor: true, // SET THIS TO TRUE TO SEE INSTRUCTOR DASHBOARD
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${address}`,
+        createdAt: new Date().toISOString(),
+      };
 
-      // Sign message
-      const signature = await signer.signMessage(data.message);
+      const mockToken = "mock_token_" + Date.now();
 
-      // Verify signature and login
-      const loginResponse = await api.post("/auth/verify", {
-        walletAddress: address,
-        signature,
-      });
+      setToken(mockToken);
+      setUser(mockUser);
+      localStorage.setItem("token", mockToken);
 
-      setToken(loginResponse.data.token);
-      setUser(loginResponse.data.user);
-      localStorage.setItem("token", loginResponse.data.token);
+      toast.success("Welcome to Founder Academy! (Mock Mode)");
+      setIsConnecting(false);
+      return;
 
-      toast.success(
-        loginResponse.data.isNewUser
-          ? "Welcome to Founder Academy!"
-          : "Welcome back!"
-      );
+      // TODO: Uncomment when backend is ready
+      /*
+    // Get nonce from backend
+    const { data } = await api.post("/auth/nonce", {
+      walletAddress: address,
+    });
+
+    // Sign message
+    const signature = await signer.signMessage(data.message);
+
+    // Verify signature and login
+    const loginResponse = await api.post("/auth/verify", {
+      walletAddress: address,
+      signature,
+    });
+
+    setToken(loginResponse.data.token);
+    setUser(loginResponse.data.user);
+    localStorage.setItem("token", loginResponse.data.token);
+
+    toast.success(
+      loginResponse.data.isNewUser
+        ? "Welcome to Founder Academy!"
+        : "Welcome back!"
+    );
+    */
     } catch (error) {
       console.error("Wallet connection error:", error);
       toast.error(error.response?.data?.error || "Failed to connect wallet");

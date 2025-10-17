@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import { Toaster, toast } from "react-hot-toast";
 import App from "./App";
 import "./index.css";
 
@@ -11,12 +11,16 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <App />
       <Toaster
         position="top-right"
+        containerStyle={{
+          top: 60, // Push down from top
+        }}
         toastOptions={{
-          duration: 4000,
+          duration: 2500, // Shorter duration
           style: {
             background: "#1a1a1a",
             color: "#fff",
             border: "1px solid #facc15",
+            cursor: "pointer", // Show it's clickable
           },
           success: {
             iconTheme: {
@@ -29,6 +33,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
               primary: "#ef4444",
               secondary: "#fff",
             },
+          },
+          // Make dismissible on click
+          onClick: (event) => {
+            const toastId = event.currentTarget.getAttribute("data-toast-id");
+            if (toastId) toast.dismiss(toastId);
           },
         }}
       />

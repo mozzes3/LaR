@@ -85,7 +85,7 @@ const DashboardPage = () => {
       lastWatched: "3 days ago",
       rating: 4.7,
       status: "completed",
-      // certificateUrl: "/certificates/2",
+      certificateUrl: "/certificates/2",
     },
     {
       id: 3,
@@ -142,6 +142,7 @@ const DashboardPage = () => {
       timeLeft: "15h 30m",
     },
   ];
+
   const stats = [
     {
       label: "Courses Enrolled",
@@ -178,6 +179,7 @@ const DashboardPage = () => {
       borderColor: "border-primary-400/20",
     },
   ];
+
   const filteredCourses = enrolledCourses.filter((course) => {
     const matchesFilter =
       selectedFilter === "all" ||
@@ -532,7 +534,7 @@ const DashboardPage = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <button
-                          onClick={() => navigate(`/certificates/${course.id}`)}
+                          onClick={() => navigate(course.certificateUrl)}
                           className="py-2 bg-primary-400 text-black rounded-lg font-bold hover:bg-primary-500 transition text-sm flex items-center justify-center space-x-1"
                         >
                           <Award className="w-4 h-4" />
