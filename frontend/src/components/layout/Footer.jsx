@@ -12,9 +12,9 @@ const Footer = () => {
           <div>
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-lg flex items-center justify-center font-bold text-black">
-                FA
+                LA
               </div>
-              <span className="text-xl font-bold">Founder Academy</span>
+              <span className="text-xl font-bold">Lizard Academy</span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               Empowering the next generation of Web3 founders and creators.

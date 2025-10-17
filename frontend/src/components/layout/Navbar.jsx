@@ -56,10 +56,10 @@ const Navbar = () => {
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-lg flex items-center justify-center font-bold text-black transform group-hover:scale-110 transition">
-                FA
+                LA {/* or 🦎 emoji */}
               </div>
               <span className="text-xl font-bold hidden sm:block">
-                Founder Academy
+                Lizard Academy
               </span>
             </Link>
 

@@ -110,7 +110,7 @@ const verifyAndLogin = async (req, res) => {
 
       // Generate unique username
       const randomSuffix = Math.floor(Math.random() * 10000);
-      const username = `founder${randomSuffix}`;
+      const username = `lizard${randomSuffix}`;
 
       user = await User.create({
         walletAddress: normalizedAddress,

@@ -9,10 +9,21 @@ const {
 
 // Public routes
 router.get("/", optionalAuth, courseController.getCourses);
-router.get("/:slug", optionalAuth, courseController.getCourse);
 
-// Instructor routes
+// Instructor routes - MOVE THESE BEFORE /:slug
+router.get(
+  "/instructor/my-courses", // ← Move this BEFORE /:slug
+  authenticate,
+  isInstructor,
+  courseController.getInstructorCourses
+);
 router.post("/", authenticate, isInstructor, courseController.createCourse);
+router.post(
+  "/:slug/publish",
+  authenticate,
+  isInstructor,
+  courseController.publishCourse
+);
 router.put("/:slug", authenticate, isInstructor, courseController.updateCourse);
 router.delete(
   "/:slug",
@@ -20,17 +31,8 @@ router.delete(
   isInstructor,
   courseController.deleteCourse
 );
-router.post(
-  "/:slug/publish",
-  authenticate,
-  isInstructor,
-  courseController.publishCourse
-);
-router.get(
-  "/instructor/my-courses",
-  authenticate,
-  isInstructor,
-  courseController.getInstructorCourses
-);
+
+// Dynamic route - KEEP THIS LAST
+router.get("/:slug", optionalAuth, courseController.getCourse); // ← This should be last
 
 module.exports = router;

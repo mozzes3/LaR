@@ -106,209 +106,6 @@ const CoursesPage = () => {
     { value: "price-high", label: "Price: High to Low" },
   ];
 
-  const mockCourses = [
-    {
-      id: 1,
-      slug: "nft-marketing-masterclass",
-      title: "NFT Marketing Masterclass: 0 to 10K Discord Members",
-      subtitle: "Learn proven strategies to grow your NFT community from zero",
-      instructor: {
-        username: "CryptoMaverick",
-        avatar:
-          "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoMaverick",
-        verified: true,
-        followers: "45K",
-        badge: "KOL",
-        badgeColor: "purple",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&h=450&fit=crop",
-      price: { usd: 299, fdr: 299 },
-      rating: 4.9,
-      students: 1247,
-      duration: "12h 30m",
-      category: "marketing",
-      level: "Intermediate",
-      trending: true,
-      featured: true,
-      lessons: 47,
-      lastUpdated: "2 days ago",
-      language: "English",
-      whatYouWillLearn: [
-        "Discord server setup and optimization",
-        "Community engagement strategies",
-        "Marketing funnel creation",
-        "Influencer partnership strategies",
-      ],
-    },
-    {
-      id: 2,
-      slug: "solidity-smart-contracts",
-      title: "Solidity Smart Contracts: Build Your First DeFi Protocol",
-      subtitle: "Master Solidity and build real-world DeFi applications",
-      instructor: {
-        username: "DevWizard",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=DevWizard",
-        verified: true,
-        followers: "32K",
-        badge: "Professional",
-        badgeColor: "blue",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1639322537228-f710d846310a?w=800&h=450&fit=crop",
-      price: { usd: 399, fdr: 399 },
-      rating: 4.8,
-      students: 892,
-      duration: "18h 45m",
-      category: "smart-contracts",
-      level: "Advanced",
-      trending: true,
-      featured: true,
-      lessons: 68,
-      lastUpdated: "1 week ago",
-      language: "English",
-      whatYouWillLearn: [
-        "Smart contract development",
-        "DeFi protocol architecture",
-        "Security best practices",
-        "Testing and deployment",
-      ],
-    },
-    {
-      id: 3,
-      slug: "discord-community-growth",
-      title: "Discord Community Building: Launch & Scale Your Web3 DAO",
-      subtitle: "Build engaged communities that drive NFT project success",
-      instructor: {
-        username: "CommunityQueen",
-        avatar:
-          "https://api.dicebear.com/7.x/avataaars/svg?seed=CommunityQueen",
-        verified: true,
-        followers: "28K",
-        badge: "Expert",
-        badgeColor: "green",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1611746872915-64382b5c76da?w=800&h=450&fit=crop",
-      price: { usd: 199, fdr: 199 },
-      rating: 4.9,
-      students: 1654,
-      duration: "8h 20m",
-      category: "community",
-      level: "Beginner",
-      trending: false,
-      featured: false,
-      lessons: 34,
-      lastUpdated: "3 days ago",
-      language: "English",
-      whatYouWillLearn: [
-        "Community management basics",
-        "Engagement strategies",
-        "DAO governance setup",
-        "Moderation best practices",
-      ],
-    },
-    {
-      id: 4,
-      slug: "nft-art-creation",
-      title: "NFT Art Creation: From Concept to OpenSea",
-      subtitle: "Learn to create and sell your NFT art",
-      instructor: {
-        username: "ArtistPro",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=ArtistPro",
-        verified: true,
-        followers: "52K",
-        badge: "Creator",
-        badgeColor: "pink",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=800&h=450&fit=crop",
-      price: { usd: 249, fdr: 249 },
-      rating: 4.7,
-      students: 2103,
-      duration: "10h 15m",
-      category: "nft",
-      level: "Beginner",
-      trending: false,
-      featured: true,
-      lessons: 42,
-      lastUpdated: "5 days ago",
-      language: "English",
-      whatYouWillLearn: [
-        "Digital art creation tools",
-        "NFT minting process",
-        "Marketing your art collection",
-        "Building your artist brand",
-      ],
-    },
-    {
-      id: 5,
-      slug: "defi-yield-farming",
-      title: "DeFi Yield Farming: Maximize Your Crypto Returns",
-      subtitle: "Learn advanced DeFi strategies for passive income",
-      instructor: {
-        username: "YieldMaster",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=YieldMaster",
-        verified: true,
-        followers: "38K",
-        badge: "Professional",
-        badgeColor: "blue",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&h=450&fit=crop",
-      price: { usd: 349, fdr: 349 },
-      rating: 4.8,
-      students: 756,
-      duration: "14h 30m",
-      category: "defi",
-      level: "Intermediate",
-      trending: false,
-      featured: false,
-      lessons: 52,
-      lastUpdated: "1 week ago",
-      language: "English",
-      whatYouWillLearn: [
-        "Yield farming strategies",
-        "Risk management techniques",
-        "Protocol analysis",
-        "Portfolio optimization",
-      ],
-    },
-    {
-      id: 6,
-      slug: "web3-full-stack",
-      title: "Web3 Full Stack Development: Build dApps from Scratch",
-      subtitle: "Complete guide to building decentralized applications",
-      instructor: {
-        username: "CodeNinja",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=CodeNinja",
-        verified: true,
-        followers: "41K",
-        badge: "Expert",
-        badgeColor: "green",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=450&fit=crop",
-      price: { usd: 449, fdr: 449 },
-      rating: 4.9,
-      students: 1523,
-      duration: "22h 45m",
-      category: "development",
-      level: "Advanced",
-      trending: true,
-      featured: true,
-      lessons: 89,
-      lastUpdated: "4 days ago",
-      language: "English",
-      whatYouWillLearn: [
-        "React + Web3 integration",
-        "Smart contract interaction",
-        "Full dApp deployment",
-        "Testing and debugging",
-      ],
-    },
-  ];
-
   // Sync URL search param with filters
   useEffect(() => {
     const urlSearch = searchParams.get("search");
@@ -326,73 +123,79 @@ const CoursesPage = () => {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      let filteredCourses = [...mockCourses];
+      // Real API call
+      const response = await courseApi.getAll({
+        search: filters.search,
+        category: filters.category,
+        level: filters.level === "All Levels" ? "" : filters.level,
+        minPrice: filters.minPrice,
+        maxPrice: filters.maxPrice,
+        rating: filters.rating,
+        sort: filters.sort,
+        page: 1,
+        limit: 100,
+      });
 
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        filteredCourses = filteredCourses.filter(
-          (course) =>
-            course.title.toLowerCase().includes(searchLower) ||
-            course.subtitle.toLowerCase().includes(searchLower) ||
-            course.instructor.username.toLowerCase().includes(searchLower)
-        );
-      }
+      // Transform backend data to match frontend expectations
+      const transformedCourses = (response.data.courses || []).map(
+        (course) => ({
+          id: course._id,
+          slug: course.slug,
+          title: course.title,
+          subtitle: course.subtitle,
+          thumbnail: course.thumbnail,
+          price: course.price,
+          rating: course.averageRating || 0,
+          students: course.enrollmentCount || 0,
+          duration: formatDuration(course.totalDuration || 0),
+          category: course.category.toLowerCase().replace(/\s+/g, "-"),
+          level: course.level,
+          trending: course.enrollmentCount > 500,
+          featured: course.averageRating >= 4.8,
+          lessons: course.totalLessons || 0,
+          lastUpdated: formatDate(course.updatedAt),
+          language: "English",
+          whatYouWillLearn: course.whatYouWillLearn || [],
+          instructor: {
+            username: course.instructor?.username || "Unknown",
+            avatar:
+              course.instructor?.avatar ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${course._id}`,
+            verified: course.instructor?.instructorVerified || false,
+            followers: "0",
+            badge: course.instructor?.expertise?.[0] || "Instructor",
+            badgeColor: "blue",
+          },
+        })
+      );
 
-      if (filters.category) {
-        filteredCourses = filteredCourses.filter(
-          (course) => course.category === filters.category
-        );
-      }
-
-      if (filters.level && filters.level !== "All Levels") {
-        filteredCourses = filteredCourses.filter(
-          (course) => course.level === filters.level
-        );
-      }
-
-      if (filters.minPrice) {
-        filteredCourses = filteredCourses.filter(
-          (course) => course.price.usd >= Number(filters.minPrice)
-        );
-      }
-      if (filters.maxPrice) {
-        filteredCourses = filteredCourses.filter(
-          (course) => course.price.usd <= Number(filters.maxPrice)
-        );
-      }
-
-      if (filters.rating) {
-        filteredCourses = filteredCourses.filter(
-          (course) => course.rating >= Number(filters.rating)
-        );
-      }
-
-      switch (filters.sort) {
-        case "popular":
-          filteredCourses.sort((a, b) => b.students - a.students);
-          break;
-        case "rating":
-          filteredCourses.sort((a, b) => b.rating - a.rating);
-          break;
-        case "price-low":
-          filteredCourses.sort((a, b) => a.price.usd - b.price.usd);
-          break;
-        case "price-high":
-          filteredCourses.sort((a, b) => b.price.usd - a.price.usd);
-          break;
-        default:
-          break;
-      }
-
-      setCourses(filteredCourses);
+      setCourses(transformedCourses);
       setLoading(false);
     } catch (error) {
       console.error("Fetch courses error:", error);
       toast.error("Failed to load courses");
+      setCourses([]); // Empty array instead of mock data
       setLoading(false);
     }
+  };
+
+  // Add helper functions at the bottom
+  const formatDuration = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
+
+  const formatDate = (date) => {
+    const days = Math.floor(
+      (new Date() - new Date(date)) / (1000 * 60 * 60 * 24)
+    );
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    return `${Math.floor(days / 30)} months ago`;
   };
 
   const handleFilterChange = (key, value) => {
@@ -445,8 +248,8 @@ const CoursesPage = () => {
     }
   };
 
-  const featuredCourses = mockCourses.filter((c) => c.featured);
-  const trendingCourses = mockCourses.filter((c) => c.trending);
+  const featuredCourses = courses.filter((c) => c.featured);
+  const trendingCourses = courses.filter((c) => c.trending);
   return (
     <div className="min-h-screen bg-white dark:bg-black">
       {/* Header */}
@@ -548,7 +351,7 @@ const CoursesPage = () => {
               </div>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {categoryList.map((category) => {
-                  const categoryCourses = mockCourses.filter(
+                  const categoryCourses = courses.filter(
                     (c) => c.category === category.id
                   );
                   return (

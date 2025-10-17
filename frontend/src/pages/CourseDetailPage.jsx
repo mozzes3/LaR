@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { courseApi } from "@services/api";
 import {
   Star,
   Clock,
@@ -27,7 +28,6 @@ import {
   AlertCircle,
   X,
 } from "lucide-react";
-import { courseApi } from "@services/api"; // This is unused, but kept as requested
 import { useWallet } from "@contexts/WalletContext";
 import toast from "react-hot-toast";
 
@@ -45,6 +45,7 @@ const CourseDetailPage = () => {
   const [currentPreviewVideo, setCurrentPreviewVideo] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState("usdt");
   const [showAllPayments, setShowAllPayments] = useState(false);
+  const [isInstructor, setIsInstructor] = useState(false);
 
   // Mock crypto prices (in production, fetch from API)
   const cryptoPrices = {
@@ -115,254 +116,97 @@ const CourseDetailPage = () => {
 
   const selectedOption = paymentOptions.find((p) => p.id === selectedPayment);
 
-  const mockCourse = {
-    id: 1,
-    slug: "nft-marketing-masterclass",
-    title: "NFT Marketing Masterclass: 0 to 10K Discord Members",
-    subtitle:
-      "Learn proven strategies to grow your NFT community from zero to a thriving ecosystem of engaged members",
-    description:
-      "This comprehensive masterclass teaches you everything you need to know about NFT marketing. From setting up your Discord server to running successful marketing campaigns, you'll learn the exact strategies used by top NFT projects to build engaged communities of thousands of members.",
-    instructor: {
-      id: 1,
-      username: "CryptoMaverick",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoMaverick",
-      verified: true,
-      bio: "Former marketing director at top NFT projects including Bored Ape Yacht Club and Azuki. Helped launch 15+ successful collections with combined sales of over $50M. Now teaching the next generation of Web3 marketers.",
-      followers: "45K",
-      students: 5240,
-      courses: 8,
-      rating: 4.9,
-      badge: "KOL",
-      badgeColor: "purple",
-      expertise: ["NFT Marketing", "Community Building", "Discord Growth"],
-      socialLinks: {
-        twitter: "https://twitter.com/cryptomaverick",
-        website: "https://cryptomaverick.com",
-      },
-    },
-    thumbnail:
-      "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1200&h=675&fit=crop",
-    previewVideoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-    price: { usd: 299 },
-    discountPrice: null,
-    rating: 4.9,
-    totalRatings: 1247,
-    ratingDistribution: { 5: 980, 4: 200, 3: 45, 2: 15, 1: 7 },
-    students: 1247,
-    duration: "12h 30m",
-    totalLessons: 47,
-    category: "Marketing",
-    level: "Intermediate",
-    language: "English",
-    lastUpdated: "2 days ago",
-    createdAt: "January 15, 2024",
-    whatYouWillLearn: [
-      "Set up and optimize a Discord server for maximum engagement",
-      "Create a complete marketing funnel for your NFT project",
-      "Run successful Twitter and Discord marketing campaigns",
-      "Implement proven community growth strategies that scale",
-      "Use analytics and data to optimize your marketing efforts",
-      "Launch successful NFT mints with 10K+ engaged community members",
-      "Build strategic partnerships with influencers and other projects",
-      "Create compelling content that drives engagement and sales",
-      "Manage and moderate large communities effectively",
-      "Develop a sustainable long-term community growth strategy",
-    ],
-    requirements: [
-      "Basic understanding of NFTs and Discord",
-      "A Discord account (free to create)",
-      "Willingness to learn and implement strategies",
-      "No prior marketing experience required",
-    ],
-    targetAudience: [
-      "NFT project founders and co-founders",
-      "Community managers and moderators",
-      "Web3 marketing professionals",
-      "Anyone looking to launch an NFT project",
-      "Discord server owners wanting to grow their community",
-    ],
-    sections: [
-      {
-        id: 1,
-        title: "Getting Started: Discord Fundamentals",
-        lessons: [
-          {
-            id: 1,
-            title: "Welcome to the Course",
-            duration: "5:30",
-            isPreview: true,
-            type: "video",
-            videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-          },
-          {
-            id: 2,
-            title: "Setting Up Your Discord Server",
-            duration: "15:45",
-            isPreview: true,
-            type: "video",
-            videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-          },
-          {
-            id: 3,
-            title: "Server Structure and Channels",
-            duration: "12:20",
-            isPreview: false,
-            type: "video",
-          },
-          {
-            id: 4,
-            title: "Roles and Permissions Setup",
-            duration: "18:15",
-            isPreview: false,
-            type: "video",
-          },
-        ],
-      },
-      {
-        id: 2,
-        title: "Community Growth Strategies",
-        lessons: [
-          {
-            id: 5,
-            title: "Understanding Your Target Audience",
-            duration: "14:30",
-            isPreview: false,
-            type: "video",
-          },
-          {
-            id: 6,
-            title: "Creating Engaging Content",
-            duration: "16:45",
-            isPreview: false,
-            type: "video",
-          },
-          {
-            id: 7,
-            title: "Twitter Marketing for NFTs",
-            duration: "22:10",
-            isPreview: false,
-            type: "video",
-          },
-          {
-            id: 8,
-            title: "Influencer Partnerships",
-            duration: "19:25",
-            isPreview: false,
-            type: "video",
-          },
-        ],
-      },
-      {
-        id: 3,
-        title: "Advanced Marketing Tactics",
-        lessons: [
-          {
-            id: 9,
-            title: "Creating a Marketing Funnel",
-            duration: "25:40",
-            isPreview: false,
-            type: "video",
-          },
-          {
-            id: 10,
-            title: "Whitelist Campaigns That Convert",
-            duration: "18:55",
-            isPreview: false,
-            type: "video",
-          },
-          {
-            id: 11,
-            title: "Launch Day Strategies",
-            duration: "21:30",
-            isPreview: false,
-            type: "video",
-          },
-        ],
-      },
-    ],
-    features: [
-      {
-        icon: <Play className="w-5 h-5" />,
-        text: "12.5 hours on-demand video",
-      },
-      {
-        icon: <FileText className="w-5 h-5" />,
-        text: "15 downloadable resources",
-      },
-      {
-        icon: <Download className="w-5 h-5" />,
-        text: "Access on mobile and desktop",
-      },
-      {
-        icon: <Trophy className="w-5 h-5" />,
-        text: "Certificate of completion",
-      },
-      { icon: <Clock className="w-5 h-5" />, text: "Lifetime access" },
-      {
-        icon: <MessageSquare className="w-5 h-5" />,
-        text: "Direct instructor support",
-      },
-    ],
-    reviews: [
-      {
-        id: 1,
-        user: {
-          name: "Sarah Johnson",
-          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-          verified: true,
-        },
-        rating: 5,
-        date: "2 days ago",
-        comment:
-          "This course completely changed how I approach NFT marketing. The strategies are practical and actually work. Grew my Discord from 500 to 5000 members in just 2 months!",
-        helpful: 234,
-      },
-      {
-        id: 2,
-        user: {
-          name: "Alex Chen",
-          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
-          verified: true,
-        },
-        rating: 5,
-        date: "1 week ago",
-        comment:
-          "Best NFT marketing course out there. CryptoMaverick knows his stuff and explains everything clearly. The real-world examples are gold.",
-        helpful: 189,
-      },
-      {
-        id: 3,
-        user: {
-          name: "Mike Rodriguez",
-          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mike",
-          verified: false,
-        },
-        rating: 4,
-        date: "2 weeks ago",
-        comment:
-          "Great content overall. Would love to see more advanced tactics for projects that already have 10K+ members.",
-        helpful: 92,
-      },
-    ],
-  };
-
   useEffect(() => {
-    fetchCourse();
-  }, [slug]);
+    const loadCourse = async () => {
+      try {
+        setLoading(true);
 
-  const fetchCourse = async () => {
-    try {
-      setLoading(true);
-      setTimeout(() => {
-        setCourse(mockCourse);
+        // Real API call
+        const response = await courseApi.getBySlug(slug);
+
+        // Transform data
+        const courseData = {
+          ...response.data.course,
+          id: response.data.course._id,
+          students: response.data.course.enrollmentCount || 0,
+          duration: formatDuration(response.data.course.totalDuration || 0),
+          lessons: response.data.course.totalLessons || 0,
+          rating: response.data.course.averageRating || 0,
+          totalRatings: response.data.course.totalRatings || 0,
+          ratingDistribution: response.data.course.ratingDistribution || {
+            5: 0,
+            4: 0,
+            3: 0,
+            2: 0,
+            1: 0,
+          },
+          reviews: [],
+          features: [
+            {
+              icon: <Clock className="w-5 h-5" />,
+              text: `${formatDuration(
+                response.data.course.totalDuration || 0
+              )} on-demand video`,
+            },
+            {
+              icon: <Download className="w-5 h-5" />,
+              text: "Downloadable resources",
+            },
+            {
+              icon: <Trophy className="w-5 h-5" />,
+              text: "Certificate of completion",
+            },
+            {
+              icon: <Users className="w-5 h-5" />,
+              text: "Lifetime access",
+            },
+          ],
+          instructor: {
+            ...response.data.course.instructor,
+            verified:
+              response.data.course.instructor?.instructorVerified || false,
+            totalStudents: response.data.course.instructor?.totalStudents || 0,
+            totalCoursesCreated:
+              response.data.course.instructor?.totalCoursesCreated || 0,
+            rating: response.data.course.instructor?.averageRating || 0,
+            followers: "0",
+            badge:
+              response.data.course.instructor?.expertise?.[0] || "Instructor",
+            badgeColor: "blue",
+            bio:
+              response.data.course.instructor?.bio ||
+              response.data.course.instructor?.instructorBio ||
+              "",
+            expertise: response.data.course.instructor?.expertise || [],
+            socialLinks: response.data.course.instructor?.socialLinks || {
+              twitter: "",
+              website: "",
+            },
+          },
+        };
+
+        setCourse(courseData);
+        setHasPurchased(response.data.hasPurchased || false);
+        setIsInstructor(response.data.isInstructor || false);
         setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error("Fetch course error:", error);
-      toast.error("Failed to load course");
-      setLoading(false);
+      } catch (error) {
+        console.error("Error loading course:", error);
+        toast.error("Failed to load course");
+        setLoading(false);
+        navigate("/courses");
+      }
+    };
+
+    if (slug) {
+      loadCourse();
     }
+  }, [slug, navigate]);
+
+  // Helper function
+  const formatDuration = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
   };
 
   const toggleSection = (sectionId) => {
@@ -378,7 +222,8 @@ const CourseDetailPage = () => {
       toast.error("Please connect your wallet to enroll");
       return;
     }
-    navigate(`/checkout/${course.id}`, {
+    navigate(`/checkout/${course.slug}`, {
+      // ← Use slug instead of id
       state: { paymentMethod: selectedPayment },
     });
   };
@@ -508,12 +353,14 @@ const CourseDetailPage = () => {
                   <Star className="w-5 h-5 text-primary-400 fill-primary-400" />
                   <span className="text-lg font-bold">{course.rating}</span>
                   <span className="text-gray-400">
-                    ({course.totalRatings.toLocaleString()} ratings)
+                    ({(course?.totalRatings || 0).toLocaleString()} ratings)
                   </span>
                 </div>
                 <div className="flex items-center space-x-1 text-gray-400">
                   <Users className="w-5 h-5" />
-                  <span>{course.students.toLocaleString()} students</span>
+                  <span>
+                    {(course.students || 0).toLocaleString()} students
+                  </span>
                 </div>
               </div>
               <div className="flex items-center space-x-4 p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
@@ -540,8 +387,9 @@ const CourseDetailPage = () => {
                     </div>
                   </div>
                   <p className="text-sm text-gray-400">
-                    {course.instructor.students.toLocaleString()} students •{" "}
-                    {course.instructor.courses} courses
+                    {(course.instructor?.totalStudents || 0).toLocaleString()}{" "}
+                    students • {course.instructor?.totalCoursesCreated || 0}{" "}
+                    courses
                   </p>
                 </div>
                 <Link
@@ -988,7 +836,7 @@ const CourseDetailPage = () => {
                     <div className="grid grid-cols-4 gap-4 mb-6">
                       <div>
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {course.instructor.rating}
+                          {course.instructor?.rating || 0}
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           Rating
@@ -996,7 +844,9 @@ const CourseDetailPage = () => {
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {course.instructor.students.toLocaleString()}
+                          {(
+                            course.instructor?.totalStudents || 0
+                          ).toLocaleString()}
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           Students
@@ -1004,7 +854,7 @@ const CourseDetailPage = () => {
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {course.instructor.courses}
+                          {course.instructor?.totalCoursesCreated || 0}
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           Courses
@@ -1012,7 +862,7 @@ const CourseDetailPage = () => {
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {course.instructor.followers}
+                          {course.instructor?.followers || "0"}
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           Followers
@@ -1125,7 +975,7 @@ const CourseDetailPage = () => {
                         ))}
                       </div>
                       <div className="text-gray-600 dark:text-gray-400">
-                        {course.totalRatings.toLocaleString()} ratings
+                        {(course?.totalRatings || 0).toLocaleString()} ratings
                       </div>
                     </div>
                     <div className="space-y-2">

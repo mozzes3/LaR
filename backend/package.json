@@ -1,7 +1,7 @@
 {
-  "name": "founder-academy-backend",
+  "name": "lizard-academy-backend",
   "version": "1.0.0",
-  "description": "Founder Academy Backend API",
+  "description": "Lizard Academy Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

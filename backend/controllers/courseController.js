@@ -108,7 +108,7 @@ const getCourse = async (req, res) => {
 
     const course = await Course.findOne({ slug }).populate(
       "instructor",
-      "username avatar bio instructorBio expertise averageRating totalStudents"
+      "username avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks" // Added more fields
     );
 
     if (!course) {
@@ -135,6 +135,8 @@ const getCourse = async (req, res) => {
     }
 
     const courseData = course.toObject();
+
+    // Hide lesson videos if not purchased (except previews)
     if (
       !hasPurchased &&
       req.userId?.toString() !== course.instructor._id.toString()

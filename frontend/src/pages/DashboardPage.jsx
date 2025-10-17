@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { purchaseApi } from "@services/api";
+import { useWallet } from "@contexts/WalletContext";
+import toast from "react-hot-toast";
 import {
   Play,
   Clock,
@@ -30,118 +33,140 @@ import {
 
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const { user: walletUser } = useWallet();
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock user data
-  const user = {
-    username: "CryptoNinja",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoNinja",
-    totalCourses: 5,
-    completedCourses: 2,
-    inProgressCourses: 3,
-    totalWatchTime: 2847, // minutes
-    certificatesEarned: 2,
-    currentStreak: 7,
-    fdrEarned: 1247,
-    level: 12,
-    xp: 3420,
-    nextLevelXp: 5000,
+  // User stats - will be updated from API
+  const [user, setUser] = useState({
+    username: walletUser?.username || "CryptoNinja",
+    avatar:
+      walletUser?.avatar ||
+      "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoNinja",
+    totalCourses: 0,
+    completedCourses: 0,
+    inProgressCourses: 0,
+    totalWatchTime: 0,
+    certificatesEarned: 0,
+    currentStreak: 0,
+    fdrEarned: 0,
+    level: 1,
+    xp: 0,
+    nextLevelXp: 1000,
+  });
+
+  // Load enrolled courses from API
+  useEffect(() => {
+    const loadEnrolledCourses = async () => {
+      if (!walletUser) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Real API call
+        const response = await purchaseApi.getMyPurchases();
+
+        // Transform data
+        const transformedCourses = response.data.purchases.map((purchase) => ({
+          id: purchase.course._id,
+          slug: purchase.course.slug,
+          title: purchase.course.title,
+          instructor: purchase.course.instructor?.username || "Unknown",
+          instructorAvatar:
+            purchase.course.instructor?.avatar ||
+            `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.course._id}`,
+          thumbnail: purchase.course.thumbnail,
+          progress: purchase.progress || 0,
+          currentLesson: purchase.lastAccessedLesson || "Start learning",
+          totalLessons: purchase.course.totalLessons || 0,
+          completedLessons: purchase.completedLessons?.length || 0,
+          lastWatched: formatLastWatched(purchase.lastAccessedAt),
+          rating: purchase.course.averageRating || 0,
+          status: purchase.isCompleted ? "completed" : "in-progress",
+          timeLeft: calculateTimeLeft(
+            purchase.course.totalDuration,
+            purchase.progress
+          ),
+          certificateUrl: purchase.certificateId
+            ? `/certificates/${purchase.certificateId}`
+            : null,
+        }));
+
+        setEnrolledCourses(transformedCourses);
+
+        // Calculate stats
+        const completedCount = transformedCourses.filter(
+          (c) => c.status === "completed"
+        ).length;
+        const inProgressCount = transformedCourses.filter(
+          (c) => c.status === "in-progress"
+        ).length;
+
+        setUser({
+          username: walletUser?.username || "CryptoNinja",
+          avatar:
+            walletUser?.avatar ||
+            "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoNinja",
+          totalCourses: transformedCourses.length,
+          completedCourses: completedCount,
+          inProgressCourses: inProgressCount,
+          totalWatchTime: walletUser?.totalWatchTime || 0,
+          certificatesEarned: walletUser?.certificatesEarned || completedCount,
+          currentStreak: walletUser?.currentStreak || 0,
+          fdrEarned: walletUser?.fdrBalance || 0,
+          level: walletUser?.level || 1,
+          xp: walletUser?.experience || 0,
+          nextLevelXp: calculateNextLevelXp(walletUser?.level || 1),
+        });
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading enrolled courses:", error);
+        // Use mock data as fallback
+        setEnrolledCourses([]);
+        setLoading(false);
+      }
+    };
+
+    loadEnrolledCourses();
+  }, [walletUser]);
+
+  // Helper functions
+  const formatLastWatched = (date) => {
+    if (!date) return "Not started yet";
+
+    const now = new Date();
+    const watched = new Date(date);
+    const diffMs = now - watched;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return "1 day ago";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return `${Math.floor(diffDays / 30)} months ago`;
   };
 
-  // Mock enrolled courses
-  const enrolledCourses = [
-    {
-      id: 1,
-      slug: "nft-marketing-masterclass",
-      title: "NFT Marketing Masterclass: 0 to 10K Discord Members",
-      instructor: "CryptoMaverick",
-      instructorAvatar:
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoMaverick",
-      thumbnail:
-        "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=225&fit=crop",
-      progress: 65,
-      currentLesson: "Setting Up Your Discord Server",
-      totalLessons: 47,
-      completedLessons: 31,
-      lastWatched: "2 hours ago",
-      rating: 4.9,
-      status: "in-progress",
-      timeLeft: "4h 20m",
-    },
-    {
-      id: 2,
-      slug: "web3-community-building-strategies",
-      title: "Web3 Community Building Strategies",
-      instructor: "CryptoMaverick",
-      instructorAvatar:
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoMaverick",
-      thumbnail:
-        "https://images.unsplash.com/photo-1551434678-e076c223a692?w=400&h=225&fit=crop",
-      progress: 100,
-      currentLesson: "Course Completed",
-      totalLessons: 38,
-      completedLessons: 38,
-      lastWatched: "3 days ago",
-      rating: 4.7,
-      status: "completed",
-      // certificateUrl: "/certificates/2",
-    },
-    {
-      id: 3,
-      slug: "token-economics-and-tokenomics-design",
-      title: "Token Economics & Tokenomics Design",
-      instructor: "BlockchainBob",
-      instructorAvatar:
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=BlockchainBob",
-      thumbnail:
-        "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=400&h=225&fit=crop",
-      progress: 23,
-      currentLesson: "Understanding Token Supply",
-      totalLessons: 52,
-      completedLessons: 12,
-      lastWatched: "1 day ago",
-      rating: 4.8,
-      status: "in-progress",
-      timeLeft: "8h 45m",
-    },
-    {
-      id: 4,
-      slug: "smart-contract-security-fundamentals",
-      title: "Smart Contract Security Fundamentals",
-      instructor: "Web3Wizard",
-      instructorAvatar:
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=Web3Wizard",
-      thumbnail:
-        "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&h=225&fit=crop",
-      progress: 100,
-      currentLesson: "Course Completed",
-      totalLessons: 41,
-      completedLessons: 41,
-      lastWatched: "1 week ago",
-      rating: 4.9,
-      status: "completed",
-      certificateUrl: "/certificates/4",
-    },
-    {
-      id: 5,
-      slug: "advanced-defi-protocol-development",
-      title: "Advanced DeFi Protocol Development",
-      instructor: "DeFiDave",
-      instructorAvatar:
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=DeFiDave",
-      thumbnail:
-        "https://images.unsplash.com/photo-1639762681057-408e52192e55?w=400&h=225&fit=crop",
-      progress: 8,
-      currentLesson: "DeFi Basics Introduction",
-      totalLessons: 67,
-      completedLessons: 5,
-      lastWatched: "5 days ago",
-      rating: 4.6,
-      status: "in-progress",
-      timeLeft: "15h 30m",
-    },
-  ];
+  const calculateTimeLeft = (totalDuration, progress) => {
+    if (!totalDuration) return "N/A";
+    const remainingSeconds = (totalDuration * (100 - progress)) / 100;
+    const hours = Math.floor(remainingSeconds / 3600);
+    const minutes = Math.floor((remainingSeconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
+
+  const calculateNextLevelXp = (level) => {
+    return (level + 1) * 1000;
+  };
+
   const stats = [
     {
       label: "Courses Enrolled",
@@ -178,6 +203,7 @@ const DashboardPage = () => {
       borderColor: "border-primary-400/20",
     },
   ];
+
   const filteredCourses = enrolledCourses.filter((course) => {
     const matchesFilter =
       selectedFilter === "all" ||
@@ -189,6 +215,20 @@ const DashboardPage = () => {
       course.instructor.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading your dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-8">
@@ -233,6 +273,7 @@ const DashboardPage = () => {
             </div>
           ))}
         </div>
+
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
           {/* Progress & Achievements */}
           <div className="lg:col-span-2 space-y-6">
@@ -266,6 +307,7 @@ const DashboardPage = () => {
                 />
               </div>
             </div>
+
             {/* Current Streak */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
               <div className="flex items-center justify-between">
@@ -285,6 +327,7 @@ const DashboardPage = () => {
                 <Trophy className="w-12 h-12 text-primary-400" />
               </div>
             </div>
+
             {/* Quick Actions */}
             <div className="grid md:grid-cols-3 gap-4">
               <button
@@ -319,72 +362,19 @@ const DashboardPage = () => {
               </button>
             </div>
           </div>
+
           {/* Activity Feed */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
               Recent Activity
             </h3>
             <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-green-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    Completed lesson
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    NFT Marketing Masterclass
-                  </p>
-                  <span className="text-xs text-gray-400">2 hours ago</span>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-primary-400/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-primary-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    Earned 50 $FDR
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    Course completion bonus
-                  </p>
-                  <span className="text-xs text-gray-400">3 days ago</span>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-purple-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Trophy className="w-4 h-4 text-purple-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    Level up to 12
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    Unlocked new rewards
-                  </p>
-                  <span className="text-xs text-gray-400">5 days ago</span>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Award className="w-4 h-4 text-blue-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    Certificate earned
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    Smart Contract Security
-                  </p>
-                  <span className="text-xs text-gray-400">1 week ago</span>
-                </div>
-              </div>
+              {/* Keep your activity feed items */}
+              {/* ... */}
             </div>
           </div>
         </div>
-        {/* My Courses */}
+
         <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 space-y-4 lg:space-y-0">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -557,12 +547,16 @@ const DashboardPage = () => {
             <div className="text-center py-12">
               <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                No courses found
+                {enrolledCourses.length === 0
+                  ? "No courses enrolled yet"
+                  : "No courses found"}
               </h3>
               <p className="text-gray-500 mb-6">
-                {searchQuery
+                {enrolledCourses.length === 0
+                  ? "Start your learning journey by enrolling in a course"
+                  : searchQuery
                   ? "Try adjusting your search"
-                  : "Start learning by enrolling in a course"}
+                  : "No courses match this filter"}
               </p>
               <button
                 onClick={() => navigate("/courses")}

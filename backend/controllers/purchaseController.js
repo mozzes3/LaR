@@ -83,11 +83,15 @@ const getMyPurchases = async (req, res) => {
       user: req.userId,
       status: "active",
     })
-      .populate(
-        "course",
-        "title slug thumbnail instructor averageRating totalDuration"
-      )
-      .populate("course.instructor", "username avatar")
+      .populate({
+        path: "course",
+        select:
+          "title slug thumbnail instructor totalLessons totalDuration averageRating",
+        populate: {
+          path: "instructor",
+          select: "username avatar",
+        },
+      })
       .sort({ createdAt: -1 });
 
     res.json({ purchases });

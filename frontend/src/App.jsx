@@ -151,7 +151,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
+            <Route path="/checkout/:slug" element={<CheckoutPage />} />
             <Route
               path="certificates"
               element={

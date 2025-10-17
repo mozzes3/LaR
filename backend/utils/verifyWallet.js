@@ -27,7 +27,7 @@ const verifyWalletSignature = async (walletAddress, signature, message) => {
  * @returns {string} - Message to sign
  */
 const generateSignMessage = (walletAddress, nonce) => {
-  return `Welcome to Founder Academy!\n\nSign this message to authenticate your wallet.\n\nWallet: ${walletAddress}\nNonce: ${nonce}\n\nThis request will not trigger a blockchain transaction or cost any gas fees.`;
+  return `Welcome to Lizard Academy!\n\nSign this message to authenticate your wallet.\n\nWallet: ${walletAddress}\nNonce: ${nonce}\n\nThis request will not trigger a blockchain transaction or cost any gas fees.`;
 };
 
 /**
