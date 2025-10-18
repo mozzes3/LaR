@@ -227,3 +227,53 @@
 .video-container iframe {
   @apply absolute top-0 left-0 w-full h-full;
 }
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #facc15, #eab308);
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #eab308, #ca8a04);
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Firefox scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #facc15 transparent;
+}
+
+.dark * {
+  scrollbar-color: #facc15 rgba(255, 255, 255, 0.05);
+}
+
+/* For horizontal scrollbars - make them thinner */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 4px;
+}
+
+/* Hide scrollbar for horizontal category filters but keep functionality */
+.overflow-x-auto.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.overflow-x-auto.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

@@ -60,7 +60,7 @@ const CourseDetailPage = () => {
     sol: 140,
     usdt: 1,
     usdc: 1,
-    fdr: 0.85,
+    fdr: 1,
   };
 
   const calculateCryptoPrice = (usdPrice, crypto) => {
@@ -68,59 +68,79 @@ const CourseDetailPage = () => {
     return crypto === "btc" ? amount.toFixed(4) : amount.toFixed(2);
   };
 
-  const paymentOptions = [
-    {
-      id: "usdt",
-      name: "USDT",
-      icon: "₮",
-      color: "bg-green-500",
-      amount: "299.00",
-      isStable: true,
-    },
-    {
-      id: "usdc",
-      name: "USDC",
-      icon: "$",
-      color: "bg-blue-500",
-      amount: "299.00",
-      isStable: true,
-    },
-    {
-      id: "eth",
-      name: "ETH",
-      icon: "Ξ",
-      color: "bg-gradient-to-br from-purple-500 to-blue-500",
-      amount: calculateCryptoPrice(299, "eth"),
-      isStable: false,
-    },
-    {
-      id: "btc",
-      name: "BTC",
-      icon: "₿",
-      color: "bg-orange-500",
-      amount: calculateCryptoPrice(299, "btc"),
-      isStable: false,
-    },
-    {
-      id: "sol",
-      name: "SOL",
-      icon: "S",
-      color: "bg-gradient-to-br from-purple-500 to-green-400",
-      amount: calculateCryptoPrice(299, "sol"),
-      isStable: false,
-    },
-    {
-      id: "fdr",
-      name: "$FDR",
-      icon: "F",
-      color: "bg-gradient-to-br from-primary-400 to-primary-600",
-      amount: "299",
-      isStable: true,
-      badge: "Save 10%",
-    },
-  ];
+  // Get dynamic payment options based on course price
+  const getPaymentOptions = () => {
+    if (!course?.price) {
+      return [
+        {
+          id: "usdt",
+          name: "USDT",
+          icon: "₮",
+          color: "bg-green-500",
+          amount: "0.00",
+          isStable: true,
+        },
+      ];
+    }
 
-  const selectedOption = paymentOptions.find((p) => p.id === selectedPayment);
+    const usdPrice = course.price.usd || 0;
+
+    return [
+      {
+        id: "usdt",
+        name: "USDT",
+        icon: "₮",
+        color: "bg-green-500",
+        amount: usdPrice.toFixed(2),
+        isStable: true,
+      },
+      {
+        id: "usdc",
+        name: "USDC",
+        icon: "$",
+        color: "bg-blue-500",
+        amount: usdPrice.toFixed(2),
+        isStable: true,
+      },
+      {
+        id: "eth",
+        name: "ETH",
+        icon: "Ξ",
+        color: "bg-gradient-to-br from-purple-500 to-blue-500",
+        amount: calculateCryptoPrice(usdPrice, "eth"),
+        isStable: false,
+      },
+      {
+        id: "btc",
+        name: "BTC",
+        icon: "₿",
+        color: "bg-orange-500",
+        amount: calculateCryptoPrice(usdPrice, "btc"),
+        isStable: false,
+      },
+      {
+        id: "sol",
+        name: "SOL",
+        icon: "S",
+        color: "bg-gradient-to-br from-purple-500 to-green-400",
+        amount: calculateCryptoPrice(usdPrice, "sol"),
+        isStable: false,
+      },
+      {
+        id: "fdr",
+        name: "$FDR",
+        icon: "F",
+        color: "bg-gradient-to-br from-primary-400 to-primary-600",
+        amount: (course.price.fdr || usdPrice).toString(),
+        isStable: true,
+        badge: "Platform Token",
+      },
+    ];
+  };
+
+  const paymentOptions = getPaymentOptions();
+  const selectedOption =
+    paymentOptions.find((p) => p.id === selectedPayment) || paymentOptions[0];
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -692,6 +712,16 @@ const CourseDetailPage = () => {
                             </span>
                           </li>
                         ))}
+                        {/* Dynamic Refund Period */}
+                        <li className="flex items-start space-x-3 text-sm">
+                          <div className="text-green-500 mt-0.5">
+                            <Shield className="w-5 h-5" />
+                          </div>
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {course.escrowSettings?.refundPeriodDays || 14}-day
+                            money-back guarantee
+                          </span>
+                        </li>
                       </ul>
                     </div>
                     {/* Share */}

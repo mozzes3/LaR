@@ -60,54 +60,117 @@ const createCourse = async (req, res) => {
 // Get all courses (public browse)
 const getCourses = async (req, res) => {
   try {
-    const { category, level, search, sort, page = 1, limit = 12 } = req.query;
+    const {
+      search,
+      category,
+      level,
+      minPrice,
+      maxPrice,
+      rating,
+      sort = "newest",
+      page = 1,
+      limit = 100,
+    } = req.query;
 
-    const filter = { status: "published" };
+    console.log("📋 Course filters:", {
+      search,
+      category,
+      level,
+      minPrice,
+      maxPrice,
+      rating,
+      sort,
+    });
 
-    if (category) filter.category = category;
-    if (level) filter.level = level;
-    if (search) {
-      filter.$or = [
+    // Build filter query
+    let query = { status: "published" };
+
+    // Search filter
+    if (search && search.trim()) {
+      query.$or = [
         { title: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
+        { subtitle: { $regex: search, $options: "i" } },
       ];
     }
 
-    let sortOption = {};
-    switch (sort) {
-      case "popular":
-        sortOption = { enrollmentCount: -1 };
-        break;
-      case "rating":
-        sortOption = { averageRating: -1 };
-        break;
-      case "newest":
-        sortOption = { createdAt: -1 };
-        break;
-      default:
-        sortOption = { createdAt: -1 };
+    // Category filter
+    if (category && category.trim()) {
+      query.category = category;
     }
 
-    const courses = await Course.find(filter)
-      .populate("instructor", "username avatar averageRating totalStudents")
-      .sort(sortOption)
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    // Level filter
+    if (level && level.trim()) {
+      query.level = level.toLowerCase();
+    }
 
-    const count = await Course.countDocuments(filter);
+    // Price filter
+    if (minPrice || maxPrice) {
+      query["price.usd"] = {};
+      if (minPrice) {
+        query["price.usd"].$gte = Number(minPrice);
+      }
+      if (maxPrice) {
+        query["price.usd"].$lte = Number(maxPrice);
+      }
+    }
+
+    // Rating filter
+    if (rating) {
+      query.averageRating = { $gte: Number(rating) };
+    }
+
+    console.log("🔍 MongoDB query:", JSON.stringify(query, null, 2));
+
+    // Sort options
+    let sortQuery = {};
+    switch (sort) {
+      case "newest":
+        sortQuery = { createdAt: -1 };
+        break;
+      case "popular":
+        sortQuery = { enrollmentCount: -1 };
+        break;
+      case "rating":
+        sortQuery = { averageRating: -1 };
+        break;
+      case "price-low":
+        sortQuery = { "price.usd": 1 };
+        break;
+      case "price-high":
+        sortQuery = { "price.usd": -1 };
+        break;
+      default:
+        sortQuery = { createdAt: -1 };
+    }
+
+    // Execute query
+    const courses = await Course.find(query)
+      .populate("instructor", "username avatar instructorVerified expertise")
+      .sort(sortQuery)
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit))
+      .lean();
+
+    const total = await Course.countDocuments(query);
+
+    console.log(`✅ Found ${courses.length} courses (total: ${total})`);
 
     res.json({
+      success: true,
       courses,
-      totalPages: Math.ceil(count / limit),
-      currentPage: page,
-      total: count,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
     console.error("Get courses error:", error);
     res.status(500).json({ error: "Failed to fetch courses" });
   }
 };
-
 // Get single course
 // Get single course
 const getCourse = async (req, res) => {
@@ -160,6 +223,58 @@ const getCourse = async (req, res) => {
 
     const courseData = course.toObject();
 
+    // ✅ NEW: Fetch durations from Bunny if missing
+    const bunnyService = require("../services/bunnyService");
+    let needsSave = false;
+
+    for (const section of courseData.sections) {
+      for (const lesson of section.lessons) {
+        // If duration is 0 or missing, fetch from Bunny
+        if ((!lesson.duration || lesson.duration === 0) && lesson.videoId) {
+          try {
+            console.log(
+              `⏱️ Fetching duration for "${lesson.title}" from Bunny...`
+            );
+            const videoInfo = await bunnyService.getVideoInfo(lesson.videoId);
+
+            if (videoInfo.duration > 0) {
+              lesson.duration = videoInfo.duration;
+
+              // Update in the actual course document
+              const originalLesson = course.sections
+                .find((s) => s._id.toString() === section._id.toString())
+                ?.lessons.find(
+                  (l) => l._id.toString() === lesson._id.toString()
+                );
+
+              if (originalLesson) {
+                originalLesson.duration = videoInfo.duration;
+                needsSave = true;
+              }
+
+              console.log(`✅ Set duration: ${videoInfo.duration}s`);
+            }
+          } catch (error) {
+            console.error(
+              `❌ Failed to get duration for "${lesson.title}":`,
+              error.message
+            );
+            lesson.duration = 0; // Fallback to 0
+          }
+        } else {
+          console.log(
+            `📹 Lesson "${lesson.title}" duration: ${lesson.duration || 0}s`
+          );
+        }
+      }
+    }
+
+    // Save course if we updated any durations
+    if (needsSave) {
+      await course.save();
+      console.log("💾 Saved updated durations to database");
+    }
+
     // Calculate total lessons correctly
     const totalLessons = courseData.sections.reduce((total, section) => {
       return total + (section.lessons?.length || 0);
@@ -187,7 +302,7 @@ const getCourse = async (req, res) => {
         lessons: section.lessons.map((lesson) => ({
           ...lesson,
           videoUrl: lesson.isPreview ? lesson.videoUrl : null,
-          videoId: lesson.isPreview ? lesson.videoId : null, // Also hide videoId
+          videoId: lesson.isPreview ? lesson.videoId : null,
         })),
       }));
     }
@@ -215,7 +330,6 @@ const getCourse = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch course" });
   }
 };
-
 // Update course
 const updateCourse = async (req, res) => {
   try {

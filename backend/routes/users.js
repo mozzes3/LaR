@@ -20,6 +20,14 @@ const upload = multer({
 });
 
 /**
+/**
+ * @route   GET /api/users/analytics
+ * @desc    Get student's learning analytics
+ * @access  Private
+ */
+router.get("/analytics", authenticate, userController.getStudentAnalytics);
+
+/**
  * @route   GET /api/users/dashboard/stats
  * @desc    Get dashboard statistics
  * @access  Private
@@ -86,9 +94,14 @@ router.get(
 );
 
 /**
- * @route   GET /api/users/instructor/profile
- * @desc    Get instructor's own profile with stats
+ * @route   GET /api/users/instructor/all-students
+ * @desc    Get all students across all instructor's courses
  * @access  Private (Instructor only)
  */
+router.get(
+  "/instructor/all-students",
+  authenticate,
+  userController.getAllStudents
+);
 
 module.exports = router;

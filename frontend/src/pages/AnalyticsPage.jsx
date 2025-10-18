@@ -1,188 +1,171 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { userApi } from "@services/api";
+import { useWallet } from "@contexts/WalletContext";
 import {
   TrendingUp,
   Target,
   Award,
   Clock,
-  Calendar,
   BookOpen,
   CheckCircle,
   Zap,
   Trophy,
   Star,
   BarChart3,
-  Activity,
   ArrowUp,
-  ArrowDown,
   Sparkles,
-  Users,
   Play,
   Brain,
   Flame,
-  Plus, // Added missing import
-  Search,
-  Filter,
+  Crown,
+  Code,
+  Coins,
+  Link,
+  Image,
+  Rocket,
+  MessageSquare,
+  MessageCircle,
+  ShoppingCart,
+  Package,
+  Library,
+  Globe,
+  Compass,
+  Calendar,
+  Moon,
+  Sunrise,
+  Shield,
+  GraduationCap,
+  Eye,
+  PlayCircle,
+  Activity,
+  Stars,
+  User,
 } from "lucide-react";
+import toast from "react-hot-toast";
+
+const iconMap = {
+  Play,
+  Trophy,
+  Flame,
+  Zap,
+  Crown,
+  Award,
+  BookOpen,
+  Brain,
+  Target,
+  CheckCircle,
+  Clock,
+  Sparkles,
+  Star,
+  Stars,
+  Code,
+  Coins,
+  Link,
+  TrendingUp,
+  Image,
+  Rocket,
+  MessageSquare,
+  MessageCircle,
+  ShoppingCart,
+  Package,
+  Library,
+  Globe,
+  Compass,
+  Calendar,
+  Moon,
+  Sunrise,
+  Shield,
+  GraduationCap,
+  Eye,
+  PlayCircle,
+  Activity,
+  User,
+};
 
 const AnalyticsPage = () => {
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState("all"); // all, month, week
+  const { user: currentUser } = useWallet();
+  const [timeRange, setTimeRange] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState(null);
+  const [achievementFilter, setAchievementFilter] = useState("all");
+  const [difficultyFilter, setDifficultyFilter] = useState("all");
 
-  // Mock analytics data
-  const stats = {
-    totalCourses: 5,
-    completedCourses: 2,
-    inProgressCourses: 3,
-    totalWatchTime: 2847, // minutes
-    averageScore: 93.5,
-    certificatesEarned: 2,
-    currentStreak: 7,
-    longestStreak: 14,
-    totalXP: 3420,
-    level: 12,
-    fdrEarned: 1247,
-    skillsLearned: 15,
-    lessonsCompleted: 127,
-    totalLessons: 203,
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      if (!currentUser) {
+        toast.error("Please log in to view analytics");
+        navigate("/");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await userApi.getStudentAnalytics();
+        console.log("📊 Student analytics:", response.data);
+        setAnalytics(response.data.analytics);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading analytics:", error);
+        toast.error("Failed to load analytics");
+        setLoading(false);
+      }
+    };
+
+    loadAnalytics();
+  }, [currentUser, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading analytics...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">No analytics available</h2>
+          <p className="text-gray-500 mb-4">
+            Start taking courses to see your progress!
+          </p>
+          <button
+            onClick={() => navigate("/courses")}
+            className="px-6 py-3 bg-primary-400 text-black rounded-xl font-bold"
+          >
+            Browse Courses
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { stats, weeklyActivity, courseProgress, skills } = analytics;
+
+  // Helper function to format watch time
+  const formatWatchTime = (seconds) => {
+    if (seconds >= 3600) {
+      return `${Math.floor(seconds / 3600)}h ${Math.floor(
+        (seconds % 3600) / 60
+      )}m`;
+    } else if (seconds >= 60) {
+      return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
   };
 
-  // Weekly activity
-  const weeklyActivity = [
-    { day: "Mon", hours: 2.5, lessons: 5 },
-    { day: "Tue", hours: 1.8, lessons: 3 },
-    { day: "Wed", hours: 3.2, lessons: 7 },
-    { day: "Thu", hours: 2.0, lessons: 4 },
-    { day: "Fri", hours: 4.5, lessons: 9 },
-    { day: "Sat", hours: 1.2, lessons: 2 },
-    { day: "Sun", hours: 2.8, lessons: 6 },
-  ];
+  const maxWeeklyHours = Math.max(...weeklyActivity.map((d) => d.hours), 1);
 
-  // Course breakdown
-  const courseProgress = [
-    {
-      id: 1,
-      slug: "nft-marketing-masterclass",
-      title: "NFT Marketing Masterclass",
-      progress: 65,
-      timeSpent: 780, // minutes
-      lessonsCompleted: 31,
-      totalLessons: 47,
-      lastAccessed: "2 hours ago",
-      category: "Marketing",
-      status: "in-progress",
-    },
-    {
-      id: 2,
-      slug: "web3-community-building",
-      title: "Web3 Community Building",
-      progress: 100,
-      timeSpent: 630,
-      lessonsCompleted: 38,
-      totalLessons: 38,
-      lastAccessed: "3 days ago",
-      category: "Community",
-      status: "completed",
-    },
-    {
-      id: 3,
-      slug: "token-economics-design",
-      title: "Token Economics Design",
-      progress: 23,
-      timeSpent: 425,
-      lessonsCompleted: 12,
-      totalLessons: 52,
-      lastAccessed: "1 day ago",
-      category: "Blockchain",
-      status: "in-progress",
-    },
-    {
-      id: 4,
-      slug: "smart-contract-security",
-      title: "Smart Contract Security",
-      progress: 100,
-      timeSpent: 574,
-      lessonsCompleted: 41,
-      totalLessons: 41,
-      lastAccessed: "1 week ago",
-      category: "Development",
-      status: "completed",
-    },
-    {
-      id: 5,
-      slug: "defi-protocol-development",
-      title: "DeFi Protocol Development",
-      progress: 8,
-      timeSpent: 438,
-      lessonsCompleted: 5,
-      totalLessons: 67,
-      lastAccessed: "5 days ago",
-      category: "Development",
-      status: "in-progress",
-    },
-  ];
-
-  // Skills mastered
-  const skills = [
-    { name: "NFT Marketing", level: 85, courses: 2 },
-    { name: "Community Building", level: 92, courses: 2 },
-    { name: "Smart Contracts", level: 78, courses: 2 },
-    { name: "Token Economics", level: 45, courses: 1 },
-    { name: "DeFi", level: 25, courses: 1 },
-    { name: "Discord Management", level: 88, courses: 1 },
-  ];
-
-  // Achievements
-  const achievements = [
-    {
-      id: 1,
-      title: "First Steps",
-      description: "Complete your first lesson",
-      icon: Play,
-      unlocked: true,
-      unlockedDate: "Sep 1, 2024",
-    },
-    {
-      id: 2,
-      title: "Week Warrior",
-      description: "Maintain a 7-day learning streak",
-      icon: Flame,
-      unlocked: true,
-      unlockedDate: "Oct 10, 2024",
-    },
-    {
-      id: 3,
-      title: "Course Conqueror",
-      description: "Complete your first course",
-      icon: Trophy,
-      unlocked: true,
-      unlockedDate: "Sep 28, 2024",
-    },
-    {
-      id: 4,
-      title: "Knowledge Seeker",
-      description: "Watch 50 hours of content",
-      icon: Brain,
-      unlocked: true,
-      unlockedDate: "Oct 15, 2024",
-    },
-    {
-      id: 5,
-      title: "Perfect Score",
-      description: "Score 100% on a quiz",
-      icon: Star,
-      unlocked: false,
-    },
-    {
-      id: 6,
-      title: "Marathon Runner",
-      description: "Maintain a 30-day streak",
-      icon: Zap,
-      unlocked: false,
-    },
-  ];
-
-  const maxWeeklyHours = Math.max(...weeklyActivity.map((d) => d.hours));
+  // Simple achievements based on real data
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-8">
@@ -249,8 +232,7 @@ const AnalyticsPage = () => {
               </div>
             </div>
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-              {Math.floor(stats.totalWatchTime / 60)}h{" "}
-              {stats.totalWatchTime % 60}m
+              {formatWatchTime(stats.totalWatchTime)}
             </div>
             <div className="text-sm text-gray-500">Total Watch Time</div>
           </div>
@@ -280,7 +262,7 @@ const AnalyticsPage = () => {
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
               {stats.averageScore}%
             </div>
-            <div className="text-sm text-gray-500">Average Score</div>
+            <div className="text-sm text-gray-500">Average Progress</div>
           </div>
 
           <div className="bg-gradient-to-br from-orange-500/10 to-red-500/10 border-2 border-orange-500/30 rounded-2xl p-6">
@@ -288,7 +270,7 @@ const AnalyticsPage = () => {
               <Flame className="w-8 h-8 text-orange-500" />
               <div className="flex items-center space-x-1 text-green-500 text-sm font-bold">
                 <ArrowUp className="w-4 h-4" />
-                <span>2 days</span>
+                <span>Keep it up!</span>
               </div>
             </div>
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
@@ -298,6 +280,7 @@ const AnalyticsPage = () => {
           </div>
         </div>
 
+        {/* Weekly Activity & Level Progress - Keep the same structure but use real weeklyActivity data */}
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
           {/* Weekly Activity Chart */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
@@ -317,39 +300,45 @@ const AnalyticsPage = () => {
               </div>
             </div>
 
-            <div className="space-y-4">
-              {weeklyActivity.map((day, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-gray-600 dark:text-gray-400 w-12">
-                      {day.day}
-                    </span>
-                    <div className="flex-1 flex items-center space-x-3">
-                      <div className="flex-1 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary-400 to-primary-600 rounded-lg flex items-center justify-end pr-2"
-                          style={{
-                            width: `${(day.hours / maxWeeklyHours) * 100}%`,
-                          }}
-                        >
-                          {day.hours > 0 && (
-                            <span className="text-xs font-bold text-black">
-                              {day.hours}h
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-xs text-gray-500 w-16 text-right">
-                        {day.lessons} lessons
+            {weeklyActivity.length > 0 ? (
+              <div className="space-y-4">
+                {weeklyActivity.map((day, index) => (
+                  <div key={index}>
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-gray-600 dark:text-gray-400 w-12">
+                        {day.day}
                       </span>
+                      <div className="flex-1 flex items-center space-x-3">
+                        <div className="flex-1 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary-400 to-primary-600 rounded-lg flex items-center justify-end pr-2"
+                            style={{
+                              width: `${(day.hours / maxWeeklyHours) * 100}%`,
+                            }}
+                          >
+                            {day.hours > 0 && (
+                              <span className="text-xs font-bold text-black">
+                                {day.hours}h
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-500 w-16 text-right">
+                          {day.lessons} lessons
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No activity this week. Start learning!</p>
+              </div>
+            )}
           </div>
 
-          {/* Level Progress */}
+          {/* Level Progress - Keep same UI but use real stats */}
           <div className="bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-2xl p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
               Level Progress
@@ -448,66 +437,72 @@ const AnalyticsPage = () => {
             Course Progress Breakdown
           </h2>
 
-          <div className="space-y-4">
-            {courseProgress.map((course) => (
-              <div
-                key={course.id}
-                className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:shadow-md transition cursor-pointer"
-                onClick={() => navigate(`/courses/${course.slug}/learn`)}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-gray-900 dark:text-white mb-1">
-                      {course.title}
-                    </h3>
-                    <div className="flex items-center space-x-4 text-xs text-gray-500">
-                      <span>{course.category}</span>
-                      <span>•</span>
-                      <span>Last accessed {course.lastAccessed}</span>
+          {courseProgress.length > 0 ? (
+            <div className="space-y-4">
+              {courseProgress.map((course) => (
+                <div
+                  key={course.id}
+                  className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:shadow-md transition cursor-pointer"
+                  onClick={() => navigate(`/courses/${course.slug}/learn`)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-900 dark:text-white mb-1">
+                        {course.title}
+                      </h3>
+                      <div className="flex items-center space-x-4 text-xs text-gray-500">
+                        <span>{course.category}</span>
+                        <span>•</span>
+                        <span>Last accessed {course.lastAccessed}</span>
+                      </div>
                     </div>
+                    {course.status === "completed" ? (
+                      <div className="px-3 py-1 bg-green-500/10 text-green-500 text-xs font-bold rounded-lg border border-green-500/30">
+                        Completed
+                      </div>
+                    ) : (
+                      <div className="px-3 py-1 bg-blue-500/10 text-blue-500 text-xs font-bold rounded-lg border border-blue-500/30">
+                        In Progress
+                      </div>
+                    )}
                   </div>
-                  {course.status === "completed" ? (
-                    <div className="px-3 py-1 bg-green-500/10 text-green-500 text-xs font-bold rounded-lg border border-green-500/30">
-                      Completed
-                    </div>
-                  ) : (
-                    <div className="px-3 py-1 bg-blue-500/10 text-blue-500 text-xs font-bold rounded-lg border border-blue-500/30">
-                      In Progress
-                    </div>
-                  )}
-                </div>
 
-                <div className="grid grid-cols-3 gap-4 mb-3">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Progress</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">
-                      {course.progress}%
-                    </p>
+                  <div className="grid grid-cols-3 gap-4 mb-3">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Progress</p>
+                      <p className="text-lg font-bold text-gray-900 dark:text-white">
+                        {course.progress}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Time Spent</p>
+                      <p className="text-lg font-bold text-gray-900 dark:text-white">
+                        {formatWatchTime(course.timeSpent)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Lessons</p>
+                      <p className="text-lg font-bold text-gray-900 dark:text-white">
+                        {course.lessonsCompleted}/{course.totalLessons}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Time Spent</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">
-                      {Math.floor(course.timeSpent / 60)}h{" "}
-                      {course.timeSpent % 60}m
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Lessons</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">
-                      {course.lessonsCompleted}/{course.totalLessons}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all"
-                    style={{ width: `${course.progress}%` }}
-                  />
+                  <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all"
+                      style={{ width: `${course.progress}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <BookOpen className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p>No courses enrolled yet</p>
+            </div>
+          )}
         </div>
 
         {/* Skills & Achievements */}
@@ -518,34 +513,41 @@ const AnalyticsPage = () => {
               Skills Progress
             </h2>
 
-            <div className="space-y-4">
-              {skills.map((skill, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {skill.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {skill.courses}{" "}
-                        {skill.courses === 1 ? "course" : "courses"}
-                      </p>
+            {skills.length > 0 ? (
+              <div className="space-y-4">
+                {skills.map((skill, index) => (
+                  <div key={index}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {skill.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {skill.courses}{" "}
+                          {skill.courses === 1 ? "course" : "courses"}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold text-primary-400">
+                        {skill.level}%
+                      </span>
                     </div>
-                    <span className="text-sm font-bold text-primary-400">
-                      {skill.level}%
-                    </span>
+                    <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary-400 to-purple-500 transition-all"
+                        style={{ width: `${skill.level}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-primary-400 to-purple-500 transition-all"
-                      style={{ width: `${skill.level}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No skills tracked yet</p>
+              </div>
+            )}
           </div>
 
+          {/* Achievements */}
           {/* Achievements */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
             <div className="flex items-center justify-between mb-6">
@@ -553,48 +555,191 @@ const AnalyticsPage = () => {
                 Achievements
               </h2>
               <span className="text-sm text-gray-500">
-                {achievements.filter((a) => a.unlocked).length}/
-                {achievements.length}
+                {analytics.achievements
+                  ? `${
+                      analytics.achievements.filter((a) => a.unlocked).length
+                    }/${analytics.achievements.length}`
+                  : "0/0"}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {achievements.map((achievement) => (
-                <div
-                  key={achievement.id}
-                  className={`p-4 rounded-xl border-2 transition ${
-                    achievement.unlocked
-                      ? "bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-primary-400/30"
-                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-50"
-                  }`}
-                >
-                  <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${
-                      achievement.unlocked
-                        ? "bg-primary-400"
-                        : "bg-gray-300 dark:bg-gray-700"
-                    }`}
-                  >
-                    <achievement.icon
-                      className={`w-6 h-6 ${
-                        achievement.unlocked ? "text-black" : "text-gray-500"
+            {analytics.achievements && analytics.achievements.length > 0 ? (
+              <>
+                {/* Filter by category */}
+                <div className="flex items-center space-x-2 mb-4 overflow-x-auto  pb-2">
+                  {[
+                    "all",
+                    "getting_started",
+                    "streaks",
+                    "completion",
+                    "watch_time",
+                    "lessons",
+                    "web3",
+                    "perfection",
+                    "speed",
+                    "community",
+                    "spending",
+                    "certificates",
+                    "special",
+                  ].map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => setAchievementFilter(category)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+                        achievementFilter === category
+                          ? "bg-primary-400 text-black"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
                       }`}
-                    />
-                  </div>
-                  <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-1">
-                    {achievement.title}
-                  </h3>
-                  <p className="text-xs text-gray-500 mb-2">
-                    {achievement.description}
-                  </p>
-                  {achievement.unlocked && (
-                    <p className="text-xs text-primary-400 font-medium">
-                      Unlocked {achievement.unlockedDate}
-                    </p>
-                  )}
+                    >
+                      {category.replace("_", " ").toUpperCase()}
+                    </button>
+                  ))}
                 </div>
-              ))}
-            </div>
+
+                {/* Filter by difficulty */}
+                <div className="flex items-center space-x-2 mb-6">
+                  {[
+                    "all",
+                    "easy",
+                    "medium",
+                    "hard",
+                    "extreme",
+                    "legendary",
+                  ].map((difficulty) => (
+                    <button
+                      key={difficulty}
+                      onClick={() => setDifficultyFilter(difficulty)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                        difficultyFilter === difficulty
+                          ? "bg-primary-400 text-black"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {difficulty.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Achievements Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  {analytics.achievements
+                    .filter((a) => {
+                      if (
+                        achievementFilter !== "all" &&
+                        a.category !== achievementFilter
+                      )
+                        return false;
+                      if (
+                        difficultyFilter !== "all" &&
+                        a.difficulty !== difficultyFilter
+                      )
+                        return false;
+                      return true;
+                    })
+                    .map((achievement) => {
+                      const Icon = iconMap[achievement.icon] || Trophy;
+                      const difficultyColors = {
+                        easy: "border-blue-500/30 from-blue-500/5 to-cyan-500/5",
+                        medium:
+                          "border-purple-500/30 from-purple-500/5 to-pink-500/5",
+                        hard: "border-orange-500/30 from-orange-500/5 to-red-500/5",
+                        extreme:
+                          "border-red-500/30 from-red-500/5 to-pink-500/5",
+                        legendary:
+                          "border-primary-400/30 from-primary-400/5 to-purple-500/5",
+                      };
+
+                      return (
+                        <div
+                          key={achievement.id}
+                          className={`p-4 rounded-xl border-2 transition cursor-pointer hover:scale-105 ${
+                            achievement.unlocked
+                              ? `bg-gradient-to-br ${
+                                  difficultyColors[achievement.difficulty] ||
+                                  difficultyColors.medium
+                                }`
+                              : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-60"
+                          }`}
+                        >
+                          <div
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${
+                              achievement.unlocked
+                                ? "bg-primary-400"
+                                : "bg-gray-300 dark:bg-gray-700"
+                            }`}
+                          >
+                            <Icon
+                              className={`w-6 h-6 ${
+                                achievement.unlocked
+                                  ? "text-black"
+                                  : "text-gray-500"
+                              }`}
+                            />
+                          </div>
+                          <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-1">
+                            {achievement.title}
+                          </h3>
+                          <p className="text-xs text-gray-500 mb-2 line-clamp-2">
+                            {achievement.description}
+                          </p>
+
+                          {achievement.unlocked ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center space-x-2 text-xs">
+                                {achievement.xpReward > 0 && (
+                                  <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-bold">
+                                    +{achievement.xpReward} XP
+                                  </span>
+                                )}
+                                {achievement.fdrReward > 0 && (
+                                  <span className="bg-primary-400/20 text-primary-400 px-2 py-0.5 rounded font-bold">
+                                    +{achievement.fdrReward} $FDR
+                                  </span>
+                                )}
+                              </div>
+                              {achievement.unlockedAt && (
+                                <p className="text-xs text-primary-400 font-medium">
+                                  {new Date(
+                                    achievement.unlockedAt
+                                  ).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400 uppercase">
+                              {achievement.difficulty}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {analytics.achievements.filter((a) => {
+                  if (
+                    achievementFilter !== "all" &&
+                    a.category !== achievementFilter
+                  )
+                    return false;
+                  if (
+                    difficultyFilter !== "all" &&
+                    a.difficulty !== difficultyFilter
+                  )
+                    return false;
+                  return true;
+                }).length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No achievements found in this category</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Complete lessons to unlock achievements!</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

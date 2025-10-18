@@ -33,13 +33,11 @@ const CourseLearningPage = () => {
   const navigate = useNavigate();
   const { user } = useWallet();
 
-  // State declarations
   const [course, setCourse] = useState(null);
   const [purchase, setPurchase] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [completedLessons, setCompletedLessons] = useState([]);
-  const [watchTime, setWatchTime] = useState(0);
   const [expandedModules, setExpandedModules] = useState([]);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [userReview, setUserReview] = useState(null);
@@ -48,7 +46,6 @@ const CourseLearningPage = () => {
   const [note, setNote] = useState("");
   const [totalCourseDuration, setTotalCourseDuration] = useState(0);
 
-  // Helper functions
   const formatDuration = (seconds) => {
     if (isNaN(seconds) || seconds < 0) return "0m";
     const hours = Math.floor(seconds / 3600);
@@ -63,7 +60,6 @@ const CourseLearningPage = () => {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Load course data
   useEffect(() => {
     const loadCourseData = async () => {
       console.log("🚀 Starting loadCourseData...");
@@ -130,7 +126,7 @@ const CourseLearningPage = () => {
               lessons: section.lessons.map((lesson) => ({
                 id: lesson._id,
                 title: lesson.title,
-                duration: formatLessonDuration(lesson.duration),
+                duration: formatLessonDuration(lesson.duration || 0),
                 type: "video",
                 videoUrl: lesson.videoUrl,
                 description: lesson.description || "",
@@ -142,25 +138,11 @@ const CourseLearningPage = () => {
 
         console.log("🔄 Transformed course:", transformedCourse);
         console.log("📊 Total modules:", transformedCourse.modules.length);
-        console.log(
-          "📋 Modules detail:",
-          JSON.stringify(transformedCourse.modules, null, 2)
-        );
-        transformedCourse.modules.forEach((module, idx) => {
-          console.log(
-            `📦 Module ${idx}:`,
-            module.title,
-            `- ${module.lessons.length} lessons`
-          );
-          module.lessons.forEach((lesson, lIdx) => {
-            console.log(`  📹 Lesson ${lIdx}:`, lesson.title, lesson.id);
-          });
-        });
+
         setCourse(transformedCourse);
         setPurchase(purchaseData);
         setCompletedLessons(purchaseData.completedLessons || []);
 
-        // Calculate total course duration
         const totalDuration = transformedCourse.modules.reduce(
           (total, module) => {
             return (
@@ -183,7 +165,6 @@ const CourseLearningPage = () => {
           setExpandedModules([transformedCourse.modules[0].id]);
         }
 
-        // Check for existing review
         try {
           const reviewsResponse = await reviewApi.getCourseReviews(
             courseData._id,
@@ -205,7 +186,6 @@ const CourseLearningPage = () => {
         setLoading(false);
       } catch (error) {
         console.error("❌ Error loading course:", error);
-        console.error("❌ Error details:", error.response?.data);
         toast.error("Failed to load course");
         setLoading(false);
         navigate("/courses");
@@ -215,23 +195,6 @@ const CourseLearningPage = () => {
     loadCourseData();
   }, [courseSlug, user, navigate]);
 
-  useEffect(() => {
-    if (!course?.modules || course.modules.length === 0) return;
-    const allLessons = course.modules.flatMap((module) => module.lessons);
-    const currentLesson = allLessons[currentLessonIndex];
-    if (!currentLesson?.id) return;
-
-    const watchInterval = setInterval(() => {
-      setWatchTime((prev) => prev + 10);
-    }, 10000);
-
-    return () => clearInterval(watchInterval);
-  }, [course, currentLessonIndex]);
-
-  useEffect(() => {
-    setWatchTime(0);
-  }, [currentLessonIndex]);
-
   const markAsComplete = async () => {
     if (!course) return;
 
@@ -239,51 +202,39 @@ const CourseLearningPage = () => {
     const currentLesson = allLessons[currentLessonIndex];
 
     if (!currentLesson || completedLessons.includes(currentLesson.id)) {
-      return;
-    }
-
-    const [mins, secs] = (currentLesson.duration || "0:0")
-      .split(":")
-      .map(Number);
-    const lessonDurationInSeconds = mins * 60 + (secs || 0);
-    const minWatchPercentage = 0.8;
-    const requiredWatchTime = lessonDurationInSeconds * minWatchPercentage;
-
-    if (watchTime < requiredWatchTime && lessonDurationInSeconds > 0) {
-      toast.error(
-        `Please watch at least ${Math.round(
-          minWatchPercentage * 100
-        )}% of the video`
-      );
+      toast.error("Lesson already completed!");
       return;
     }
 
     try {
-      await purchaseApi.completeLesson({
+      console.log(`✅ Marking lesson complete`);
+
+      // ✅ No watchTime needed - backend will add lesson duration
+      const response = await purchaseApi.completeLesson({
         purchaseId: purchase._id,
         lessonId: currentLesson.id,
-        watchTime: watchTime,
       });
 
-      const newCompletedLessons = [...completedLessons, currentLesson.id];
-      setCompletedLessons(newCompletedLessons);
+      // Update local state with backend data
+      const updatedPurchase = response.data.purchase;
+      setCompletedLessons(updatedPurchase.completedLessons || []);
+      setPurchase(updatedPurchase);
 
-      const totalLessons = allLessons.length;
-      const newProgress = Math.round(
-        (newCompletedLessons.length / totalLessons) * 100
-      );
-
+      // Update course progress display
       setCourse((prev) => ({
         ...prev,
-        progress: newProgress,
-        completedLessons: newCompletedLessons.length,
+        progress: updatedPurchase.progress,
+        completedLessons: updatedPurchase.completedLessons?.length || 0,
       }));
 
       toast.success("Lesson completed! 🎉");
-      setWatchTime(0);
 
+      // Auto-advance to next lesson
       if (currentLessonIndex < allLessons.length - 1) {
         setTimeout(() => handleNextLesson(), 1500);
+      } else {
+        toast.success("🎓 Congratulations! You've completed all lessons!");
+        setShowReviewModal(true);
       }
     } catch (error) {
       console.error("Error completing lesson:", error);
@@ -309,9 +260,21 @@ const CourseLearningPage = () => {
     if (!course) return;
     const allLessons = course.modules.flatMap((module) => module.lessons);
     const lessonIndex = allLessons.findIndex((l) => l.id === lessonId);
-    if (lessonIndex !== -1 && !allLessons[lessonIndex].locked) {
-      setCurrentLessonIndex(lessonIndex);
+
+    if (lessonIndex === -1 || allLessons[lessonIndex].locked) {
+      return;
     }
+
+    // ENFORCE SEQUENTIAL LEARNING: Can't skip ahead
+    if (lessonIndex > 0) {
+      const previousLesson = allLessons[lessonIndex - 1];
+      if (!completedLessons.includes(previousLesson.id)) {
+        toast.error("Please complete the previous lesson first");
+        return;
+      }
+    }
+
+    setCurrentLessonIndex(lessonIndex);
   };
 
   const toggleModule = (moduleId) => {
@@ -322,7 +285,11 @@ const CourseLearningPage = () => {
     );
   };
 
+  console.log("🎯 RENDER CHECK: loading =", loading);
+  console.log("🎯 RENDER CHECK: course =", course);
+
   if (loading) {
+    console.log("🔄 RENDERING: Loading state");
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
         <div className="text-center">
@@ -334,10 +301,13 @@ const CourseLearningPage = () => {
   }
 
   if (!course) {
+    console.log("❌ RENDERING: No course");
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Course not found</h2>
+          <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">
+            Course not found
+          </h2>
           <Link
             to="/dashboard"
             className="text-primary-400 hover:text-primary-500"
@@ -352,17 +322,21 @@ const CourseLearningPage = () => {
   const allLessons = course.modules.flatMap((module) => module.lessons);
   const currentLessonData = allLessons[currentLessonIndex];
 
+  console.log("🎯 allLessons count:", allLessons.length);
+  console.log("🎯 currentLessonIndex:", currentLessonIndex);
+  console.log("🎯 currentLessonData:", currentLessonData);
+
   if (!currentLessonData) {
-    console.log("❌ EARLY RETURN: No currentLessonData");
+    console.log("❌ RENDERING: No currentLessonData");
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
         <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400">
-            No lessons available
+          <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
+            No lessons available for this course
           </p>
           <Link
             to="/dashboard"
-            className="text-primary-400 hover:text-primary-500 mt-4 inline-block"
+            className="text-primary-400 hover:text-primary-500"
           >
             ← Back to Dashboard
           </Link>
@@ -370,15 +344,515 @@ const CourseLearningPage = () => {
       </div>
     );
   }
+
+  // FIXED: Proper calculation with parentheses
   const totalWatchPercentage =
     totalCourseDuration > 0
-      ? ((purchase?.totalWatchTime || 0 / totalCourseDuration) * 100).toFixed(1)
+      ? (((purchase?.totalWatchTime || 0) / totalCourseDuration) * 100).toFixed(
+          1
+        )
       : "0";
+
+  console.log("✅ RENDERING: Main content");
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header and other JSX remains the same */}
-      {/* ... The rest of your component's JSX */}
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate(`/courses/${course.slug}`)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-1">
+                  {course.title}
+                </h1>
+                <div className="flex items-center space-x-3 text-sm text-gray-500">
+                  <span>
+                    {course.completedLessons} of {course.totalLessons} lessons
+                  </span>
+                  <span>•</span>
+                  <span>{course.progress}% complete</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-400 transition text-sm font-medium flex items-center space-x-2">
+                <Share2 className="w-4 h-4" />
+                <span>Share</span>
+              </button>
+              <button
+                onClick={() => setShowSidebar(!showSidebar)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition lg:hidden"
+              >
+                {showSidebar ? (
+                  <X className="w-5 h-5" />
+                ) : (
+                  <Menu className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all duration-300"
+                style={{ width: `${course.progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row">
+        <div className="flex-1 w-full">
+          <VideoPlayer
+            courseSlug={course.slug}
+            lessonId={currentLessonData.id}
+            lessonTitle={currentLessonData.title}
+          />
+
+          <div className="p-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  {currentLessonData.title}
+                </h2>
+                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <div className="flex items-center space-x-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{currentLessonData.duration}</span>
+                  </div>
+                  <span>•</span>
+                  <span>
+                    Lesson {currentLessonIndex + 1} of {allLessons.length}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={markAsComplete}
+                className={`px-4 py-2 rounded-xl font-bold transition flex items-center space-x-2 ${
+                  completedLessons.includes(currentLessonData.id)
+                    ? "bg-green-500/10 text-green-500 border-2 border-green-500/30"
+                    : "bg-primary-400 text-black hover:bg-primary-500"
+                }`}
+              >
+                {completedLessons.includes(currentLessonData.id) ? (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    <span>Completed</span>
+                  </>
+                ) : (
+                  <>
+                    <Circle className="w-5 h-5" />
+                    <span>Mark Complete</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+              <img
+                src={course.instructor.avatar}
+                alt={course.instructor.username}
+                className="w-12 h-12 rounded-full"
+              />
+              <div className="flex-1">
+                <div className="flex items-center space-x-2">
+                  <span className="font-bold text-gray-900 dark:text-white">
+                    {course.instructor.username}
+                  </span>
+                  {course.instructor.verified && (
+                    <Award className="w-4 h-4 text-primary-400" />
+                  )}
+                  <span className="px-2 py-0.5 bg-purple-500/10 text-purple-400 text-xs font-bold rounded border border-purple-500/30">
+                    {course.instructor.badge}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500">Course Instructor</p>
+              </div>
+              <Link
+                to={`/instructor/${course.instructor.username}`}
+                className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg font-medium hover:border-primary-400 transition flex items-center space-x-2 whitespace-nowrap"
+              >
+                <User className="w-4 h-4" />
+                <span>View Profile</span>
+              </Link>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex space-x-6 px-6">
+              {[
+                { id: "overview", label: "Overview", icon: BookOpen },
+                { id: "notes", label: "Notes", icon: FileText },
+                { id: "resources", label: "Resources", icon: Download },
+                { id: "review", label: "Review", icon: Star },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center space-x-2 py-4 border-b-2 transition ${
+                    activeTab === tab.id
+                      ? "border-primary-400 text-primary-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span className="font-medium">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-6 bg-white dark:bg-gray-900 min-h-screen">
+            {activeTab === "overview" && (
+              <div className="max-w-3xl">
+                <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                  About this lesson
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-6">
+                  {currentLessonData.description || "No description available."}
+                </p>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <TrendingUp className="w-5 h-5 text-blue-500" />
+                      <span className="font-bold text-sm">Your Progress</span>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-500">
+                      {course.progress}%
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {course.completedLessons} lessons completed
+                    </p>
+                  </div>
+                  <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-xl">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Target className="w-5 h-5 text-green-500" />
+                      <span className="font-bold text-sm">
+                        Lessons Completed
+                      </span>
+                    </div>
+                    <p className="text-2xl font-bold text-green-500">
+                      {course.completedLessons}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      out of {course.totalLessons} total
+                    </p>
+                  </div>
+                  {/* ✅ ADD THIS NEW CARD */}
+                  <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Clock className="w-5 h-5 text-purple-500" />
+                      <span className="font-bold text-sm">Watch Time</span>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-500">
+                      {(() => {
+                        const totalSeconds = purchase?.totalWatchTime || 0;
+                        if (totalSeconds >= 3600) {
+                          return `${Math.floor(
+                            totalSeconds / 3600
+                          )}h ${Math.floor((totalSeconds % 3600) / 60)}m`;
+                        } else if (totalSeconds >= 60) {
+                          return `${Math.floor(totalSeconds / 60)}m ${
+                            totalSeconds % 60
+                          }s`;
+                        } else {
+                          return `${totalSeconds}s`;
+                        }
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {totalCourseDuration > 0
+                        ? `${Math.round(
+                            ((purchase?.totalWatchTime || 0) /
+                              totalCourseDuration) *
+                              100
+                          )}% of course`
+                        : "Total watched"}
+                    </p>
+                  </div>
+                </div>
+                <div className="p-4 bg-primary-400/5 border border-primary-400/20 rounded-xl">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Sparkles className="w-5 h-5 text-primary-400" />
+                    <span className="font-bold">Smart Contract Escrow</span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Your payment is held in escrow. Watch less than 20% or under
+                    120 minutes to be eligible for a full refund within 14 days.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "notes" && (
+              <div className="max-w-3xl">
+                <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                  Your Notes
+                </h3>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Take notes while watching..."
+                  className="w-full h-64 p-4 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black resize-none focus:border-primary-400 transition"
+                />
+                <button className="mt-3 px-6 py-2 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition">
+                  Save Note
+                </button>
+              </div>
+            )}
+
+            {activeTab === "resources" && (
+              <div className="max-w-3xl">
+                <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                  Downloadable Resources
+                </h3>
+                {currentLessonData.resources &&
+                currentLessonData.resources.length > 0 ? (
+                  <div className="space-y-3">
+                    {currentLessonData.resources.map((resource, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-primary-400/10 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-primary-400" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {resource.title}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {resource.type}
+                            </p>
+                          </div>
+                        </div>
+                        <a
+                          href={resource.url}
+                          download
+                          className="p-2 hover:bg-primary-400/10 rounded-lg transition text-primary-400"
+                        >
+                          <Download className="w-5 h-5" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">
+                    No resources available for this lesson
+                  </p>
+                )}
+              </div>
+            )}
+
+            {activeTab === "review" && (
+              <div className="max-w-3xl">
+                {userReview ? (
+                  <div className="border-2 border-primary-400/30 rounded-xl p-6 bg-primary-400/5">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold">Your Review</h3>
+                      <button
+                        onClick={() => setShowReviewModal(true)}
+                        className="px-4 py-2 text-sm font-medium text-primary-400 hover:text-primary-500 transition"
+                      >
+                        Edit Review
+                      </button>
+                    </div>
+                    <div className="flex mb-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-5 h-5 ${
+                            i < userReview.rating
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <h4 className="font-bold mb-2">{userReview.title}</h4>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {userReview.comment}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-3">
+                      Posted{" "}
+                      {new Date(userReview.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border-2 border-gray-200 dark:border-gray-800 rounded-xl p-6 text-center">
+                    <Star className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold mb-2">
+                      Share Your Experience
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      Help other students by sharing your thoughts about this
+                      course.
+                    </p>
+                    <button
+                      onClick={() => setShowReviewModal(true)}
+                      className="px-8 py-4 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition"
+                    >
+                      Write a Review
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {showSidebar && (
+          <div className="w-full lg:w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 lg:sticky lg:top-[89px] lg:h-[calc(100vh-89px)] lg:overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold">Course Content</h3>
+                <button
+                  onClick={() => setShowSidebar(false)}
+                  className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {course.modules.map((module) => (
+                  <div
+                    key={module.id}
+                    className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden"
+                  >
+                    <button
+                      onClick={() => toggleModule(module.id)}
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                    >
+                      <div className="text-left">
+                        <h4 className="font-bold text-gray-900 dark:text-white">
+                          {module.title}
+                        </h4>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {module.lessons.length} lessons • {module.duration}
+                        </p>
+                      </div>
+                      <ChevronDown
+                        className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${
+                          expandedModules.includes(module.id)
+                            ? "rotate-180"
+                            : ""
+                        }`}
+                      />
+                    </button>
+
+                    {expandedModules.includes(module.id) && (
+                      <div className="divide-y divide-gray-200 dark:divide-gray-800">
+                        {module.lessons.map((lesson) => (
+                          <button
+                            key={lesson.id}
+                            onClick={() => handleSelectLesson(lesson.id)}
+                            disabled={lesson.locked}
+                            className={`w-full p-4 flex items-start space-x-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition text-left ${
+                              currentLessonData.id === lesson.id
+                                ? "bg-primary-400/10"
+                                : ""
+                            } ${
+                              lesson.locked
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            <div className="mt-0.5">
+                              {lesson.locked ? (
+                                <Lock className="w-5 h-5 text-gray-400" />
+                              ) : completedLessons.includes(lesson.id) ? (
+                                <CheckCircle className="w-5 h-5 text-green-500" />
+                              ) : currentLessonData.id === lesson.id ? (
+                                <Play className="w-5 h-5 text-primary-400" />
+                              ) : (
+                                <Circle className="w-5 h-5 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className={`font-medium mb-1 ${
+                                  currentLessonData.id === lesson.id
+                                    ? "text-primary-400"
+                                    : "text-gray-900 dark:text-white"
+                                }`}
+                              >
+                                {lesson.title}
+                              </p>
+                              <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                <span>{lesson.duration}</span>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {course.certificate && (
+                <div className="mt-6 p-4 bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-xl">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Trophy className="w-6 h-6 text-primary-400" />
+                    <div>
+                      <h4 className="font-bold text-gray-900 dark:text-white">
+                        Certificate Progress
+                      </h4>
+                      <p className="text-sm text-gray-500">
+                        {course.progress}% completed
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary-400 to-purple-500"
+                      style={{ width: `${course.progress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ReviewModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        courseId={course?.id}
+        existingReview={userReview}
+        onSuccess={async () => {
+          try {
+            const reviewsResponse = await reviewApi.getCourseReviews(
+              course.id,
+              { page: 1, limit: 100 }
+            );
+
+            const myReview = reviewsResponse.data.reviews.find(
+              (r) => r.user._id === user.id || r.user.username === user.username
+            );
+
+            if (myReview) {
+              setUserReview(myReview);
+            } else {
+              setUserReview(null);
+            }
+          } catch (error) {
+            console.error("Error refreshing reviews:", error);
+          }
+        }}
+      />
     </div>
   );
 };

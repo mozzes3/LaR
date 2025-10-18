@@ -46,7 +46,10 @@ app.use("/api/purchases", require("./routes/purchases"));
 app.use("/api/reviews", require("./routes/reviews"));
 app.use("/api/certificates", require("./routes/certificates")); // ← ADD THIS
 app.use("/api/enrollments", require("./routes/enrollments")); // ← ADD THIS
+const categoryRoutes = require("./routes/categories");
 app.use("/api/upload", uploadRoutes);
+
+app.use("/api/categories", categoryRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

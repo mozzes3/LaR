@@ -8,6 +8,7 @@ import ResourceUpload from "@components/ResourceUpload";
 import ThumbnailUploadDraft from "@components/ThumbnailUploadDraft";
 import VideoUploadDraft from "@components/VideoUploadDraft";
 import ResourceUploadDraft from "@components/ResourceUploadDraft";
+import { categoryApi } from "@services/api";
 import {
   ArrowLeft,
   Save,
@@ -46,18 +47,20 @@ const CreateCoursePage = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [expandedSection, setExpandedSection] = useState(null);
-
+  const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   // Course data state
   const [courseData, setCourseData] = useState({
     title: "",
     subtitle: "",
     description: "",
     category: "",
+    subcategories: [],
     level: "beginner",
     language: "english",
     thumbnailFile: null,
-    thumbnailPreview: null, // ← Only declare once
-    originalThumbnailUrl: null, // NEW: Add this
+    thumbnailPreview: null,
+    originalThumbnailUrl: null,
     price: { usd: "", fdr: "" },
     acceptedPayments: ["usdt", "usdc"],
     escrowSettings: {
@@ -81,6 +84,37 @@ const CreateCoursePage = () => {
     }
   }, [currentUser, navigate]);
 
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const response = await categoryApi.getAll();
+        setCategories(response.data.categories);
+      } catch (error) {
+        console.error("Error loading categories:", error);
+      }
+    };
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    const loadSubcategories = async () => {
+      if (courseData.category) {
+        try {
+          const response = await categoryApi.getSubcategories(
+            courseData.category
+          );
+          setSubcategories(response.data.subcategories);
+          console.log("✅ Loaded subcategories:", response.data.subcategories);
+        } catch (error) {
+          console.error("Error loading subcategories:", error);
+          setSubcategories([]);
+        }
+      } else {
+        setSubcategories([]);
+      }
+    };
+    loadSubcategories();
+  }, [courseData.category]);
   // Load course data when editing
   useEffect(() => {
     const loadCourseForEditing = async () => {
@@ -117,6 +151,7 @@ const CreateCoursePage = () => {
             subtitle: course.subtitle || "",
             description: course.description || "",
             category: course.category || "",
+            subcategories: course.subcategories || [],
             level: course.level || "beginner",
             language: course.language || "english",
 
@@ -182,17 +217,6 @@ const CreateCoursePage = () => {
 
     loadCourseForEditing();
   }, [slug, currentUser, navigate]);
-  const categories = [
-    "Blockchain Development",
-    "NFT & Digital Art",
-    "DeFi & Trading",
-    "Web3 Marketing",
-    "Smart Contracts",
-    "Tokenomics",
-    "Community Building",
-    "Cryptocurrency",
-    "Other",
-  ];
 
   // ADD THIS:
   const paymentOptions = [
@@ -742,6 +766,7 @@ const CreateCoursePage = () => {
           subtitle: courseData.subtitle,
           description: courseData.description,
           category: courseData.category,
+          subcategories: courseData.subcategories,
           level: courseData.level,
           price: courseData.price,
           requirements: courseData.requirements.filter((r) => r.trim()),
@@ -920,6 +945,7 @@ const CreateCoursePage = () => {
                   <p className="text-red-500 text-sm mt-1">{errors.title}</p>
                 )}
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                   Course Subtitle *
@@ -941,6 +967,7 @@ const CreateCoursePage = () => {
                   <p className="text-red-500 text-sm mt-1">{errors.subtitle}</p>
                 )}
               </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                   Course Description *
@@ -964,6 +991,7 @@ const CreateCoursePage = () => {
                   </p>
                 )}
               </div>
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
@@ -974,16 +1002,13 @@ const CreateCoursePage = () => {
                     onChange={(e) =>
                       handleInputChange("category", e.target.value)
                     }
-                    className={`w-full px-4 py-3 border-2 rounded-xl bg-white dark:bg-black ${
-                      errors.category
-                        ? "border-red-500"
-                        : "border-gray-200 dark:border-gray-800"
-                    } focus:border-primary-400 transition`}
+                    required
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
                   >
-                    <option value="">Select category</option>
+                    <option value="">Select Category</option>
                     {categories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
+                      <option key={cat.name} value={cat.name}>
+                        {cat.name}
                       </option>
                     ))}
                   </select>
@@ -993,6 +1018,7 @@ const CreateCoursePage = () => {
                     </p>
                   )}
                 </div>
+
                 <div>
                   <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                     Course Level
@@ -1009,6 +1035,83 @@ const CreateCoursePage = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Subcategory dropdown - full width below category/level */}
+              {/* Multi-select Subcategories - appears after category is selected */}
+              {courseData.category && subcategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    Subcategories (Optional - Max 5)
+                  </label>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Select up to 5 subcategories that best describe your course
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {subcategories.map((sub) => {
+                      const isSelected = (
+                        courseData.subcategories || []
+                      ).includes(sub); // ← Add || [] here
+                      const canSelect =
+                        (courseData.subcategories || []).length < 5;
+
+                      return (
+                        <button
+                          key={sub}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              // Remove subcategory
+                              handleInputChange(
+                                "subcategories",
+                                courseData.subcategories.filter(
+                                  (s) => s !== sub
+                                )
+                              );
+                            } else if (canSelect) {
+                              // Add subcategory
+                              handleInputChange("subcategories", [
+                                ...courseData.subcategories,
+                                sub,
+                              ]);
+                            }
+                          }}
+                          disabled={!isSelected && !canSelect}
+                          className={`p-3 rounded-xl border-2 text-left text-sm font-medium transition ${
+                            isSelected
+                              ? "border-primary-400 bg-primary-400/10 text-primary-400"
+                              : !canSelect
+                              ? "border-gray-200 dark:border-gray-800 text-gray-400 cursor-not-allowed opacity-50"
+                              : "border-gray-200 dark:border-gray-800 hover:border-primary-400 text-gray-700 dark:text-gray-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="flex-1">{sub}</span>
+                            {isSelected && (
+                              <CheckCircle className="w-4 h-4 text-primary-400 flex-shrink-0 ml-2" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {courseData.subcategories &&
+                    courseData.subcategories.length > 0 && (
+                      <div className="mt-3 flex items-center space-x-2 text-sm">
+                        <span className="text-gray-500">
+                          Selected: {courseData.subcategories.length}/5
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleInputChange("subcategories", [])}
+                          className="text-red-500 hover:text-red-600 font-medium"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+                </div>
+              )}
+
               <ThumbnailUploadDraft
                 currentFile={courseData.thumbnailFile}
                 currentPreview={courseData.thumbnailPreview}

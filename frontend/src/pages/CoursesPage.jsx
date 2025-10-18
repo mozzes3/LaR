@@ -23,8 +23,9 @@ import {
   MessageSquare,
   TrendingUp as Fire,
   Coins,
+  ChevronUp,
 } from "lucide-react";
-import { courseApi } from "@services/api";
+import { courseApi, categoryApi } from "@services/api";
 import toast from "react-hot-toast";
 
 const CoursesPage = () => {
@@ -33,6 +34,8 @@ const CoursesPage = () => {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState("browse");
+  const [categories, setCategories] = useState([]);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
@@ -115,6 +118,19 @@ const CoursesPage = () => {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await categoryApi.getAll();
+      setCategories(response.data.categories || []);
+    } catch (error) {
+      console.error("Fetch categories error:", error);
+    }
+  };
+
   // Fetch courses whenever filters change
   useEffect(() => {
     fetchCourses();
@@ -149,7 +165,8 @@ const CoursesPage = () => {
           rating: course.averageRating || 0,
           students: course.enrollmentCount || 0,
           duration: formatDuration(course.totalDuration || 0),
-          category: course.category.toLowerCase().replace(/\s+/g, "-"),
+          category: course.category,
+          subcategories: course.subcategories || [],
           level: course.level,
           trending: course.enrollmentCount > 500,
           featured: course.averageRating >= 4.8,
@@ -266,7 +283,7 @@ const CoursesPage = () => {
               Learn from verified KOLs, professionals, and experts
             </p>
             {/* Search Bar */}
-            <div className="relative max-w-2xl mx-auto">
+            <div className="relative max-w-2xl mx-auto mb-6">
               <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
@@ -275,6 +292,19 @@ const CoursesPage = () => {
                 value={filters.search}
                 onChange={(e) => handleFilterChange("search", e.target.value)}
               />
+            </div>
+
+            {/* ADD: View All Courses Button - RIGHT UNDER SEARCH */}
+            <div className="flex items-center justify-center space-x-4 mt-6">
+              <button
+                onClick={() => setViewMode("all")}
+                className="inline-flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold hover:shadow-xl hover:shadow-primary-400/50 transition-all transform hover:scale-105"
+              >
+                <BookOpen className="w-5 h-5" />
+                <span>View All Courses</span>
+                <ChevronRight className="w-5 h-5" />
+              </button>
+              <span className="text-gray-400">or browse by category below</span>
             </div>
           </div>
         </div>
@@ -340,6 +370,7 @@ const CoursesPage = () => {
               </section>
             )}
             {/* Browse by Category */}
+            {/* Browse by Category */}
             <section className="mb-12">
               <div className="mb-8">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -349,64 +380,178 @@ const CoursesPage = () => {
                   Find the perfect course for your Web3 journey
                 </p>
               </div>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {categoryList.map((category) => {
-                  const categoryCourses = courses.filter(
-                    (c) => c.category === category.id
-                  );
-                  return (
-                    <div
-                      key={category.id}
-                      className="group relative overflow-hidden rounded-2xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-primary-400 transition-all duration-300 cursor-pointer"
-                      onClick={() =>
-                        handleFilterChange("category", category.id)
-                      }
-                    >
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-br ${category.color} opacity-5 group-hover:opacity-10 transition-opacity`}
-                      ></div>
-                      <div className="relative p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div
-                            className={`p-3 rounded-xl bg-gradient-to-br ${category.color} text-white`}
-                          >
-                            {category.icon}
-                          </div>
-                          <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-primary-400 group-hover:translate-x-1 transition-all" />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-400 transition">
-                          {category.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                          {category.description}
-                        </p>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600 dark:text-gray-400">
-                            {categoryCourses.length} courses
-                          </span>
-                          <span className="text-primary-400 font-medium group-hover:underline">
-                            Explore →
-                          </span>
-                        </div>
-                      </div>
+
+              {categories.length === 0 ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="bg-gray-200 dark:bg-gray-800 rounded-2xl h-48"></div>
                     </div>
-                  );
-                })}
-              </div>
-              {/* View All Courses Button */}
-              <div className="mt-12 text-center">
-                <button
-                  onClick={() => setViewMode("all")}
-                  className="inline-flex items-center space-x-2 px-8 py-4 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold hover:shadow-xl hover:shadow-primary-400/50 transition-all transform hover:scale-105"
-                >
-                  <BookOpen className="w-5 h-5" />
-                  <span>View All Courses</span>
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {categories
+                      .slice(0, showAllCategories ? categories.length : 6)
+                      .map((category) => {
+                        const categoryCourses = courses.filter(
+                          (c) =>
+                            c.category ===
+                            category.name.toLowerCase().replace(/\s+/g, "-")
+                        );
+
+                        // Color gradients for each category
+                        const colorGradients = [
+                          "from-pink-500 to-rose-500",
+                          "from-blue-500 to-cyan-500",
+                          "from-green-500 to-emerald-500",
+                          "from-purple-500 to-violet-500",
+                          "from-yellow-500 to-orange-500",
+                          "from-indigo-500 to-blue-500",
+                          "from-red-500 to-pink-500",
+                          "from-teal-500 to-green-500",
+                          "from-orange-500 to-red-500",
+                          "from-cyan-500 to-blue-500",
+                          "from-violet-500 to-purple-500",
+                          "from-lime-500 to-green-500",
+                          "from-fuchsia-500 to-pink-500",
+                          "from-sky-500 to-blue-500",
+                          "from-amber-500 to-orange-500",
+                        ];
+
+                        const colorIndex =
+                          categories.indexOf(category) % colorGradients.length;
+                        const gradient = colorGradients[colorIndex];
+
+                        // Icon mapping
+                        const iconMap = {
+                          "Web3 Development": <Code className="w-6 h-6" />,
+                          "Blockchain Fundamentals": (
+                            <Sparkles className="w-6 h-6" />
+                          ),
+                          DeFi: <Coins className="w-6 h-6" />,
+                          "NFTs & Digital Art": <Palette className="w-6 h-6" />,
+                          "Smart Contracts": <Code className="w-6 h-6" />,
+                          "Community Building": (
+                            <MessageSquare className="w-6 h-6" />
+                          ),
+                          "Marketing & Growth": (
+                            <TrendingUp className="w-6 h-6" />
+                          ),
+                          "Trading & Investment": <Fire className="w-6 h-6" />,
+                          "Security & Auditing": <Shield className="w-6 h-6" />,
+                          "DAOs & Governance": <Users className="w-6 h-6" />,
+                          "Gaming & Metaverse": <Zap className="w-6 h-6" />,
+                          "Content Creation": <Palette className="w-6 h-6" />,
+                          "Business & Entrepreneurship": (
+                            <Trophy className="w-6 h-6" />
+                          ),
+                          "Design & UX": <Palette className="w-6 h-6" />,
+                          "Legal & Compliance": <Shield className="w-6 h-6" />,
+                        };
+
+                        return (
+                          <div
+                            key={category.name}
+                            className="group relative overflow-hidden rounded-2xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-primary-400 transition-all duration-300 cursor-pointer hover:shadow-2xl hover:-translate-y-1"
+                            onClick={() =>
+                              handleFilterChange("category", category.name)
+                            }
+                          >
+                            {/* Gradient Background */}
+                            <div
+                              className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-5 group-hover:opacity-10 transition-opacity`}
+                            ></div>
+
+                            {/* Content */}
+                            <div className="relative p-6">
+                              <div className="flex items-start justify-between mb-4">
+                                <div
+                                  className={`p-3 rounded-xl bg-gradient-to-br ${gradient} text-white shadow-lg`}
+                                >
+                                  {iconMap[category.name] || (
+                                    <BookOpen className="w-6 h-6" />
+                                  )}
+                                </div>
+                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-primary-400 group-hover:translate-x-1 transition-all" />
+                              </div>
+
+                              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-400 transition">
+                                {category.name}
+                              </h3>
+
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2 min-h-[2.5rem]">
+                                {category.description}
+                              </p>
+
+                              {/* Subcategories Preview */}
+                              {category.subcategories &&
+                                category.subcategories.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5 mb-4">
+                                    {category.subcategories
+                                      .slice(0, 3)
+                                      .map((sub, idx) => (
+                                        <span
+                                          key={idx}
+                                          className="px-2 py-1 bg-purple-500/10 text-purple-400 rounded-md text-xs font-medium border border-purple-500/20"
+                                        >
+                                          {sub}
+                                        </span>
+                                      ))}
+                                    {category.subcategories.length > 3 && (
+                                      <span className="px-2 py-1 bg-gray-500/10 text-gray-400 rounded-md text-xs font-medium">
+                                        +{category.subcategories.length - 3}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                              <div className="flex items-center justify-between text-sm pt-4 border-t border-gray-200 dark:border-gray-800">
+                                <span className="text-gray-600 dark:text-gray-400 font-medium">
+                                  {categoryCourses.length} courses
+                                </span>
+                                <span className="text-primary-400 font-bold group-hover:underline flex items-center space-x-1">
+                                  <span>Explore</span>
+                                  <span>→</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Load More Button */}
+                  {categories.length > 6 && (
+                    <div className="mt-8 text-center">
+                      <button
+                        onClick={() => setShowAllCategories(!showAllCategories)}
+                        className="inline-flex items-center space-x-2 px-8 py-4 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl font-bold hover:border-primary-400 hover:shadow-lg transition-all"
+                      >
+                        {showAllCategories ? (
+                          <>
+                            <ChevronUp className="w-5 h-5" />
+                            <span>Show Less</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Load More Categories</span>
+                            <span className="text-primary-400">
+                              ({categories.length - 6} more)
+                            </span>
+                            <ChevronDown className="w-5 h-5" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
             </section>
           </>
         ) : (
+          /* All Courses Mode - With Filters */
           /* All Courses Mode - With Filters */
           <>
             {/* Back Button & Filter Bar */}
@@ -419,27 +564,28 @@ const CoursesPage = () => {
                 <span>Back to Browse</span>
               </button>
               <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                {/* Filter Button */}
-                <div className="flex flex-wrap gap-3">
+                {/* Filter Button & Quick Category Filters */}
+                <div className="flex items-center gap-3 overflow-x-auto pb-2 hide-scrollbar w-full lg:w-auto">
                   <button
                     onClick={() => setShowFilters(!showFilters)}
-                    className="inline-flex items-center space-x-2 px-5 py-3 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl font-medium hover:border-primary-400 transition"
+                    className="inline-flex items-center space-x-2 px-5 py-3 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl font-medium hover:border-primary-400 transition flex-shrink-0"
                   >
                     <SlidersHorizontal className="w-5 h-5" />
                     <span>Filters</span>
                   </button>
-                  {/* Quick Category Filters */}
-                  {categoryList.map((cat) => (
+
+                  {/* Quick Category Filters - Using Real Data */}
+                  {categories.slice(0, 5).map((cat) => (
                     <button
-                      key={cat.id}
+                      key={cat.name}
                       onClick={() =>
                         handleFilterChange(
                           "category",
-                          filters.category === cat.id ? "" : cat.id
+                          filters.category === cat.name ? "" : cat.name
                         )
                       }
-                      className={`px-4 py-3 rounded-xl font-medium transition ${
-                        filters.category === cat.id
+                      className={`px-4 py-3 rounded-xl font-medium transition whitespace-nowrap text-sm flex-shrink-0 ${
+                        filters.category === cat.name
                           ? "bg-primary-400 text-black"
                           : "bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800"
                       }`}
@@ -447,9 +593,19 @@ const CoursesPage = () => {
                       {cat.name}
                     </button>
                   ))}
+
+                  {categories.length > 5 && (
+                    <button
+                      onClick={() => setShowFilters(true)}
+                      className="px-4 py-3 rounded-xl font-medium transition whitespace-nowrap text-sm bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 flex-shrink-0"
+                    >
+                      +{categories.length - 5} more
+                    </button>
+                  )}
                 </div>
+
                 {/* Sort & Results */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-shrink-0">
                   <span className="text-sm text-gray-600 dark:text-gray-400">
                     <span className="font-bold text-gray-900 dark:text-white">
                       {courses.length}
@@ -470,82 +626,129 @@ const CoursesPage = () => {
                 </div>
               </div>
             </div>
+
             {/* Advanced Filters */}
             {showFilters && (
               <div className="mb-8 p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800">
-                <div className="grid md:grid-cols-4 gap-6">
-                  {/* Level */}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Advanced Filters
+                  </h3>
+                  <button
+                    onClick={() => setShowFilters(false)}
+                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* All Categories */}
                   <div>
                     <label className="block text-sm font-bold mb-3">
-                      Level
+                      All Categories
                     </label>
-                    <select
-                      className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
-                      value={filters.level}
-                      onChange={(e) =>
-                        handleFilterChange("level", e.target.value)
-                      }
-                    >
-                      {levels.map((level) => (
-                        <option
-                          key={level}
-                          value={level === "All Levels" ? "" : level}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                      {categories.map((cat) => (
+                        <button
+                          key={cat.name}
+                          onClick={() =>
+                            handleFilterChange(
+                              "category",
+                              filters.category === cat.name ? "" : cat.name
+                            )
+                          }
+                          className={`px-3 py-2 rounded-lg text-xs font-medium transition ${
+                            filters.category === cat.name
+                              ? "bg-primary-400 text-black"
+                              : "bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 hover:border-primary-400"
+                          }`}
                         >
-                          {level}
-                        </option>
+                          {cat.name}
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
-                  {/* Price Range */}
-                  <div>
-                    <label className="block text-sm font-bold mb-3">
-                      Min Price
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="$0"
-                      className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
-                      value={filters.minPrice}
-                      onChange={(e) =>
-                        handleFilterChange("minPrice", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold mb-3">
-                      Max Price
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="Any"
-                      className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
-                      value={filters.maxPrice}
-                      onChange={(e) =>
-                        handleFilterChange("maxPrice", e.target.value)
-                      }
-                    />
-                  </div>
-                  {/* Rating */}
-                  <div>
-                    <label className="block text-sm font-bold mb-3">
-                      Min Rating
-                    </label>
-                    <select
-                      className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
-                      value={filters.rating}
-                      onChange={(e) =>
-                        handleFilterChange("rating", e.target.value)
-                      }
-                    >
-                      <option value="">Any Rating</option>
-                      <option value="4.5">4.5+ Stars</option>
-                      <option value="4.0">4.0+ Stars</option>
-                      <option value="3.5">3.5+ Stars</option>
-                    </select>
+
+                  {/* Other Filters */}
+                  <div className="grid md:grid-cols-4 gap-6">
+                    {/* Level */}
+                    <div>
+                      <label className="block text-sm font-bold mb-3">
+                        Level
+                      </label>
+                      <select
+                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
+                        value={filters.level}
+                        onChange={(e) =>
+                          handleFilterChange("level", e.target.value)
+                        }
+                      >
+                        {levels.map((level) => (
+                          <option
+                            key={level}
+                            value={level === "All Levels" ? "" : level}
+                          >
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Price Range */}
+                    <div>
+                      <label className="block text-sm font-bold mb-3">
+                        Min Price
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="$0"
+                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
+                        value={filters.minPrice}
+                        onChange={(e) =>
+                          handleFilterChange("minPrice", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold mb-3">
+                        Max Price
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="Any"
+                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
+                        value={filters.maxPrice}
+                        onChange={(e) =>
+                          handleFilterChange("maxPrice", e.target.value)
+                        }
+                      />
+                    </div>
+
+                    {/* Rating */}
+                    <div>
+                      <label className="block text-sm font-bold mb-3">
+                        Min Rating
+                      </label>
+                      <select
+                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
+                        value={filters.rating}
+                        onChange={(e) =>
+                          handleFilterChange("rating", e.target.value)
+                        }
+                      >
+                        <option value="">Any Rating</option>
+                        <option value="4.5">4.5+ Stars</option>
+                        <option value="4.0">4.0+ Stars</option>
+                        <option value="3.5">3.5+ Stars</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
+
             {/* Course Grid */}
             {loading ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -644,6 +847,23 @@ const CourseCard = ({ course, getBadgeIcon, getBadgeColors, compact }) => {
           <div className="text-xs font-bold text-primary-400 mb-2 uppercase tracking-wide">
             {course.category}
           </div>
+          {course.subcategories && course.subcategories.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {course.subcategories.slice(0, 2).map((sub, idx) => (
+                <span
+                  key={idx}
+                  className="px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded text-xs font-medium border border-purple-500/20"
+                >
+                  {sub}
+                </span>
+              ))}
+              {course.subcategories.length > 2 && (
+                <span className="px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded text-xs font-medium">
+                  +{course.subcategories.length - 2}
+                </span>
+              )}
+            </div>
+          )}
           <h3
             className={`${
               compact ? "text-sm" : "text-base"

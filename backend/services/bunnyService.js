@@ -343,8 +343,8 @@ class BunnyService {
 
     console.log(`✅ Generated token: ${token}`);
 
-    // URL with disabled analytics to prevent RUM errors
-    const url = `https://iframe.mediadelivery.net/embed/${this.videoLibraryId}/${videoId}?token=${token}&expires=${expires}&disableanalytics=true&preload=true`;
+    // URL with completely disabled analytics and autoplay
+    const url = `https://iframe.mediadelivery.net/embed/${this.videoLibraryId}/${videoId}?token=${token}&expires=${expires}&disableanalytics=true&preload=true&autoplay=false&loop=false`;
 
     return url;
   }
@@ -353,6 +353,8 @@ class BunnyService {
    */
   async getVideoInfo(videoId) {
     try {
+      console.log(`📹 Getting video info for: ${videoId}`);
+
       const response = await axios.get(
         `https://video.bunnycdn.com/library/${this.videoLibraryId}/videos/${videoId}`,
         {
@@ -362,13 +364,27 @@ class BunnyService {
         }
       );
 
-      return response.data;
+      const video = response.data;
+
+      console.log(
+        `✅ Video info: ${video.title}, Duration: ${video.length}s, Status: ${video.status}`
+      );
+
+      return {
+        videoId: video.guid,
+        title: video.title,
+        duration: video.length, // Duration in seconds
+        status: video.status, // 0=queued, 1=processing, 2=encoding, 3=finished, 4=failed
+        thumbnailUrl: video.thumbnailFileName
+          ? `https://vz-${video.videoLibraryId}.b-cdn.net/${video.guid}/${video.thumbnailFileName}`
+          : null,
+      };
     } catch (error) {
       console.error(
-        "Get video info error:",
+        "❌ Error getting video info:",
         error.response?.data || error.message
       );
-      throw new Error(`Failed to get video info: ${error.message}`);
+      throw error;
     }
   }
 }

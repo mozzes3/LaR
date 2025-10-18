@@ -79,34 +79,53 @@ const DashboardPage = () => {
 
         console.log("📊 Dashboard stats from API:", apiStats);
 
-        // Transform courses
+        // Transform courses with proper lesson title lookup
         const transformedCourses = coursesResponse.data.purchases
           .filter((purchase) => purchase.course)
-          .map((purchase) => ({
-            id: purchase.course._id,
-            slug: purchase.course.slug,
-            title: purchase.course.title,
-            instructor: purchase.course.instructor?.username || "Unknown",
-            instructorAvatar:
-              purchase.course.instructor?.avatar ||
-              `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.course._id}`,
-            thumbnail: purchase.course.thumbnail,
-            progress: purchase.progress || 0,
-            currentLesson: purchase.lastAccessedLesson || "Start learning",
-            totalLessons: purchase.course.totalLessons || 0,
-            completedLessons: purchase.completedLessons?.length || 0,
-            lastWatched: formatLastWatched(purchase.lastAccessedAt),
-            lastAccessedAt: purchase.lastAccessedAt, // ← ADD THIS for sorting
-            rating: purchase.course.averageRating || 0,
-            status: purchase.isCompleted ? "completed" : "in-progress",
-            timeLeft: calculateTimeLeft(
-              purchase.course.totalDuration,
-              purchase.progress
-            ),
-            certificateUrl: purchase.certificateId
-              ? `/certificates/${purchase.certificateId}`
-              : null,
-          }));
+          .map((purchase) => {
+            // ✅ FIX: Get the actual last accessed lesson title
+            let currentLessonTitle = "Start learning";
+
+            if (purchase.lastAccessedLesson && purchase.course.sections) {
+              // Search through all sections to find the lesson
+              for (const section of purchase.course.sections) {
+                const lesson = section.lessons.find(
+                  (l) =>
+                    l._id.toString() === purchase.lastAccessedLesson.toString()
+                );
+                if (lesson) {
+                  currentLessonTitle = lesson.title;
+                  break;
+                }
+              }
+            }
+
+            return {
+              id: purchase.course._id,
+              slug: purchase.course.slug,
+              title: purchase.course.title,
+              instructor: purchase.course.instructor?.username || "Unknown",
+              instructorAvatar:
+                purchase.course.instructor?.avatar ||
+                `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.course._id}`,
+              thumbnail: purchase.course.thumbnail,
+              progress: purchase.progress || 0,
+              currentLesson: currentLessonTitle, // ✅ FIXED: Show actual lesson title
+              totalLessons: purchase.course.totalLessons || 0,
+              completedLessons: purchase.completedLessons?.length || 0,
+              lastWatched: formatLastWatched(purchase.lastAccessedAt),
+              lastAccessedAt: purchase.lastAccessedAt,
+              rating: purchase.course.averageRating || 0,
+              status: purchase.isCompleted ? "completed" : "in-progress",
+              timeLeft: calculateTimeLeft(
+                purchase.course.totalDuration,
+                purchase.progress
+              ),
+              certificateUrl: purchase.certificateId
+                ? `/certificates/${purchase.certificateId}`
+                : null,
+            };
+          });
 
         setEnrolledCourses(transformedCourses);
 

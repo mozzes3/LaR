@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { userApi } from "@services/api";
+import { useWallet } from "@contexts/WalletContext";
 import {
   Users,
   Search,
-  Filter,
   Download,
   TrendingUp,
   Clock,
@@ -13,7 +14,6 @@ import {
   Activity,
   Target,
   Eye,
-  MoreVertical,
   BookOpen,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -21,133 +21,77 @@ import StudentDetailModal from "@components/StudentDetailModal";
 
 const AllStudentsPage = () => {
   const navigate = useNavigate();
+  const { user: currentUser } = useWallet();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [sortBy, setSortBy] = useState("recent");
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [students, setStudents] = useState([]);
+  const [aggregateStats, setAggregateStats] = useState(null);
 
-  // Mock aggregate data across all courses
-  const aggregateStats = {
-    totalStudents: 3847,
-    activeStudents: 2891,
-    completedStudents: 956,
-    averageProgress: 64,
-  };
+  useEffect(() => {
+    const loadStudents = async () => {
+      if (!currentUser || !currentUser.isInstructor) {
+        toast.error("You must be an instructor to access this page");
+        navigate("/");
+        return;
+      }
 
-  // Mock students data from ALL courses
-  const students = [
-    {
-      id: 1,
-      name: "CryptoNinja",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoNinja",
-      email: "crypto@example.com",
-      enrolledCourses: 3,
-      courseTitles: ["NFT Marketing", "Web3 Community", "Token Economics"],
-      totalProgress: 75,
-      lastActive: "2 hours ago",
-      status: "active",
-      totalWatchTime: 2847,
-      averageRating: 4.8,
-    },
-    {
-      id: 2,
-      name: "Web3Warrior",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Web3Warrior",
-      email: "web3@example.com",
-      enrolledCourses: 5,
-      courseTitles: [
-        "NFT Marketing",
-        "Smart Contracts",
-        "DeFi",
-        "Web3 Community",
-        "Token Economics",
-      ],
-      totalProgress: 92,
-      lastActive: "1 day ago",
-      status: "active",
-      totalWatchTime: 5240,
-      averageRating: 5.0,
-    },
-    {
-      id: 3,
-      name: "BlockchainBob",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=BlockchainBob",
-      email: "bob@example.com",
-      enrolledCourses: 2,
-      courseTitles: ["NFT Marketing", "Token Economics"],
-      totalProgress: 45,
-      lastActive: "5 hours ago",
-      status: "active",
-      totalWatchTime: 1523,
-      averageRating: 4.5,
-    },
-    {
-      id: 4,
-      name: "NFTQueen",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=NFTQueen",
-      email: "nft@example.com",
-      enrolledCourses: 1,
-      courseTitles: ["NFT Marketing"],
-      totalProgress: 23,
-      lastActive: "2 weeks ago",
-      status: "inactive",
-      totalWatchTime: 287,
-      averageRating: null,
-    },
-    {
-      id: 5,
-      name: "DeFiDave",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=DeFiDave",
-      email: "defi@example.com",
-      enrolledCourses: 4,
-      courseTitles: [
-        "Smart Contracts",
-        "DeFi",
-        "Token Economics",
-        "Web3 Community",
-      ],
-      totalProgress: 88,
-      lastActive: "3 days ago",
-      status: "active",
-      totalWatchTime: 4180,
-      averageRating: 4.7,
-    },
-  ];
+      try {
+        setLoading(true);
+        const response = await userApi.getAllStudents();
+        console.log("📚 All students data:", response.data);
 
-  const stats = [
-    {
-      label: "Total Students",
-      value: aggregateStats.totalStudents,
-      icon: Users,
-      color: "text-blue-500",
-      bgColor: "bg-blue-500/10",
-      trend: "+12%",
-    },
-    {
-      label: "Active Students",
-      value: aggregateStats.activeStudents,
-      icon: Activity,
-      color: "text-green-500",
-      bgColor: "bg-green-500/10",
-      trend: "+8%",
-    },
-    {
-      label: "Completed Courses",
-      value: aggregateStats.completedStudents,
-      icon: CheckCircle,
-      color: "text-purple-500",
-      bgColor: "bg-purple-500/10",
-      trend: "+15%",
-    },
-    {
-      label: "Avg Progress",
-      value: `${aggregateStats.averageProgress}%`,
-      icon: Target,
-      color: "text-orange-500",
-      bgColor: "bg-orange-500/10",
-      trend: "+5%",
-    },
-  ];
+        setStudents(response.data.students);
+        setAggregateStats(response.data.stats);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading students:", error);
+        toast.error("Failed to load students");
+        setLoading(false);
+      }
+    };
+
+    loadStudents();
+  }, [currentUser, navigate]);
+
+  const stats = aggregateStats
+    ? [
+        {
+          label: "Total Students",
+          value: aggregateStats.totalStudents,
+          icon: Users,
+          color: "text-blue-500",
+          bgColor: "bg-blue-500/10",
+          trend: "+12%",
+        },
+        {
+          label: "Active Students",
+          value: aggregateStats.activeStudents,
+          icon: Activity,
+          color: "text-green-500",
+          bgColor: "bg-green-500/10",
+          trend: "+8%",
+        },
+        {
+          label: "Completed Courses",
+          value: aggregateStats.completedStudents,
+          icon: CheckCircle,
+          color: "text-purple-500",
+          bgColor: "bg-purple-500/10",
+          trend: "+15%",
+        },
+        {
+          label: "Avg Progress",
+          value: `${aggregateStats.averageProgress}%`,
+          icon: Target,
+          color: "text-orange-500",
+          bgColor: "bg-orange-500/10",
+          trend: "+5%",
+        },
+      ]
+    : [];
 
   const filteredStudents = students
     .filter((student) => {
@@ -162,7 +106,7 @@ const AllStudentsPage = () => {
     })
     .sort((a, b) => {
       if (sortBy === "recent") {
-        return b.id - a.id;
+        return new Date(b.lastActive) - new Date(a.lastActive);
       } else if (sortBy === "progress") {
         return b.totalProgress - a.totalProgress;
       } else if (sortBy === "courses") {
@@ -185,8 +129,53 @@ const AllStudentsPage = () => {
   };
 
   const handleExportStudents = () => {
-    toast.success("Exporting all student data...");
+    // Create CSV
+    const headers = [
+      "Name",
+      "Email",
+      "Courses",
+      "Progress",
+      "Status",
+      "Watch Time",
+      "Last Active",
+    ];
+    const csvData = filteredStudents.map((s) => [
+      s.name,
+      s.email,
+      s.enrolledCourses,
+      `${s.totalProgress}%`,
+      s.status,
+      `${Math.floor(s.totalWatchTime / 60)}h ${s.totalWatchTime % 60}m`,
+      s.lastActive,
+    ]);
+
+    const csv = [
+      headers.join(","),
+      ...csvData.map((row) => row.join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `students-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+
+    toast.success("Student data exported!");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading students...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-8">
@@ -244,6 +233,7 @@ const AllStudentsPage = () => {
           ))}
         </div>
 
+        {/* Rest of the component remains the same... */}
         {/* Filters & Search */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6 mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
@@ -354,7 +344,7 @@ const AllStudentsPage = () => {
                         />
                         <div>
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {student.name}
+                            {student.displayName || student.name}
                           </p>
                           <p className="text-sm text-gray-500">
                             {student.email}
@@ -411,8 +401,17 @@ const AllStudentsPage = () => {
                       <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                         <Clock className="w-4 h-4" />
                         <span>
-                          {Math.floor(student.totalWatchTime / 60)}h{" "}
-                          {student.totalWatchTime % 60}m
+                          {student.totalWatchTime >= 3600
+                            ? `${Math.floor(
+                                student.totalWatchTime / 3600
+                              )}h ${Math.floor(
+                                (student.totalWatchTime % 3600) / 60
+                              )}m`
+                            : student.totalWatchTime >= 60
+                            ? `${Math.floor(student.totalWatchTime / 60)}m ${
+                                student.totalWatchTime % 60
+                              }s`
+                            : `${student.totalWatchTime}s`}
                         </span>
                       </div>
                     </td>
@@ -450,12 +449,6 @@ const AllStudentsPage = () => {
                 ))}
               </tbody>
             </table>
-            {selectedStudent && (
-              <StudentDetailModal
-                student={selectedStudent}
-                onClose={() => setSelectedStudent(null)}
-              />
-            )}
           </div>
 
           {filteredStudents.length === 0 && (
@@ -473,6 +466,17 @@ const AllStudentsPage = () => {
           )}
         </div>
       </div>
+
+      {selectedStudent && (
+        <StudentDetailModal
+          student={selectedStudent}
+          courses={
+            students.find((s) => s.id === selectedStudent.id)?.courseTitles ||
+            []
+          }
+          onClose={() => setSelectedStudent(null)}
+        />
+      )}
     </div>
   );
 };

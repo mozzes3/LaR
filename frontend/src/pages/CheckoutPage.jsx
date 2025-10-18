@@ -53,7 +53,7 @@ const CheckoutPage = () => {
     sol: 140,
     usdt: 1,
     usdc: 1,
-    fdr: 0.85,
+    fdr: 1,
   };
 
   const calculateCryptoPrice = (usdPrice, crypto) => {
@@ -61,104 +61,98 @@ const CheckoutPage = () => {
     return crypto === "btc" ? amount.toFixed(4) : amount.toFixed(2);
   };
 
-  // All available payment options
-  const allPaymentOptions = [
-    {
-      id: "usdt",
-      name: "USDT",
-      fullName: "Tether USD",
-      icon: "₮",
-      color: "bg-green-500",
-      amount: "299.00",
-      isStable: true,
-      network: "Ethereum (ERC-20)",
-      chainId: 1,
-    },
-    {
-      id: "usdc",
-      name: "USDC",
-      fullName: "USD Coin",
-      icon: "$",
-      color: "bg-blue-500",
-      amount: "299.00",
-      isStable: true,
-      network: "Ethereum (ERC-20)",
-      chainId: 1,
-    },
-    {
-      id: "eth",
-      name: "ETH",
-      fullName: "Ethereum",
-      icon: "Ξ",
-      color: "bg-gradient-to-br from-purple-500 to-blue-500",
-      amount: calculateCryptoPrice(299, "eth"),
-      isStable: false,
-      network: "Ethereum Mainnet",
-      chainId: 1,
-    },
-    {
-      id: "btc",
-      name: "BTC",
-      fullName: "Bitcoin",
-      icon: "₿",
-      color: "bg-orange-500",
-      amount: calculateCryptoPrice(299, "btc"),
-      isStable: false,
-      network: "Bitcoin Network",
-      chainId: null,
-    },
-    {
-      id: "sol",
-      name: "SOL",
-      fullName: "Solana",
-      icon: "S",
-      color: "bg-gradient-to-br from-purple-500 to-green-400",
-      amount: calculateCryptoPrice(299, "sol"),
-      isStable: false,
-      network: "Solana Mainnet",
-      chainId: null,
-    },
-    {
-      id: "fdr",
-      name: "$FDR",
-      fullName: "Founder Token",
-      icon: "F",
-      color: "bg-gradient-to-br from-primary-400 to-primary-600",
-      amount: "299",
-      isStable: true,
-      network: "Polygon Network",
-      chainId: 137,
-      badge: "Save 10%",
-    },
-  ];
+  // Get dynamic payment options based on course price
+  const getPaymentOptions = () => {
+    if (!course?.price) {
+      return [
+        {
+          id: "usdt",
+          name: "USDT",
+          fullName: "Tether USD",
+          icon: "₮",
+          color: "bg-green-500",
+          amount: "0.00",
+          isStable: true,
+          network: "Ethereum (ERC-20)",
+          chainId: 1,
+        },
+      ];
+    }
 
-  const mockCourse = {
-    id: 1,
-    slug: "nft-marketing-masterclass",
-    title: "NFT Marketing Masterclass: 0 to 10K Discord Members",
-    subtitle: "Learn proven strategies to grow your NFT community from zero",
-    instructor: {
-      username: "CryptoMaverick",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoMaverick",
-      verified: true,
-      badge: "KOL",
-      badgeColor: "purple",
-      walletAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-      acceptedPayments: ["usdt", "usdc", "eth", "fdr"],
-    },
-    thumbnail:
-      "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=225&fit=crop",
-    price: { usd: 299 },
-    duration: "12h 30m",
-    totalLessons: 47,
-    totalDuration: 750,
-    level: "Intermediate",
-    escrowSettings: {
-      refundPeriodDays: 14,
-      minWatchPercentage: 20,
-      maxWatchTime: 120,
-    },
+    const usdPrice = course.price.usd || 0;
+
+    return [
+      {
+        id: "usdt",
+        name: "USDT",
+        fullName: "Tether USD",
+        icon: "₮",
+        color: "bg-green-500",
+        amount: usdPrice.toFixed(2),
+        isStable: true,
+        network: "Ethereum (ERC-20)",
+        chainId: 1,
+      },
+      {
+        id: "usdc",
+        name: "USDC",
+        fullName: "USD Coin",
+        icon: "$",
+        color: "bg-blue-500",
+        amount: usdPrice.toFixed(2),
+        isStable: true,
+        network: "Ethereum (ERC-20)",
+        chainId: 1,
+      },
+      {
+        id: "eth",
+        name: "ETH",
+        fullName: "Ethereum",
+        icon: "Ξ",
+        color: "bg-gradient-to-br from-purple-500 to-blue-500",
+        amount: calculateCryptoPrice(usdPrice, "eth"),
+        isStable: false,
+        network: "Ethereum Mainnet",
+        chainId: 1,
+      },
+      {
+        id: "btc",
+        name: "BTC",
+        fullName: "Bitcoin",
+        icon: "₿",
+        color: "bg-orange-500",
+        amount: calculateCryptoPrice(usdPrice, "btc"),
+        isStable: false,
+        network: "Bitcoin Network",
+        chainId: null,
+      },
+      {
+        id: "sol",
+        name: "SOL",
+        fullName: "Solana",
+        icon: "S",
+        color: "bg-gradient-to-br from-purple-500 to-green-400",
+        amount: calculateCryptoPrice(usdPrice, "sol"),
+        isStable: false,
+        network: "Solana Mainnet",
+        chainId: null,
+      },
+      {
+        id: "fdr",
+        name: "$FDR",
+        fullName: "Founder Token",
+        icon: "F",
+        color: "bg-gradient-to-br from-primary-400 to-primary-600",
+        amount: (course.price.fdr || usdPrice).toString(),
+        isStable: true,
+        network: "Polygon Network",
+        chainId: 137,
+        badge: "Platform Token",
+      },
+    ];
   };
+
+  const allPaymentOptions = getPaymentOptions();
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -356,9 +350,10 @@ const CheckoutPage = () => {
   }
 
   const paymentOptions = allPaymentOptions.filter((opt) =>
-    course?.instructor.acceptedPayments.includes(opt.id)
+    course?.instructor?.acceptedPayments?.includes(opt.id)
   );
-  const selectedOption = paymentOptions.find((p) => p.id === selectedPayment);
+  const selectedOption =
+    paymentOptions.find((p) => p.id === selectedPayment) || paymentOptions[0];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-12">

@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      sparse: true, // Can be null, but if exists must be unique
+      sparse: true,
       lowercase: true,
     },
     username: {
@@ -29,13 +29,11 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
     displayName: {
-      // ← ADD THIS ENTIRE BLOCK
       type: String,
       trim: true,
       maxlength: 50,
     },
     lastUsernameChange: {
-      // ← ADD THIS TOO IF NOT THERE
       type: Date,
       default: null,
     },
@@ -82,6 +80,51 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // ✅ ADD THESE NEW FIELDS FOR ACHIEVEMENTS
+    totalXP: {
+      type: Number,
+      default: 0,
+    },
+    tokensEarned: {
+      type: Number,
+      default: 0,
+    },
+    currentStreak: {
+      type: Number,
+      default: 0,
+    },
+    longestStreak: {
+      type: Number,
+      default: 0,
+    },
+    lastActivityDate: {
+      type: Date,
+      default: null,
+    },
+    reviewsWritten: {
+      type: Number,
+      default: 0,
+    },
+    unlockedAchievements: [
+      {
+        achievementId: {
+          type: String,
+          required: true,
+        },
+        unlockedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        xpEarned: {
+          type: Number,
+          default: 0,
+        },
+        fdrEarned: {
+          type: Number,
+          default: 0,
+        },
+      },
+    ],
 
     // Stats
     totalCoursesCreated: {

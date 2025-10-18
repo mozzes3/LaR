@@ -76,12 +76,15 @@ const UserProfilePage = () => {
 
   // Helper function to get level progress
   const getLevelProgress = () => {
-    if (!stats) return 0;
+    if (!stats || !stats.level || !stats.experience) return 0;
     const currentLevelXP = stats.level * stats.level * 100;
     const nextLevelXP = (stats.level + 1) * (stats.level + 1) * 100;
     const progressXP = stats.experience - currentLevelXP;
     const requiredXP = nextLevelXP - currentLevelXP;
-    return (progressXP / requiredXP) * 100;
+    const percentage = (progressXP / requiredXP) * 100;
+
+    // Ensure percentage is between 0 and 100
+    return Math.max(0, Math.min(100, percentage));
   };
 
   if (loading) {
@@ -177,7 +180,10 @@ const UserProfilePage = () => {
                   <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                     <BookOpen className="w-6 h-6 text-blue-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile.coursesEnrolled || 0}
+                      {enrolledCourses.filter((p) => p.course !== null)
+                        .length ||
+                        profile.coursesEnrolled ||
+                        0}
                     </div>
                     <div className="text-sm text-gray-500">Enrolled</div>
                   </div>
@@ -356,47 +362,49 @@ const UserProfilePage = () => {
 
                   {enrolledCourses.length > 0 ? (
                     <div className="grid md:grid-cols-2 gap-6">
-                      {enrolledCourses.map((purchase) => (
-                        <Link
-                          key={purchase._id}
-                          to={`/learn/${purchase.course.slug}`}
-                          className="group border-2 border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden hover:border-primary-400 transition"
-                        >
-                          <img
-                            src={purchase.course.thumbnail}
-                            alt={purchase.course.title}
-                            className="w-full h-48 object-cover"
-                          />
-                          <div className="p-4">
-                            <h3 className="font-bold text-lg mb-2 group-hover:text-primary-400 transition">
-                              {purchase.course.title}
-                            </h3>
-                            <div className="mb-3">
-                              <div className="flex items-center justify-between text-sm mb-1">
-                                <span className="text-gray-600 dark:text-gray-400">
-                                  Progress
-                                </span>
-                                <span className="font-bold">
-                                  {purchase.progress}%
-                                </span>
+                      {enrolledCourses
+                        .filter((purchase) => purchase.course !== null) // ← ADD THIS LINE to filter out deleted courses
+                        .map((purchase) => (
+                          <Link
+                            key={purchase._id}
+                            to={`/courses/${purchase.course.slug}/learn`} // ← FIX: Changed from /learn/ to /courses/
+                            className="group border-2 border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden hover:border-primary-400 transition"
+                          >
+                            <img
+                              src={purchase.course.thumbnail}
+                              alt={purchase.course.title}
+                              className="w-full h-48 object-cover"
+                            />
+                            <div className="p-4">
+                              <h3 className="font-bold text-lg mb-2 group-hover:text-primary-400 transition">
+                                {purchase.course.title}
+                              </h3>
+                              <div className="mb-3">
+                                <div className="flex items-center justify-between text-sm mb-1">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    Progress
+                                  </span>
+                                  <span className="font-bold">
+                                    {purchase.progress}%
+                                  </span>
+                                </div>
+                                <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary-400"
+                                    style={{ width: `${purchase.progress}%` }}
+                                  />
+                                </div>
                               </div>
-                              <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-primary-400"
-                                  style={{ width: `${purchase.progress}%` }}
-                                />
+                              <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                                <span>
+                                  {purchase.completedLessons?.length || 0} /{" "}
+                                  {purchase.course.totalLessons} lessons
+                                </span>
+                                <Play className="w-4 h-4 text-primary-400" />
                               </div>
                             </div>
-                            <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                              <span>
-                                {purchase.completedLessons?.length || 0} /{" "}
-                                {purchase.course.totalLessons} lessons
-                              </span>
-                              <Play className="w-4 h-4 text-primary-400" />
-                            </div>
-                          </div>
-                        </Link>
-                      ))}
+                          </Link>
+                        ))}
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-500">

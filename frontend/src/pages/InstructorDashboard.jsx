@@ -361,7 +361,7 @@ const InstructorDashboard = () => {
             </p>
           </button>
           <button
-            onClick={() => toast.info("Students page coming soon")}
+            onClick={() => navigate("/instructor/students")}
             className="p-6 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-2 border-blue-500/20 rounded-2xl hover:shadow-lg transition text-left group"
           >
             <div className="flex items-center justify-between mb-4">
@@ -378,7 +378,7 @@ const InstructorDashboard = () => {
             </p>
           </button>
           <button
-            onClick={() => toast.info("Analytics page coming soon")}
+            onClick={() => navigate("/instructor/analytics")}
             className="p-6 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-2 border-purple-500/20 rounded-2xl hover:shadow-lg transition text-left group"
           >
             <div className="flex items-center justify-between mb-4">
@@ -519,7 +519,9 @@ const InstructorDashboard = () => {
 
                               <button
                                 onClick={() => {
-                                  toast.info("Analytics coming soon");
+                                  navigate(
+                                    `/instructor/courses/${course.slug}/analytics`
+                                  ); // Use slug, not _id
                                   setShowCourseMenu(null);
                                 }}
                                 className="w-full px-4 py-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition flex items-center space-x-2"

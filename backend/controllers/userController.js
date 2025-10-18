@@ -491,6 +491,353 @@ const getInstructorRecentActivity = async (req, res) => {
   }
 };
 
+const getAllStudents = async (req, res) => {
+  try {
+    const instructorId = req.userId;
+
+    // Verify user is an instructor
+    const instructor = await User.findById(instructorId);
+    if (!instructor || !instructor.isInstructor) {
+      return res.status(403).json({ error: "Not authorized as instructor" });
+    }
+
+    // Get all instructor's courses
+    const Course = require("../models/Course");
+    const Purchase = require("../models/Purchase");
+
+    const courses = await Course.find({ instructor: instructorId });
+    const courseIds = courses.map((c) => c._id);
+
+    // Get all purchases for instructor's courses
+    const purchases = await Purchase.find({
+      course: { $in: courseIds },
+      status: "active",
+    })
+      .populate("user", "username avatar email lastLogin")
+      .populate("course", "title")
+      .lean();
+
+    // Aggregate student data
+    const studentMap = new Map();
+
+    purchases.forEach((purchase) => {
+      if (!purchase.user) return;
+
+      const userId = purchase.user._id.toString();
+
+      if (!studentMap.has(userId)) {
+        studentMap.set(userId, {
+          id: userId,
+          name: purchase.user.username,
+          displayName: purchase.user.displayName || purchase.user.username,
+          avatar:
+            purchase.user.avatar ||
+            `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.user.username}`,
+          email: purchase.user.email || "No email provided",
+          enrolledCourses: 0,
+          courseTitles: [],
+          totalProgress: 0,
+          totalWatchTime: 0,
+          lastActive: purchase.user.lastLogin || purchase.lastAccessedAt,
+          status: "active",
+          completedCourses: 0,
+          averageRating: null,
+        });
+      }
+
+      const student = studentMap.get(userId);
+      student.enrolledCourses++;
+      student.courseTitles.push(purchase.course?.title || "Unknown Course");
+      student.totalProgress += purchase.progress || 0;
+      student.totalWatchTime += purchase.totalWatchTime || 0;
+
+      if (purchase.isCompleted) {
+        student.completedCourses++;
+      }
+
+      // Update last active
+      if (
+        purchase.lastAccessedAt &&
+        new Date(purchase.lastAccessedAt) > new Date(student.lastActive)
+      ) {
+        student.lastActive = purchase.lastAccessedAt;
+      }
+    });
+
+    // Calculate averages and format
+    const students = Array.from(studentMap.values()).map((student) => {
+      student.totalProgress = Math.round(
+        student.totalProgress / student.enrolledCourses
+      );
+
+      // Determine status based on last active
+      const lastActiveDate = new Date(student.lastActive);
+      const daysSinceActive = Math.floor(
+        (Date.now() - lastActiveDate) / (1000 * 60 * 60 * 24)
+      );
+      student.status = daysSinceActive > 14 ? "inactive" : "active";
+
+      // Format last active
+      if (daysSinceActive === 0) {
+        student.lastActive = "Today";
+      } else if (daysSinceActive === 1) {
+        student.lastActive = "Yesterday";
+      } else if (daysSinceActive < 7) {
+        student.lastActive = `${daysSinceActive} days ago`;
+      } else if (daysSinceActive < 30) {
+        student.lastActive = `${Math.floor(daysSinceActive / 7)} weeks ago`;
+      } else {
+        student.lastActive = lastActiveDate.toLocaleDateString();
+      }
+
+      return student;
+    });
+
+    // Calculate aggregate stats
+    const totalStudents = students.length;
+    const activeStudents = students.filter((s) => s.status === "active").length;
+    const totalCompletedCourses = students.reduce(
+      (sum, s) => sum + s.completedCourses,
+      0
+    );
+    const averageProgress =
+      totalStudents > 0
+        ? Math.round(
+            students.reduce((sum, s) => sum + s.totalProgress, 0) /
+              totalStudents
+          )
+        : 0;
+
+    res.json({
+      success: true,
+      students,
+      stats: {
+        totalStudents,
+        activeStudents,
+        inactiveStudents: totalStudents - activeStudents,
+        completedStudents: totalCompletedCourses,
+        averageProgress,
+      },
+    });
+  } catch (error) {
+    console.error("Get all students error:", error);
+    res.status(500).json({ error: "Failed to get students" });
+  }
+};
+/**
+ * Get student's learning analytics
+ */
+const getStudentAnalytics = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const Purchase = require("../models/Purchase");
+    const Course = require("../models/Course");
+    const { getUserAchievements } = require("../services/achievementService");
+
+    // Get all user's purchases
+    const purchases = await Purchase.find({
+      user: userId,
+      status: "active",
+    })
+      .populate({
+        path: "course",
+        select: "title slug thumbnail category totalLessons totalDuration",
+      })
+      .lean();
+
+    // ✅ CRITICAL: Filter out purchases with deleted courses
+    const validPurchases = purchases.filter(
+      (p) => p.course !== null && p.course !== undefined
+    );
+
+    console.log(
+      `📊 User ${userId}: ${purchases.length} total purchases, ${validPurchases.length} valid purchases`
+    );
+
+    // Calculate stats using ONLY valid purchases
+    const totalCourses = validPurchases.length;
+    const completedCourses = validPurchases.filter((p) => p.isCompleted).length;
+    const inProgressCourses = totalCourses - completedCourses;
+
+    // Total watch time across all courses
+    const totalWatchTime = validPurchases.reduce(
+      (sum, p) => sum + (p.totalWatchTime || 0),
+      0
+    );
+
+    // Calculate average progress
+    const averageProgress =
+      totalCourses > 0
+        ? Math.round(
+            validPurchases.reduce((sum, p) => sum + (p.progress || 0), 0) /
+              totalCourses
+          )
+        : 0;
+
+    // Calculate current streak
+    let currentStreak = 0;
+    let longestStreak = 0;
+
+    // Sort purchases by lastAccessedAt
+    const sortedPurchases = validPurchases
+      .filter((p) => p.lastAccessedAt)
+      .sort((a, b) => new Date(b.lastAccessedAt) - new Date(a.lastAccessedAt));
+
+    if (sortedPurchases.length > 0) {
+      const lastAccessed = new Date(sortedPurchases[0].lastAccessedAt);
+      const today = new Date();
+      const daysDiff = Math.floor(
+        (today - lastAccessed) / (1000 * 60 * 60 * 24)
+      );
+
+      currentStreak = daysDiff <= 1 ? daysDiff + 1 : 0;
+      longestStreak = currentStreak;
+    }
+
+    // Total lessons completed
+    const lessonsCompleted = validPurchases.reduce(
+      (sum, p) => sum + (p.completedLessons?.length || 0),
+      0
+    );
+
+    // Total lessons across all courses
+    const totalLessons = validPurchases.reduce(
+      (sum, p) => sum + (p.course?.totalLessons || 0),
+      0
+    );
+
+    // Get user data
+    const user = await User.findById(userId);
+
+    const allAchievements = getUserAchievements(user);
+    const unlockedCount = allAchievements.filter((a) => a.unlocked).length;
+
+    // Weekly activity (last 7 days)
+    const weeklyActivity = [];
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const today = new Date();
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dayName = days[date.getDay()];
+
+      weeklyActivity.push({
+        day: dayName,
+        hours: 0,
+        lessons: 0,
+      });
+    }
+
+    // Course progress breakdown - ONLY valid purchases
+    const courseProgress = validPurchases.map((purchase) => ({
+      id: purchase.course._id,
+      slug: purchase.course.slug,
+      title: purchase.course.title,
+      thumbnail: purchase.course.thumbnail,
+      category: purchase.course.category || "Uncategorized",
+      progress: purchase.progress || 0,
+      timeSpent: purchase.totalWatchTime || 0,
+      lessonsCompleted: purchase.completedLessons?.length || 0,
+      totalLessons: purchase.course.totalLessons || 0,
+      lastAccessed: purchase.lastAccessedAt
+        ? formatTimeAgo(purchase.lastAccessedAt)
+        : "Never",
+      status: purchase.isCompleted ? "completed" : "in-progress",
+    }));
+
+    // Skills (based on course categories) - ONLY valid purchases
+    const skillsMap = new Map();
+    validPurchases.forEach((purchase) => {
+      const category = purchase.course?.category || "General";
+      if (!skillsMap.has(category)) {
+        skillsMap.set(category, {
+          name: category,
+          level: 0,
+          courses: 0,
+          totalProgress: 0,
+        });
+      }
+      const skill = skillsMap.get(category);
+      skill.courses++;
+      skill.totalProgress += purchase.progress || 0;
+      skill.level = Math.round(skill.totalProgress / skill.courses);
+    });
+
+    const skills = Array.from(skillsMap.values());
+
+    res.json({
+      success: true,
+      analytics: {
+        stats: {
+          totalCourses,
+          completedCourses,
+          inProgressCourses,
+          totalWatchTime,
+          averageScore: averageProgress,
+          certificatesEarned: user.certificatesEarned || 0,
+          currentStreak,
+          longestStreak,
+          totalXP: user.totalXP || 0,
+          level: user.level || 1,
+          fdrEarned: user.tokensEarned || 0,
+          skillsLearned: skills.length,
+          lessonsCompleted,
+          totalLessons,
+          achievementsUnlocked: unlockedCount,
+        },
+        weeklyActivity,
+        courseProgress,
+        skills,
+        achievements: allAchievements,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Get student analytics error:", error);
+    console.error("Error stack:", error.stack);
+
+    // Return empty analytics on error instead of 500
+    res.json({
+      success: true,
+      analytics: {
+        stats: {
+          totalCourses: 0,
+          completedCourses: 0,
+          inProgressCourses: 0,
+          totalWatchTime: 0,
+          averageScore: 0,
+          certificatesEarned: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXP: 0,
+          level: 1,
+          fdrEarned: 0,
+          skillsLearned: 0,
+          lessonsCompleted: 0,
+          totalLessons: 0,
+          achievementsUnlocked: 0,
+        },
+        weeklyActivity: [],
+        courseProgress: [],
+        skills: [],
+        achievements: [],
+      },
+    });
+  }
+};
+
+// Helper function
+function formatTimeAgo(date) {
+  const now = new Date();
+  const diff = Math.floor((now - new Date(date)) / 1000);
+
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(date).toLocaleDateString();
+}
 module.exports = {
   getProfile,
   updateProfile,
@@ -498,6 +845,7 @@ module.exports = {
   getUserDashboardStats,
   getInstructorDashboardStats,
   getInstructorRecentActivity,
-
+  getAllStudents,
+  getStudentAnalytics,
   getStats,
 };

@@ -77,7 +77,7 @@ const VideoPlayer = ({ courseSlug, lessonId, lessonTitle }) => {
         <>
           <iframe
             key={currentVideoUrl}
-            src={`${currentVideoUrl}&disableanalytics=true`}
+            src={currentVideoUrl}
             className="w-full h-full"
             allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
             allowFullScreen

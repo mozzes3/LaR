@@ -123,17 +123,33 @@ const courseSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
-        "Blockchain Development",
-        "NFT & Digital Art",
-        "DeFi & Trading",
-        "Web3 Marketing",
+        "Web3 Development",
+        "Blockchain Fundamentals",
+        "DeFi",
+        "NFTs & Digital Art",
         "Smart Contracts",
-        "Tokenomics",
         "Community Building",
-        "Cryptocurrency",
-        "Other",
+        "Marketing & Growth",
+        "Trading & Investment",
+        "Security & Auditing",
+        "DAOs & Governance",
+        "Gaming & Metaverse",
+        "Content Creation",
+        "Business & Entrepreneurship",
+        "Design & UX",
+        "Legal & Compliance",
       ],
     },
+    subcategories: [
+      {
+        type: String,
+      },
+    ],
+    tags: [
+      {
+        type: String,
+      },
+    ],
 
     // Level
     level: {
@@ -236,6 +252,19 @@ courseSchema.pre("save", function (next) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
   }
+  let totalLessons = 0;
+  let totalDuration = 0;
+
+  this.sections.forEach((section) => {
+    section.lessons.forEach((lesson) => {
+      totalLessons++;
+      totalDuration += lesson.duration || 0;
+    });
+  });
+
+  this.totalLessons = totalLessons;
+  this.totalDuration = totalDuration;
+
   next();
 });
 

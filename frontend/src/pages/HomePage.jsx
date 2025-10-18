@@ -18,9 +18,11 @@ import {
   Coins,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { courseApi } from "@services/api";
 
 const HomePage = () => {
   const [trendingCourses, setTrendingCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const stats = [
     { label: "Course Creators", value: "500+", icon: Users },
@@ -55,86 +57,81 @@ const HomePage = () => {
     },
   ];
 
-  // Mock trending courses
-  const mockTrendingCourses = [
-    {
-      id: 1,
-      slug: "nft-marketing-masterclass",
-      title: "NFT Marketing Masterclass: 0 to 10K Discord Members",
-      instructor: {
-        username: "CryptoMaverick",
-        avatar:
-          "https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoMaverick",
-        verified: true,
-        followers: "45K",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&h=450&fit=crop",
-      price: { usd: 299, fdr: 299 },
-      rating: 4.9,
-      students: 1247,
-      duration: "12h 30m",
-      category: "Marketing",
-      level: "Intermediate",
-      trending: true,
-      lessons: 47,
-      lastUpdated: "2 days ago",
-    },
-    {
-      id: 2,
-      slug: "solidity-smart-contracts",
-      title: "Solidity Smart Contracts: Build Your First DeFi Protocol",
-      instructor: {
-        username: "DevWizard",
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=DevWizard",
-        verified: true,
-        followers: "32K",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1639322537228-f710d846310a?w=800&h=450&fit=crop",
-      price: { usd: 399, fdr: 399 },
-      rating: 4.8,
-      students: 892,
-      duration: "18h 45m",
-      category: "Development",
-      level: "Advanced",
-      trending: true,
-      lessons: 68,
-      lastUpdated: "1 week ago",
-    },
-    {
-      id: 3,
-      slug: "discord-community-growth",
-      title: "Discord Community Building: Launch & Scale Your Web3 DAO",
-      instructor: {
-        username: "CommunityQueen",
-        avatar:
-          "https://api.dicebear.com/7.x/avataaars/svg?seed=CommunityQueen",
-        verified: true,
-        followers: "28K",
-      },
-      thumbnail:
-        "https://images.unsplash.com/photo-1611746872915-64382b5c76da?w=800&h=450&fit=crop",
-      price: { usd: 199, fdr: 199 },
-      rating: 4.9,
-      students: 1654,
-      duration: "8h 20m",
-      category: "Community",
-      level: "Beginner",
-      trending: true,
-      lessons: 34,
-      lastUpdated: "3 days ago",
-    },
-  ];
+  // Helper function to format duration
+  const formatDuration = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
 
+  // Helper function to format date
+  const formatDate = (date) => {
+    const days = Math.floor(
+      (new Date() - new Date(date)) / (1000 * 60 * 60 * 24)
+    );
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    return `${Math.floor(days / 30)} months ago`;
+  };
+
+  // Load real trending courses from API
   useEffect(() => {
-    setTrendingCourses(mockTrendingCourses);
+    const loadTrendingCourses = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch courses sorted by popularity/enrollment
+        const response = await courseApi.getAll({
+          sort: "popular",
+          limit: 6,
+        });
+
+        // Transform courses to match component needs
+        const transformedCourses = (response.data.courses || []).map(
+          (course) => ({
+            id: course._id,
+            slug: course.slug,
+            title: course.title,
+            instructor: {
+              username: course.instructor?.username || "Unknown",
+              avatar:
+                course.instructor?.avatar ||
+                `https://api.dicebear.com/7.x/avataaars/svg?seed=${course._id}`,
+              verified: course.instructor?.instructorVerified || false,
+              followers: "0", // You can add this to backend if needed
+            },
+            thumbnail: course.thumbnail,
+            price: course.price,
+            rating: course.averageRating || 0,
+            students: course.enrollmentCount || 0,
+            duration: formatDuration(course.totalDuration || 0),
+            category: course.category,
+            level: course.level,
+            trending: course.enrollmentCount > 500, // Mark as trending if > 500 students
+            lessons: course.totalLessons || 0,
+            lastUpdated: formatDate(course.updatedAt),
+          })
+        );
+
+        setTrendingCourses(transformedCourses);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading trending courses:", error);
+        setTrendingCourses([]);
+        setLoading(false);
+      }
+    };
+
+    loadTrendingCourses();
   }, []);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
-      {/* Hero Section */}
+      {/* Hero Section - KEEP AS IS */}
       <section className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white py-20 lg:py-28">
+        {/* ... keep all hero section code ... */}
         {/* Animated Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div
@@ -222,7 +219,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Stats Section - KEEP AS IS */}
       <section className="py-16 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30">
         <div className="container-custom">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -245,7 +242,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Why Founder Academy */}
+      {/* Why Founder Academy - KEEP AS IS */}
       <section className="py-20 bg-white dark:bg-black">
         <div className="container-custom">
           <div className="text-center mb-16">
@@ -281,7 +278,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Trending Courses */}
+      {/* Trending Courses - NOW WITH REAL DATA */}
       <section className="py-20 bg-gray-50 dark:bg-gray-900/30">
         <div className="container-custom">
           <div className="flex items-center justify-between mb-12">
@@ -305,21 +302,39 @@ const HomePage = () => {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            {trendingCourses.map((course) => (
-              <EnhancedCourseCard key={course.id} course={course} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-gray-200 dark:bg-gray-800 rounded-2xl h-96"></div>
+                </div>
+              ))}
+            </div>
+          ) : trendingCourses.length > 0 ? (
+            <>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                {trendingCourses.slice(0, 3).map((course) => (
+                  <EnhancedCourseCard key={course.id} course={course} />
+                ))}
+              </div>
 
-          <div className="text-center mt-12">
-            <Link
-              to="/courses"
-              className="inline-flex items-center space-x-2 px-8 py-4 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold hover:shadow-xl hover:shadow-primary-400/50 transition-all transform hover:scale-105"
-            >
-              <span>Browse All Courses</span>
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          </div>
+              <div className="text-center mt-12">
+                <Link
+                  to="/courses"
+                  className="inline-flex items-center space-x-2 px-8 py-4 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold hover:shadow-xl hover:shadow-primary-400/50 transition-all transform hover:scale-105"
+                >
+                  <span>Browse All Courses</span>
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-600 dark:text-gray-400">
+                No courses available yet. Check back soon!
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

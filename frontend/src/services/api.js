@@ -161,6 +161,8 @@ export const userApi = {
     api.get("/users/instructor/dashboard-stats"),
   getInstructorRecentActivity: (limit = 10) =>
     api.get(`/users/instructor/recent-activity?limit=${limit}`),
+  getAllStudents: () => api.get("/users/instructor/all-students"),
+  getStudentAnalytics: () => api.get("/users/analytics"),
 };
 
 // Instructor endpoints
@@ -172,6 +174,12 @@ export const instructorApi = {
   approve: (id, data) =>
     api.post(`/instructor/applications/${id}/approve`, data),
   reject: (id, data) => api.post(`/instructor/applications/${id}/reject`, data),
+};
+
+export const categoryApi = {
+  getAll: () => api.get("/categories"),
+  getSubcategories: (category) =>
+    api.get(`/categories/${encodeURIComponent(category)}/subcategories`),
 };
 
 export default api;
