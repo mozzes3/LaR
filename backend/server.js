@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const connectDB = require("./config/database");
 const uploadRoutes = require("./routes/upload");
+const certificateRoutes = require("./routes/certificateRoutes");
+
 const app = express();
 
 // Connect to MongoDB
@@ -44,8 +46,8 @@ app.use("/api/courses", require("./routes/courses"));
 app.use("/api/instructor", require("./routes/instructor"));
 app.use("/api/purchases", require("./routes/purchases"));
 app.use("/api/reviews", require("./routes/reviews"));
-app.use("/api/certificates", require("./routes/certificates")); // ← ADD THIS
 app.use("/api/enrollments", require("./routes/enrollments")); // ← ADD THIS
+app.use("/api/certificates", certificateRoutes);
 const categoryRoutes = require("./routes/categories");
 app.use("/api/upload", uploadRoutes);
 

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { purchaseApi, userApi } from "@services/api";
+import { purchaseApi, userApi, certificateApi } from "@services/api";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@contexts/WalletContext";
-
+import CertificateViewModal from "@components/CertificateViewModal";
 import toast from "react-hot-toast";
 import {
   Play,
@@ -39,7 +39,9 @@ const DashboardPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [selectedCertificate, setSelectedCertificate] = useState(null);
+  const [loadingCertificate, setLoadingCertificate] = useState(false);
   // User stats - will be updated from API
   const [user, setUser] = useState({
     username: walletUser?.username || "CryptoNinja",
@@ -73,17 +75,18 @@ const DashboardPage = () => {
         // Load enrolled courses
         const coursesResponse = await purchaseApi.getMyPurchases();
 
-        // Load dashboard stats from new endpoint
-        const statsResponse = await userApi.getDashboardStats();
-        const apiStats = statsResponse.data.stats;
+        // Use SAME API as Analytics page
+        const analyticsResponse = await userApi.getStudentAnalytics();
+        const apiStats = analyticsResponse.data.analytics.stats;
 
         console.log("📊 Dashboard stats from API:", apiStats);
+        console.log("🔍 Full analytics:", analyticsResponse.data.analytics);
 
         // Transform courses with proper lesson title lookup
         const transformedCourses = coursesResponse.data.purchases
           .filter((purchase) => purchase.course)
           .map((purchase) => {
-            // ✅ FIX: Get the actual last accessed lesson title
+            // Get the actual last accessed lesson title
             let currentLessonTitle = "Start learning";
 
             if (purchase.lastAccessedLesson && purchase.course.sections) {
@@ -110,7 +113,7 @@ const DashboardPage = () => {
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.course._id}`,
               thumbnail: purchase.course.thumbnail,
               progress: purchase.progress || 0,
-              currentLesson: currentLessonTitle, // ✅ FIXED: Show actual lesson title
+              currentLesson: currentLessonTitle,
               totalLessons: purchase.course.totalLessons || 0,
               completedLessons: purchase.completedLessons?.length || 0,
               lastWatched: formatLastWatched(purchase.lastAccessedAt),
@@ -124,12 +127,13 @@ const DashboardPage = () => {
               certificateUrl: purchase.certificateId
                 ? `/certificates/${purchase.certificateId}`
                 : null,
+              certificateId: purchase.certificateId,
             };
           });
 
         setEnrolledCourses(transformedCourses);
 
-        // Set user stats from API
+        // Set user stats from API - SAME AS ANALYTICS
         setUser({
           username: walletUser?.username || "User",
           avatar:
@@ -138,13 +142,13 @@ const DashboardPage = () => {
           totalCourses: apiStats.totalCourses,
           completedCourses: apiStats.completedCourses,
           inProgressCourses: apiStats.inProgressCourses,
-          totalWatchTime: apiStats.totalWatchTimeMinutes,
+          totalWatchTime: apiStats.totalWatchTimeMinutes || 0,
           certificatesEarned: apiStats.certificatesEarned,
           currentStreak: apiStats.currentStreak,
           fdrEarned: apiStats.fdrEarned,
           level: apiStats.level,
-          xp: apiStats.experience,
-          nextLevelXp: calculateNextLevelXp(apiStats.level),
+          xp: apiStats.totalXP || 0, // ← Use totalXP from analytics
+          nextLevelXp: 5000,
         });
 
         setLoading(false);
@@ -157,7 +161,6 @@ const DashboardPage = () => {
 
     loadDashboardData();
   }, [walletUser]);
-
   // Helper functions
   const formatLastWatched = (date) => {
     if (!date) return "Not started yet";
@@ -186,7 +189,7 @@ const DashboardPage = () => {
   };
 
   const calculateNextLevelXp = (level) => {
-    return (level + 1) * 1000;
+    return 5000;
   };
 
   const stats = [
@@ -225,7 +228,69 @@ const DashboardPage = () => {
       borderColor: "border-primary-400/20",
     },
   ];
+  const handleViewCertificate = async (courseId) => {
+    try {
+      setLoadingCertificate(true);
 
+      // Get all certificates
+      const response = await certificateApi.getMyCertificates();
+
+      // Find certificate for this course
+      const cert = response.data.certificates.find(
+        (c) => c.courseId._id === courseId || c.courseId === courseId
+      );
+
+      if (cert) {
+        // Transform to match modal format
+        const transformedCert = {
+          id: cert._id,
+          courseTitle: cert.courseTitle,
+          instructor: cert.instructor,
+          completedDate: cert.completedDate,
+          certificateNumber: cert.certificateNumber,
+          grade: cert.grade,
+          finalScore: cert.finalScore,
+          totalHours: cert.totalHours,
+          totalLessons: cert.totalLessons,
+          verificationUrl: cert.verificationUrl,
+          templateImage: cert.templateImage,
+        };
+
+        setSelectedCertificate(transformedCert);
+        setShowCertificateModal(true);
+      } else {
+        toast.error("Certificate not found for this course");
+      }
+    } catch (error) {
+      console.error("Error loading certificate:", error);
+      toast.error("Failed to load certificate");
+    } finally {
+      setLoadingCertificate(false);
+    }
+  };
+
+  const handleShareCertificate = (cert) => {
+    const text = `I just completed "${cert.courseTitle}" on Lizard Academy! 🎓`;
+    const url = cert.verificationUrl;
+
+    // Open share options
+    if (navigator.share) {
+      navigator
+        .share({
+          title: "My Certificate",
+          text: text,
+          url: url,
+        })
+        .catch(() => {
+          // Fallback to copying link
+          navigator.clipboard.writeText(url);
+          toast.success("Link copied to clipboard!");
+        });
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success("Link copied to clipboard!");
+    }
+  };
   const filteredCourses = enrolledCourses.filter((course) => {
     const matchesFilter =
       selectedFilter === "all" ||
@@ -401,12 +466,12 @@ const DashboardPage = () => {
                 enrolledCourses
                   .filter((c) => c.lastAccessedAt)
                   .sort((a, b) => {
-                    // Sort by most recent first
-                    const dateA = new Date(a.lastWatched);
-                    const dateB = new Date(b.lastWatched);
+                    // Sort by most recent first - FIX: Use lastAccessedAt instead of lastWatched
+                    const dateA = new Date(a.lastAccessedAt);
+                    const dateB = new Date(b.lastAccessedAt);
                     return dateB - dateA;
                   })
-                  .slice(0, 5) // Show only last 5
+                  .slice(0, 5)
                   .map((course, index) => (
                     <div
                       key={course.id}
@@ -599,11 +664,14 @@ const DashboardPage = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <button
-                          onClick={() => navigate(`/certificates/${course.id}`)}
-                          className="py-2 bg-primary-400 text-black rounded-lg font-bold hover:bg-primary-500 transition text-sm flex items-center justify-center space-x-1"
+                          onClick={() => handleViewCertificate(course.id)}
+                          disabled={loadingCertificate}
+                          className="py-2 bg-primary-400 text-black rounded-lg font-bold hover:bg-primary-500 transition text-sm flex items-center justify-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Award className="w-4 h-4" />
-                          <span>Certificate</span>
+                          <span>
+                            {loadingCertificate ? "Loading..." : "Certificate"}
+                          </span>
                         </button>
                         <button
                           onClick={() =>
@@ -644,9 +712,18 @@ const DashboardPage = () => {
             </div>
           )}
         </div>
+        {showCertificateModal && selectedCertificate && (
+          <CertificateViewModal
+            certificate={selectedCertificate}
+            onClose={() => {
+              setShowCertificateModal(false);
+              setSelectedCertificate(null);
+            }}
+            onShare={handleShareCertificate}
+          />
+        )}
       </div>
     </div>
   );
 };
-
 export default DashboardPage;

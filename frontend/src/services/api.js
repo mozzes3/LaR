@@ -34,6 +34,23 @@ api.interceptors.response.use(
   }
 );
 
+export const certificateApi = {
+  // Get user's certificates
+  getMyCertificates: () => api.get("/certificates/my"),
+
+  // Get single certificate
+  getCertificate: (id) => api.get(`/certificates/${id}`),
+
+  // Verify certificate (public)
+  verifyCertificate: (certificateNumber) =>
+    api.get(`/certificates/verify/${certificateNumber}`),
+
+  // Generate certificate manually (for testing)
+  generateCertificate: (courseId) =>
+    api.post("/certificates/generate", { courseId }),
+  getCertificateImageToken: (id) => api.get(`/certificates/${id}/image-token`),
+};
+
 // Auth endpoints
 export const authApi = {
   getNonce: (walletAddress) => api.post("/auth/nonce", { walletAddress }),

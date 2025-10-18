@@ -2,6 +2,7 @@ const Purchase = require("../models/Purchase");
 const Course = require("../models/Course");
 const User = require("../models/User");
 const { checkAchievements } = require("../services/achievementService");
+const { generateCertificate } = require("../services/certificateService");
 // Purchase course with wallet
 const purchaseCourse = async (req, res) => {
   try {
@@ -136,11 +137,17 @@ const completeLesson = async (req, res) => {
       return res.status(404).json({ error: "Purchase not found" });
     }
 
-    console.log("👤 Purchase user ID:", purchase.user.toString());
-    console.log("🔍 User IDs match:", purchase.user.toString() === req.userId);
+    // Fix: Ensure both are strings
+    const purchaseUserId = purchase.user.toString();
+    const requestUserId = req.userId.toString
+      ? req.userId.toString()
+      : req.userId;
 
-    // Fix: Convert both to strings for comparison
-    if (purchase.user.toString() !== req.userId.toString()) {
+    console.log("👤 Purchase user ID:", purchaseUserId);
+    console.log("🔑 Request user ID:", requestUserId);
+    console.log("🔍 User IDs match:", purchaseUserId === requestUserId);
+
+    if (purchaseUserId !== requestUserId) {
       console.error("❌ User ID mismatch!");
       return res.status(403).json({ error: "Not authorized" });
     }
@@ -174,13 +181,23 @@ const completeLesson = async (req, res) => {
       `⏱️ Added ${lessonDuration}s (lesson duration). Total: ${purchase.totalWatchTime}s`
     );
 
-    // Calculate progress
+    // Calculate progress - Remove duplicates first
+    const uniqueCompletedLessons = [
+      ...new Set(purchase.completedLessons.map((id) => id.toString())),
+    ];
+    purchase.completedLessons = uniqueCompletedLessons;
+
     const totalLessons = purchase.course.sections.reduce(
       (sum, section) => sum + section.lessons.length,
       0
     );
-    const completedCount = purchase.completedLessons.length;
-    purchase.progress = Math.round((completedCount / totalLessons) * 100);
+    const completedCount = uniqueCompletedLessons.length;
+
+    // Cap progress at 100
+    purchase.progress = Math.min(
+      100,
+      Math.round((completedCount / totalLessons) * 100)
+    );
 
     console.log("📊 Progress calculation:");
     console.log(`  - Total lessons: ${totalLessons}`);
@@ -205,8 +222,26 @@ const completeLesson = async (req, res) => {
     console.log("✅ Lesson marked complete");
     console.log("✅ Total watch time:", purchase.totalWatchTime);
 
+    // Generate certificate AFTER saving (if course is completed)
+    if (purchase.isCompleted && purchase.progress === 100) {
+      try {
+        const {
+          generateCertificate,
+        } = require("../services/certificateService");
+        const certificate = await generateCertificate(
+          req.userId,
+          purchase.course._id
+        );
+        console.log(
+          `🎖️ Certificate generated: ${certificate.certificateNumber}`
+        );
+      } catch (certError) {
+        console.error("❌ Error generating certificate:", certError);
+        // Don't fail the lesson completion if certificate generation fails
+      }
+    }
+
     // Check achievements AFTER saving
-    const { checkAchievements } = require("../services/achievementService");
     const newAchievements = await checkAchievements(req.userId);
 
     // Send response ONLY ONCE at the end

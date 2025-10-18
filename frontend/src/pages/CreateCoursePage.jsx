@@ -294,7 +294,6 @@ const CreateCoursePage = () => {
       duration: 0,
       description: "",
       isPreview: false,
-      resources: [], // Array of resource objects
     };
     const updated = courseData.sections.map((section) =>
       section.id === sectionId || section._id === sectionId
