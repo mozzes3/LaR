@@ -34,6 +34,53 @@ api.interceptors.response.use(
   }
 );
 
+export const adminApi = {
+  // Dashboard
+  getDashboardStats: () => api.get("/admin/dashboard/stats"),
+
+  // Roles
+  getAllRoles: () => api.get("/admin/roles"),
+  createRole: (data) => api.post("/admin/roles", data),
+  updateRole: (roleId, data) => api.put(`/admin/roles/${roleId}`, data),
+  deleteRole: (roleId) => api.delete(`/admin/roles/${roleId}`),
+
+  // Users
+  getAllUsers: (params) => api.get("/admin/users", { params }),
+  getUserDetails: (userId) => api.get(`/admin/users/${userId}`),
+  assignRole: (userId, data) =>
+    api.post(`/admin/users/${userId}/assign-role`, data),
+  updateUserPermissions: (userId, data) =>
+    api.put(`/admin/users/${userId}/permissions`, data),
+  toggleUserBan: (userId) => api.post(`/admin/users/${userId}/toggle-ban`),
+  makeSuperAdmin: (userId) =>
+    api.post(`/admin/users/${userId}/make-super-admin`),
+
+  // Courses
+  getAllCoursesAdmin: (params) => api.get("/admin/courses", { params }),
+  updateCourseStatus: (courseId, data) =>
+    api.put(`/admin/courses/${courseId}/status`, data),
+  deleteCourse: (courseId) => api.delete(`/admin/courses/${courseId}`),
+
+  // Reviews
+  getAllReviewsAdmin: (params) => api.get("/admin/reviews", { params }),
+  updateReviewStatus: (reviewId, data) =>
+    api.put(`/admin/reviews/${reviewId}/status`, data),
+  deleteReview: (reviewId) => api.delete(`/admin/reviews/${reviewId}`),
+
+  // Applications
+  getAllApplications: (params) => api.get("/admin/applications", { params }),
+  approveApplication: (id, data) =>
+    api.post(`/admin/applications/${id}/approve`, data),
+  pauseApplication: (id, data) =>
+    api.post(`/admin/applications/${id}/pause`, data),
+  rejectApplication: (id, data) =>
+    api.post(`/admin/applications/${id}/reject`, data),
+  deleteApplication: (id) => api.delete(`/admin/applications/${id}`),
+
+  // Purchases
+  getAllPurchases: (params) => api.get("/admin/purchases", { params }),
+};
+
 export const certificateApi = {
   // Get user's certificates
   getMyCertificates: () => api.get("/certificates/my"),

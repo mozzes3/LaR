@@ -6,7 +6,6 @@ const User = require("../models/User");
  */
 const authenticate = async (req, res, next) => {
   try {
-    // Get token from header
     const token = req.header("Authorization")?.replace("Bearer ", "");
 
     if (!token) {
@@ -15,11 +14,11 @@ const authenticate = async (req, res, next) => {
         .json({ error: "No authentication token provided" });
     }
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Find user
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(decoded.userId)
+      .populate("roleRef")
+      .populate("customPermissions");
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
@@ -33,7 +32,6 @@ const authenticate = async (req, res, next) => {
       return res.status(403).json({ error: "Account is banned" });
     }
 
-    // Attach user to request
     req.user = user;
     req.userId = user._id;
 
@@ -65,7 +63,7 @@ const isInstructor = (req, res, next) => {
  * Check if user is admin
  */
 const isAdmin = (req, res, next) => {
-  if (req.user.role !== "admin") {
+  if (req.user.role !== "admin" && !req.user.isSuperAdmin) {
     return res.status(403).json({
       error: "Access denied. Admin privileges required.",
     });
@@ -82,7 +80,9 @@ const optionalAuth = async (req, res, next) => {
 
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId);
+      const user = await User.findById(decoded.userId)
+        .populate("roleRef")
+        .populate("customPermissions");
 
       if (user && user.isActive && !user.isBanned) {
         req.user = user;

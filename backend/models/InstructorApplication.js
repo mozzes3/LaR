@@ -39,12 +39,13 @@ const instructorApplicationSchema = new mongoose.Schema(
 
     // Social proof
     portfolio: {
-      type: String, // URL
+      type: String, // URL or link to portfolio
       required: true,
     },
     twitter: String,
     linkedin: String,
     website: String,
+    discord: String, // ← ADDED DISCORD FIELD
 
     // Teaching experience
     hasTeachingExperience: {

@@ -14,11 +14,32 @@ const applyInstructor = async (req, res) => {
       twitter,
       linkedin,
       website,
+      discord,
       hasTeachingExperience,
       teachingExperienceDetails,
       proposedCourses,
       motivation,
     } = req.body;
+
+    console.log("📥 Instructor application received:", {
+      fullName,
+      email,
+      expertise,
+      yearsOfExperience,
+    });
+
+    // Validation
+    if (!fullName || !email || !bio) {
+      return res.status(400).json({
+        error: "Missing required fields: fullName, email, and bio are required",
+      });
+    }
+
+    if (!expertise || expertise.length === 0) {
+      return res.status(400).json({
+        error: "Please provide at least one area of expertise",
+      });
+    }
 
     // Check if already applied
     const existing = await InstructorApplication.findOne({ user: req.userId });
@@ -29,34 +50,45 @@ const applyInstructor = async (req, res) => {
       });
     }
 
+    // Create application
     const application = await InstructorApplication.create({
       user: req.userId,
       fullName,
       email,
-      expertise,
-      yearsOfExperience,
+      expertise: Array.isArray(expertise) ? expertise : [expertise],
+      yearsOfExperience: parseInt(yearsOfExperience) || 0,
       bio,
-      portfolio,
-      twitter,
-      linkedin,
-      website,
-      hasTeachingExperience,
-      teachingExperienceDetails,
-      proposedCourses,
-      motivation,
+      portfolio: portfolio || "",
+      twitter: twitter || "",
+      linkedin: linkedin || "",
+      website: website || "",
+      discord: discord || "",
+      hasTeachingExperience: hasTeachingExperience || false,
+      teachingExperienceDetails: teachingExperienceDetails || "",
+      proposedCourses: proposedCourses || [],
+      motivation: motivation || "",
+      status: "pending",
     });
+
+    console.log("✅ Application created:", application._id);
 
     res.status(201).json({
       success: true,
       message: "Application submitted successfully",
-      application,
+      application: {
+        id: application._id,
+        status: application.status,
+        createdAt: application.createdAt,
+      },
     });
   } catch (error) {
-    console.error("Apply instructor error:", error);
-    res.status(500).json({ error: "Failed to submit application" });
+    console.error("❌ Apply instructor error:", error);
+    res.status(500).json({
+      error: "Failed to submit application",
+      details: error.message,
+    });
   }
 };
-
 // Get user's application status
 const getMyApplication = async (req, res) => {
   try {

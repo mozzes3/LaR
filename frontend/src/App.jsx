@@ -25,6 +25,14 @@ import InstructorProfilePage from "@pages/InstructorProfilePage";
 import AllStudentsPage from "@pages/AllStudentsPage";
 import BecomeInstructorPage from "@pages/BecomeInstructorPage";
 import NotFoundPage from "@pages/NotFoundPage";
+import AdminDashboardPage from "@pages/AdminDashboardPage";
+import AdminUsersPage from "@pages/AdminUsersPage";
+import AdminRolesPage from "@pages/AdminRolesPage";
+import AdminUserEditPage from "@pages/AdminUserEditPage";
+import AdminCoursesPage from "@pages/AdminCoursesPage";
+import AdminReviewsPage from "@pages/AdminReviewsPage";
+import AdminPurchasesPage from "@pages/AdminPurchasesPage";
+import AdminApplicationsPage from "@pages/AdminApplicationsPage";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 // Protected Route
@@ -178,6 +186,72 @@ function App() {
               }
             />
           </Route>
+
+          {/* Admin Routes */}
+          <Route
+            path="admin"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/users"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminUsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/users/:userId"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminUserEditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/roles"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminRolesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/courses"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminCoursesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/reviews"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminReviewsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/applications"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminApplicationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/purchases"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminPurchasesPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />

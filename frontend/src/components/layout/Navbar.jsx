@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@contexts/ThemeContext";
 import { useWallet } from "@contexts/WalletContext";
+import { Shield } from "lucide-react";
 import toast from "react-hot-toast";
 
 const Navbar = () => {
@@ -187,6 +188,22 @@ const Navbar = () => {
                           </Link>
                         </div>
 
+                        {(user?.role === "admin" || user?.isSuperAdmin) && (
+                          <>
+                            <div className="border-t border-gray-200 dark:border-gray-800 my-2"></div>
+                            <Link
+                              to="/admin"
+                              className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition group"
+                              onClick={() => setUserMenuOpen(false)}
+                            >
+                              <Shield className="w-4 h-4 text-primary-500 group-hover:text-primary-400" />
+                              <span className="text-sm font-bold text-primary-500 group-hover:text-primary-400">
+                                Admin Panel
+                              </span>
+                            </Link>
+                          </>
+                        )}
+
                         <div className="border-t border-gray-200 dark:border-gray-800 py-2">
                           <button
                             onClick={handleDisconnect}
@@ -270,6 +287,15 @@ const Navbar = () => {
                     Settings
                   </Link>
                 </>
+              )}
+              {(user?.role === "admin" || user?.isSuperAdmin) && (
+                <Link
+                  to="/admin"
+                  className="block py-2 text-sm font-bold text-primary-500 hover:text-primary-400"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Admin Panel
+                </Link>
               )}
 
               {!isConnected && (

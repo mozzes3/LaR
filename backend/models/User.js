@@ -42,6 +42,19 @@ const userSchema = new mongoose.Schema(
       enum: ["student", "instructor", "admin"],
       default: "student",
     },
+    // NEW: Advanced role system
+    roleRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Role",
+    },
+    customPermissions: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "UserPermission",
+    },
+    isSuperAdmin: {
+      type: Boolean,
+      default: false,
+    },
 
     // Instructor specific
     isInstructor: {
@@ -80,7 +93,6 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    // ✅ ADD THESE NEW FIELDS FOR ACHIEVEMENTS
     totalXP: {
       type: Number,
       default: 0,
@@ -188,10 +200,11 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ username: 1 });
 userSchema.index({ isInstructor: 1 });
 userSchema.index({ level: -1 });
+userSchema.index({ roleRef: 1 });
+userSchema.index({ isSuperAdmin: 1 });
 
 // Calculate level from experience
 userSchema.methods.calculateLevel = function () {
-  // Level formula: level = floor(sqrt(experience / 100))
   this.level = Math.floor(Math.sqrt(this.experience / 100)) + 1;
   return this.level;
 };

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { instructorApi } from "@services/api";
 import {
   Award,
   DollarSign,
@@ -27,6 +28,7 @@ import {
   Briefcase,
   GraduationCap,
   ArrowLeft,
+  MessageSquare,
   Plus,
 } from "lucide-react";
 import { useWallet } from "@contexts/WalletContext";
@@ -49,10 +51,11 @@ const BecomeInstructorPage = () => {
       twitter: "",
       linkedin: "",
       github: "",
+      discord: "",
     },
     whyTeach: "",
     courseIdeas: [""],
-    portfolio: null,
+    portfolio: "",
     portfolioPreview: null,
     agreedToTerms: false,
   });
@@ -144,6 +147,7 @@ const BecomeInstructorPage = () => {
   };
 
   const handleSubmit = async () => {
+    // Validation
     if (!formData.displayName || !formData.email || !formData.bio) {
       toast.error("Please fill in all required fields");
       return;
@@ -153,13 +157,65 @@ const BecomeInstructorPage = () => {
       toast.error("Please agree to the terms and conditions");
       return;
     }
+
+    // Filter out empty expertise and course ideas
+    const expertise = formData.expertise.filter((e) => e.trim());
+    const courseIdeas = formData.courseIdeas.filter((idea) => idea.trim());
+
+    if (expertise.length === 0) {
+      toast.error("Please add at least one area of expertise");
+      return;
+    }
+
     setSubmitting(true);
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      toast.success("Application submitted successfully!");
-      navigate("/dashboard");
+      // Prepare the data
+      const applicationData = {
+        fullName: formData.displayName,
+        email: formData.email,
+        expertise: expertise,
+        yearsOfExperience: parseInt(formData.experience) || 0,
+        bio: formData.bio,
+        portfolio: formData.socialLinks.website || "",
+        twitter: formData.socialLinks.twitter || "",
+        linkedin: formData.socialLinks.linkedin || "",
+        website: formData.socialLinks.website || "",
+        discord: formData.socialLinks.discord,
+        hasTeachingExperience: formData.experience.trim().length > 0,
+        teachingExperienceDetails: formData.experience || "",
+        proposedCourses: courseIdeas.map((idea) => ({
+          title: idea,
+          description: "",
+          category: "",
+        })),
+        motivation: formData.whyTeach || "",
+      };
+
+      console.log("📤 Submitting application:", applicationData);
+
+      // Submit to API
+      const response = await instructorApi.apply(applicationData);
+
+      console.log("✅ Application submitted:", response.data);
+
+      toast.success(
+        "Application submitted successfully! We'll review it within 3-5 business days."
+      );
+
+      // Redirect to dashboard after 2 seconds
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 2000);
     } catch (error) {
-      toast.error("Failed to submit application");
+      console.error("❌ Application submission error:", error);
+
+      // Handle specific error messages
+      if (error.response?.status === 400 && error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else {
+        toast.error("Failed to submit application. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -379,6 +435,18 @@ const BecomeInstructorPage = () => {
                       className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
                     />
                   </div>
+                  <div className="relative">
+                    <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.socialLinks.discord}
+                      onChange={(e) =>
+                        handleSocialChange("discord", e.target.value)
+                      }
+                      placeholder="username#1234"
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -491,48 +559,30 @@ const BecomeInstructorPage = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                  Portfolio/Work Samples (Optional)
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">
+                  Portfolio/Work Samples Link *
                 </label>
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center">
-                  {formData.portfolioPreview ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={formData.portfolioPreview}
-                        alt="Portfolio preview"
-                        className="max-h-64 rounded-lg"
-                      />
-                      <button
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            portfolio: null,
-                            portfolioPreview: null,
-                          })
-                        }
-                        className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600 dark:text-gray-400 mb-2">
-                        Upload portfolio, resume, or work samples
-                      </p>
-                      <label className="inline-block px-6 py-3 bg-primary-400 text-black rounded-xl font-bold cursor-pointer hover:bg-primary-500 transition">
-                        Choose File
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={handlePortfolioUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  )}
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  Share a link to your portfolio, Google Drive, Dropbox, GitHub,
+                  or any other platform showcasing your work
+                </p>
+                <div className="relative">
+                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="url"
+                    value={formData.portfolio}
+                    onChange={(e) =>
+                      handleInputChange("portfolio", e.target.value)
+                    }
+                    placeholder="https://drive.google.com/... or https://github.com/..."
+                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
+                    required
+                  />
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Examples: Google Drive folder, Dropbox link, GitHub profile,
+                  personal website, Behance, etc.
+                </p>
               </div>
             </div>
           )}
