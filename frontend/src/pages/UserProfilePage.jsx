@@ -105,11 +105,16 @@ const UserProfilePage = () => {
     const currentLevel = stats?.level || profile?.level || 1;
     const currentXP = stats?.experience || profile?.experience || 0;
 
-    const currentLevelXP = currentLevel * currentLevel * 100;
-    const nextLevelXP = (currentLevel + 1) * (currentLevel + 1) * 100;
+    // XP formula: level = floor(sqrt(experience / 100)) + 1
+    // Reversed: experience = (level - 1)^2 * 100
+
+    const currentLevelXP = Math.pow(currentLevel - 1, 2) * 100;
+    const nextLevelXP = Math.pow(currentLevel, 2) * 100;
+
     const progressXP = currentXP - currentLevelXP;
     const requiredXP = nextLevelXP - currentLevelXP;
-    const percentage = (progressXP / requiredXP) * 100;
+
+    const percentage = requiredXP > 0 ? (progressXP / requiredXP) * 100 : 0;
 
     return Math.max(0, Math.min(100, percentage));
   };
