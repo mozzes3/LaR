@@ -47,10 +47,24 @@ const UserProfilePage = () => {
 
         // If viewing own profile, load additional data
         if (isOwnProfile) {
-          // Load stats
+          // ✅ USE SAME API AS DASHBOARD - getStudentAnalytics()
           try {
-            const statsResponse = await userApi.getStats();
-            setStats(statsResponse.data.stats);
+            const analyticsResponse = await userApi.getStudentAnalytics();
+            const apiStats = analyticsResponse.data.analytics.stats;
+
+            console.log("📊 UserProfile stats from API:", apiStats);
+
+            // Set stats using analytics data (same as Dashboard)
+            setStats({
+              level: apiStats.level,
+              totalXP: apiStats.totalXP || 0, // ← Use totalXP
+              totalCourses: apiStats.totalCourses,
+              completedCourses: apiStats.completedCourses,
+              certificatesEarned: apiStats.certificatesEarned,
+              currentStreak: apiStats.currentStreak,
+              fdrEarned: apiStats.fdrEarned,
+              levelProgress: apiStats.levelProgress,
+            });
           } catch (error) {
             console.error("Error loading stats:", error);
             setStats(null);
@@ -82,7 +96,8 @@ const UserProfilePage = () => {
       loadProfile();
     }
   }, [username, isOwnProfile]);
-
+  const currentLevel = stats?.level || profile?.level || 1;
+  const currentXP = stats?.totalXP || profile?.totalXP || 0;
   // Format time helper
   const formatTime = (seconds) => {
     if (!seconds || seconds === 0) return "0s";
@@ -103,7 +118,7 @@ const UserProfilePage = () => {
   const getLevelProgress = () => {
     // Use stats if available, otherwise use profile data
     const currentLevel = stats?.level || profile?.level || 1;
-    const currentXP = stats?.experience || profile?.experience || 0;
+    const currentXP = stats?.totalXP || profile?.totalXP || 0; // ← CHANGED to totalXP
 
     // XP formula: level = floor(sqrt(experience / 100)) + 1
     // Reversed: experience = (level - 1)^2 * 100
@@ -119,6 +134,8 @@ const UserProfilePage = () => {
     return Math.max(0, Math.min(100, percentage));
   };
 
+  // Also update these lines further down:
+
   const getGradeColor = (grade) => {
     switch (grade?.toLowerCase()) {
       case "outstanding":
@@ -133,8 +150,6 @@ const UserProfilePage = () => {
   };
 
   // Get current level and XP
-  const currentLevel = stats?.level || profile?.level || 1;
-  const currentXP = stats?.experience || profile?.experience || 0;
 
   if (loading) {
     return (
@@ -183,7 +198,7 @@ const UserProfilePage = () => {
                 />
                 <div className="absolute bottom-0 right-0 w-10 h-10 bg-primary-400 rounded-full flex items-center justify-center border-4 border-white dark:border-gray-900">
                   <span className="text-black font-bold text-sm">
-                    {currentLevel}
+                    {stats?.levelProgress?.currentLevel || profile?.level || 1}
                   </span>
                 </div>
               </div>
@@ -249,9 +264,9 @@ const UserProfilePage = () => {
                   <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                     <Zap className="w-6 h-6 text-purple-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {currentXP}
+                      {stats?.totalXP || 0}
                     </div>
-                    <div className="text-sm text-gray-500">XP</div>
+                    <div className="text-sm text-gray-500">Total XP</div>
                   </div>
                 </div>
 
@@ -262,20 +277,33 @@ const UserProfilePage = () => {
                       <div className="flex items-center space-x-2">
                         <Target className="w-5 h-5 text-primary-400" />
                         <span className="font-bold text-gray-900 dark:text-white">
-                          Level {currentLevel}
+                          Level {stats?.levelProgress?.currentLevel || 1}
                         </span>
                       </div>
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {Math.floor(getLevelProgress())}% to Level{" "}
-                        {currentLevel + 1}
+                        {stats?.levelProgress?.xpInCurrentLevel || 0} /{" "}
+                        {stats?.levelProgress?.xpNeededForNextLevel || 100} XP
                       </span>
                     </div>
                     <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-primary-400 to-purple-500 transition-all"
-                        style={{ width: `${getLevelProgress()}%` }}
+                        style={{
+                          width: `${
+                            stats?.levelProgress?.progressPercentage || 0
+                          }%`,
+                        }}
                       />
                     </div>
+                    <p className="text-xs text-gray-500 mt-1 text-center">
+                      {stats?.levelProgress?.isMaxLevel
+                        ? "Max level reached! 🎉"
+                        : `${Math.floor(
+                            stats?.levelProgress?.progressPercentage || 0
+                          )}% to Level ${
+                            (stats?.levelProgress?.currentLevel || 1) + 1
+                          }`}
+                    </p>
                   </div>
                 )}
 

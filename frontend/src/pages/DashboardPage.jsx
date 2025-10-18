@@ -58,6 +58,7 @@ const DashboardPage = () => {
     level: 1,
     xp: 0,
     nextLevelXp: 1000,
+    levelProgress: null,
   });
 
   // Load enrolled courses from API
@@ -149,6 +150,7 @@ const DashboardPage = () => {
           level: apiStats.level,
           xp: apiStats.totalXP || 0, // ← Use totalXP from analytics
           nextLevelXp: 5000,
+          levelProgress: apiStats.levelProgress,
         });
 
         setLoading(false);
@@ -369,14 +371,15 @@ const DashboardPage = () => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-black font-bold text-xl">
-                    {user.level}
+                    {user.levelProgress?.currentLevel || 1}
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900 dark:text-white">
-                      Level {user.level}
+                      Level {user.levelProgress?.currentLevel || 1}
                     </h3>
                     <p className="text-sm text-gray-500">
-                      {user.xp} / {user.nextLevelXp} XP
+                      {user.levelProgress?.xpInCurrentLevel || 0} /{" "}
+                      {user.levelProgress?.xpNeededForNextLevel || 100} XP
                     </p>
                   </div>
                 </div>
@@ -390,11 +393,21 @@ const DashboardPage = () => {
               <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-primary-400 to-purple-500 transition-all duration-500"
-                  style={{ width: `${(user.xp / user.nextLevelXp) * 100}%` }}
+                  style={{
+                    width: `${user.levelProgress?.progressPercentage || 0}%`,
+                  }}
                 />
               </div>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                {user.levelProgress?.isMaxLevel
+                  ? "Max level reached! 🎉"
+                  : `${Math.floor(
+                      user.levelProgress?.progressPercentage || 0
+                    )}% to Level ${
+                      (user.levelProgress?.currentLevel || 1) + 1
+                    }`}
+              </p>
             </div>
-
             {/* Current Streak */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
               <div className="flex items-center justify-between">

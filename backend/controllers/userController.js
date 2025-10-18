@@ -2,7 +2,7 @@ const User = require("../models/User");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs").promises;
-
+const { getLevelProgress } = require("../config/levels");
 /**
  * Get user profile
  */
@@ -196,6 +196,7 @@ const getUserDashboardStats = async (req, res) => {
 
     // Get completed courses count
     const completedCount = purchases.filter((p) => p.isCompleted).length;
+    const levelProgress = getLevelProgress(user.totalXP || 0);
 
     res.json({
       success: true,
@@ -207,8 +208,18 @@ const getUserDashboardStats = async (req, res) => {
         certificatesEarned: user.certificatesEarned || completedCount,
         currentStreak,
         fdrEarned: user.fdrBalance || 0,
-        level: user.level || 1,
         experience: user.experience || 0,
+        level: levelProgress.currentLevel,
+        levelProgress: {
+          currentLevel: levelProgress.currentLevel,
+          nextLevel: levelProgress.currentLevel + 1,
+          currentLevelXP: levelProgress.currentLevelXP,
+          nextLevelXP: levelProgress.nextLevelXP,
+          xpInCurrentLevel: levelProgress.xpInCurrentLevel,
+          xpNeededForNextLevel: levelProgress.xpNeededForNextLevel,
+          progressPercentage: levelProgress.progressPercentage,
+          isMaxLevel: levelProgress.isMaxLevel,
+        },
       },
     });
   } catch (error) {
@@ -709,6 +720,7 @@ const getStudentAnalytics = async (req, res) => {
 
     // Get user data
     const user = await User.findById(userId);
+    const levelProgress = getLevelProgress(user.totalXP || 0);
 
     const allAchievements = getUserAchievements(user);
     const unlockedCount = allAchievements.filter((a) => a.unlocked).length;
@@ -780,7 +792,18 @@ const getStudentAnalytics = async (req, res) => {
           currentStreak,
           longestStreak,
           totalXP: user.totalXP || 0,
-          level: user.level || 1,
+          level: levelProgress.currentLevel,
+
+          levelProgress: {
+            currentLevel: levelProgress.currentLevel,
+            nextLevel: levelProgress.currentLevel + 1,
+            currentLevelXP: levelProgress.currentLevelXP,
+            nextLevelXP: levelProgress.nextLevelXP,
+            xpInCurrentLevel: levelProgress.xpInCurrentLevel,
+            xpNeededForNextLevel: levelProgress.xpNeededForNextLevel,
+            progressPercentage: levelProgress.progressPercentage,
+            isMaxLevel: levelProgress.isMaxLevel,
+          },
           fdrEarned: user.tokensEarned || 0,
           skillsLearned: skills.length,
           lessonsCompleted,

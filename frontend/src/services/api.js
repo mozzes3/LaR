@@ -50,7 +50,10 @@ export const certificateApi = {
     api.post("/certificates/generate", { courseId }),
   getCertificateImageToken: (id) => api.get(`/certificates/${id}/image-token`),
 };
-
+export const levelApi = {
+  getProgress: () => api.get("/levels/progress"),
+  getMilestones: () => api.get("/levels/milestones"),
+};
 // Auth endpoints
 export const authApi = {
   getNonce: (walletAddress) => api.post("/auth/nonce", { walletAddress }),
