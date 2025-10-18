@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { userApi, purchaseApi, reviewApi } from "@services/api";
+import { userApi, purchaseApi, certificateApi } from "@services/api";
 import { useWallet } from "@contexts/WalletContext";
 import toast from "react-hot-toast";
 import {
@@ -10,7 +10,6 @@ import {
   Trophy,
   Star,
   Calendar,
-  MapPin,
   Globe,
   Twitter,
   Linkedin,
@@ -21,6 +20,7 @@ import {
   CheckCircle,
   Play,
   Settings,
+  Lock,
 } from "lucide-react";
 
 const UserProfilePage = () => {
@@ -30,7 +30,6 @@ const UserProfilePage = () => {
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
   const [enrolledCourses, setEnrolledCourses] = useState([]);
-  const [userReviews, setUserReviews] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -49,16 +48,26 @@ const UserProfilePage = () => {
         // If viewing own profile, load additional data
         if (isOwnProfile) {
           // Load stats
-          const statsResponse = await userApi.getStats();
-          setStats(statsResponse.data.stats);
+          try {
+            const statsResponse = await userApi.getStats();
+            setStats(statsResponse.data.stats);
+          } catch (error) {
+            console.error("Error loading stats:", error);
+            setStats(null);
+          }
 
           // Load enrolled courses
           const coursesResponse = await purchaseApi.getMyPurchases();
           setEnrolledCourses(coursesResponse.data.purchases);
 
-          // Load user reviews
-          // TODO: Add getUserReviews API endpoint
-          // For now, we'll skip this
+          // Load certificates
+          try {
+            const certsResponse = await certificateApi.getMyCertificates();
+            setCertificates(certsResponse.data.certificates || []);
+          } catch (error) {
+            console.error("Error loading certificates:", error);
+            setCertificates([]);
+          }
         }
 
         setLoading(false);
@@ -74,18 +83,53 @@ const UserProfilePage = () => {
     }
   }, [username, isOwnProfile]);
 
+  // Format time helper
+  const formatTime = (seconds) => {
+    if (!seconds || seconds === 0) return "0s";
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    const parts = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (secs > 0 && hours === 0) parts.push(`${secs}s`);
+
+    return parts.join(" ") || "0s";
+  };
+
   // Helper function to get level progress
   const getLevelProgress = () => {
-    if (!stats || !stats.level || !stats.experience) return 0;
-    const currentLevelXP = stats.level * stats.level * 100;
-    const nextLevelXP = (stats.level + 1) * (stats.level + 1) * 100;
-    const progressXP = stats.experience - currentLevelXP;
+    // Use stats if available, otherwise use profile data
+    const currentLevel = stats?.level || profile?.level || 1;
+    const currentXP = stats?.experience || profile?.experience || 0;
+
+    const currentLevelXP = currentLevel * currentLevel * 100;
+    const nextLevelXP = (currentLevel + 1) * (currentLevel + 1) * 100;
+    const progressXP = currentXP - currentLevelXP;
     const requiredXP = nextLevelXP - currentLevelXP;
     const percentage = (progressXP / requiredXP) * 100;
 
-    // Ensure percentage is between 0 and 100
     return Math.max(0, Math.min(100, percentage));
   };
+
+  const getGradeColor = (grade) => {
+    switch (grade?.toLowerCase()) {
+      case "outstanding":
+        return "text-purple-500 bg-purple-500/10 border-purple-500/30";
+      case "excellent":
+        return "text-green-500 bg-green-500/10 border-green-500/30";
+      case "good":
+        return "text-blue-500 bg-blue-500/10 border-blue-500/30";
+      default:
+        return "text-gray-500 bg-gray-500/10 border-gray-500/30";
+    }
+  };
+
+  // Get current level and XP
+  const currentLevel = stats?.level || profile?.level || 1;
+  const currentXP = stats?.experience || profile?.experience || 0;
 
   if (loading) {
     return (
@@ -134,7 +178,7 @@ const UserProfilePage = () => {
                 />
                 <div className="absolute bottom-0 right-0 w-10 h-10 bg-primary-400 rounded-full flex items-center justify-center border-4 border-white dark:border-gray-900">
                   <span className="text-black font-bold text-sm">
-                    {profile.level || 1}
+                    {currentLevel}
                   </span>
                 </div>
               </div>
@@ -145,14 +189,12 @@ const UserProfilePage = () => {
                   <div>
                     <div className="flex items-center space-x-2 mb-2">
                       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                        {profile.displayName || profile.username}{" "}
-                        {/* ← CHANGE THIS LINE */}
+                        {profile.displayName || profile.username}
                       </h1>
                       {profile.isInstructor && profile.instructorVerified && (
                         <Award className="w-6 h-6 text-primary-400" />
                       )}
                     </div>
-                    {/* Show username below if displayName exists and is different */}
                     {profile.displayName &&
                       profile.displayName !== profile.username && (
                         <p className="text-sm text-gray-500 mb-2">
@@ -181,9 +223,7 @@ const UserProfilePage = () => {
                     <BookOpen className="w-6 h-6 text-blue-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
                       {enrolledCourses.filter((p) => p.course !== null)
-                        .length ||
-                        profile.coursesEnrolled ||
-                        0}
+                        .length || 0}
                     </div>
                     <div className="text-sm text-gray-500">Enrolled</div>
                   </div>
@@ -204,25 +244,25 @@ const UserProfilePage = () => {
                   <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                     <Zap className="w-6 h-6 text-purple-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {profile.experience || 0}
+                      {currentXP}
                     </div>
                     <div className="text-sm text-gray-500">XP</div>
                   </div>
                 </div>
 
                 {/* Level Progress */}
-                {isOwnProfile && stats && (
+                {isOwnProfile && (
                   <div className="p-4 bg-gradient-to-r from-primary-400/10 to-purple-500/10 border-2 border-primary-400/20 rounded-xl">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
                         <Target className="w-5 h-5 text-primary-400" />
                         <span className="font-bold text-gray-900 dark:text-white">
-                          Level {stats.level}
+                          Level {currentLevel}
                         </span>
                       </div>
                       <span className="text-sm text-gray-600 dark:text-gray-400">
                         {Math.floor(getLevelProgress())}% to Level{" "}
-                        {stats.level + 1}
+                        {currentLevel + 1}
                       </span>
                     </div>
                     <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -308,8 +348,6 @@ const UserProfilePage = () => {
             <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
               {activeTab === "overview" && (
                 <div className="space-y-6">
-                  <h2 className="text-2xl font-bold">Learning Activity</h2>
-
                   {/* Quick Stats */}
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="p-6 bg-blue-500/5 border-2 border-blue-500/20 rounded-xl">
@@ -318,7 +356,12 @@ const UserProfilePage = () => {
                         <span className="font-bold text-sm">Total Time</span>
                       </div>
                       <p className="text-3xl font-bold text-blue-500">
-                        {Math.floor((stats?.learningPoints || 0) / 10)}h
+                        {formatTime(
+                          enrolledCourses.reduce(
+                            (sum, p) => sum + (p.totalWatchTime || 0),
+                            0
+                          )
+                        )}
                       </p>
                     </div>
                     <div className="p-6 bg-green-500/5 border-2 border-green-500/20 rounded-xl">
@@ -327,7 +370,8 @@ const UserProfilePage = () => {
                         <span className="font-bold text-sm">Progress</span>
                       </div>
                       <p className="text-3xl font-bold text-green-500">
-                        {profile.coursesCompleted > 0
+                        {profile.coursesCompleted > 0 &&
+                        profile.coursesEnrolled > 0
                           ? Math.round(
                               (profile.coursesCompleted /
                                 profile.coursesEnrolled) *
@@ -343,15 +387,9 @@ const UserProfilePage = () => {
                         <span className="font-bold text-sm">Level</span>
                       </div>
                       <p className="text-3xl font-bold text-purple-500">
-                        {profile.level || 1}
+                        {currentLevel}
                       </p>
                     </div>
-                  </div>
-
-                  {/* Recent Activity - Coming Soon */}
-                  <div className="text-center py-12 text-gray-500">
-                    <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>Activity timeline coming soon</p>
                   </div>
                 </div>
               )}
@@ -363,11 +401,11 @@ const UserProfilePage = () => {
                   {enrolledCourses.length > 0 ? (
                     <div className="grid md:grid-cols-2 gap-6">
                       {enrolledCourses
-                        .filter((purchase) => purchase.course !== null) // ← ADD THIS LINE to filter out deleted courses
+                        .filter((purchase) => purchase.course !== null)
                         .map((purchase) => (
                           <Link
                             key={purchase._id}
-                            to={`/courses/${purchase.course.slug}/learn`} // ← FIX: Changed from /learn/ to /courses/
+                            to={`/courses/${purchase.course.slug}/learn`}
                             className="group border-2 border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden hover:border-primary-400 transition"
                           >
                             <img
@@ -425,13 +463,173 @@ const UserProfilePage = () => {
                 <div className="space-y-6">
                   <h2 className="text-2xl font-bold">My Certificates</h2>
 
-                  <div className="text-center py-12 text-gray-500">
-                    <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No certificates earned yet</p>
-                    <p className="text-sm mt-2">
-                      Complete courses to earn certificates
-                    </p>
-                  </div>
+                  {certificates.length > 0 ? (
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {certificates.map((cert) => (
+                        <div
+                          key={cert._id}
+                          className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-xl hover:border-primary-400/50 transition-all duration-300"
+                        >
+                          {/* Certificate Preview Card */}
+                          <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-gray-900 to-black p-6 flex flex-col overflow-hidden">
+                            {/* Background pattern */}
+                            <div className="absolute inset-0 opacity-5">
+                              <svg
+                                className="w-full h-full"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <defs>
+                                  <pattern
+                                    id={`grid-${cert._id}`}
+                                    width="40"
+                                    height="40"
+                                    patternUnits="userSpaceOnUse"
+                                  >
+                                    <path
+                                      d="M 40 0 L 0 0 0 40"
+                                      fill="none"
+                                      stroke="white"
+                                      strokeWidth="0.5"
+                                    />
+                                  </pattern>
+                                </defs>
+                                <rect
+                                  width="100%"
+                                  height="100%"
+                                  fill={`url(#grid-${cert._id})`}
+                                />
+                              </svg>
+                            </div>
+
+                            {/* Corner ornaments */}
+                            <div className="absolute top-2 left-2">
+                              <div className="w-8 h-8 border-t-2 border-l-2 border-primary-400/60 relative">
+                                <div className="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+                              </div>
+                            </div>
+                            <div className="absolute top-2 right-2">
+                              <div className="w-8 h-8 border-t-2 border-r-2 border-primary-400/60 relative">
+                                <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+                              </div>
+                            </div>
+                            <div className="absolute bottom-2 left-2">
+                              <div className="w-8 h-8 border-b-2 border-l-2 border-primary-400/60 relative">
+                                <div className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+                              </div>
+                            </div>
+                            <div className="absolute bottom-2 right-2">
+                              <div className="w-8 h-8 border-b-2 border-r-2 border-primary-400/60 relative">
+                                <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+                              </div>
+                            </div>
+
+                            {/* Glowing orbs */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-400/5 rounded-full blur-3xl"></div>
+
+                            {/* Header */}
+                            <div className="relative z-10 flex-shrink-0">
+                              <div className="text-center space-y-2">
+                                <div className="flex justify-center mb-1">
+                                  <div className="relative">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-500/50">
+                                      <Award
+                                        className="w-5 h-5 text-black"
+                                        strokeWidth={2.5}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="flex items-center justify-center space-x-2 mb-1.5">
+                                    <div className="h-px w-6 bg-gradient-to-r from-transparent to-primary-400/50"></div>
+                                    <Star className="w-2.5 h-2.5 text-primary-400" />
+                                    <div className="h-px w-6 bg-gradient-to-l from-transparent to-primary-400/50"></div>
+                                  </div>
+                                  <p className="text-primary-400 text-[9px] font-bold tracking-[0.2em] uppercase mb-1.5">
+                                    Certificate of Completion
+                                  </p>
+                                  <div className="h-px w-16 bg-gradient-to-r from-transparent via-primary-400/30 to-transparent mx-auto"></div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Course Title */}
+                            <div className="relative z-10 flex-grow flex items-center justify-center py-2">
+                              <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-6 text-center">
+                                {cert.courseTitle}
+                              </h3>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="relative z-10 flex-shrink-0">
+                              <div className="text-center space-y-1.5">
+                                <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-lg border border-primary-400/20 shadow-xl">
+                                  <p className="text-white/50 text-[8px] tracking-wider uppercase mb-0.5">
+                                    Awarded to
+                                  </p>
+                                  <p className="text-white font-bold text-[11px] tracking-wide">
+                                    {profile.username}
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-center space-x-1.5 text-[8px] text-white/30 tracking-wider">
+                                  <span className="font-semibold">
+                                    LIZARD ACADEMY
+                                  </span>
+                                  <span>•</span>
+                                  <span>
+                                    {new Date(cert.completedDate).getFullYear()}
+                                  </span>
+                                  <span>•</span>
+                                  <Lock className="w-2 h-2" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Certificate Info */}
+                          <div className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div
+                                className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getGradeColor(
+                                  cert.grade
+                                )}`}
+                              >
+                                {cert.grade}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Score:{" "}
+                                <span className="font-bold text-gray-900 dark:text-white">
+                                  {cert.finalScore}%
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4 text-xs text-gray-500">
+                              <div className="flex items-center space-x-1">
+                                <Calendar className="w-3 h-3" />
+                                <span>
+                                  {new Date(
+                                    cert.completedDate
+                                  ).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <CheckCircle className="w-3 h-3" />
+                                <span>{cert.totalLessons} lessons</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>No certificates earned yet</p>
+                      <p className="text-sm mt-2">
+                        Complete courses to earn certificates
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
