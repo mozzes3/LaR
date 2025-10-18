@@ -220,14 +220,10 @@ const completeLesson = async (req, res) => {
     // Save purchase FIRST
     await purchase.save();
     console.log("✅ Lesson marked complete");
-    console.log("✅ Total watch time:", purchase.totalWatchTime);
 
-    // Generate certificate AFTER saving (if course is completed)
+    // Generate certificate if completed
     if (purchase.isCompleted && purchase.progress === 100) {
       try {
-        const {
-          generateCertificate,
-        } = require("../services/certificateService");
         const certificate = await generateCertificate(
           req.userId,
           purchase.course._id
@@ -237,18 +233,29 @@ const completeLesson = async (req, res) => {
         );
       } catch (certError) {
         console.error("❌ Error generating certificate:", certError);
-        // Don't fail the lesson completion if certificate generation fails
       }
     }
 
     // Check achievements AFTER saving
     const newAchievements = await checkAchievements(req.userId);
 
-    // Send response ONLY ONCE at the end
+    // ✅ ADD THIS: Refresh user data to get updated level
+    const User = require("../models/User");
+    const updatedUser = await User.findById(req.userId).select("level totalXP");
+
+    console.log(
+      `📊 User stats: Level ${updatedUser.level}, ${updatedUser.totalXP} XP`
+    );
+
     res.json({
       success: true,
       purchase,
       newAchievements,
+      // ✅ ADD THIS: Return updated level info
+      levelInfo: {
+        level: updatedUser.level,
+        totalXP: updatedUser.totalXP,
+      },
     });
   } catch (error) {
     console.error("Complete lesson error:", error);

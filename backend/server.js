@@ -19,8 +19,8 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "50mb" })); // ← Increase limit
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "10mb" })); //
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // Request logging (development)
 if (process.env.NODE_ENV === "development") {

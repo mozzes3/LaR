@@ -13,15 +13,13 @@ const Purchase = require("../models/Purchase");
 const bunnyService = require("../services/bunnyService");
 
 const videoUrlLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // 50 requests per 15 minutes per IP
-  message: "Too many video requests, please try again later",
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 5, // 5 requests per minute per IP
+  message: "Too many video requests",
   standardHeaders: true,
-  legacyHeaders: false,
-  // Skip rate limiting for instructors (optional)
-  skip: (req) => {
-    // You can add logic here to skip rate limiting for certain users
-    return false;
+  handler: (req, res) => {
+    console.log(`🚨 Rate limit hit by ${req.ip}`);
+    res.status(429).json({ error: "Too many requests" });
   },
 });
 
@@ -204,8 +202,12 @@ router.get(
       const hasPurchased = await Purchase.exists({
         user: req.userId,
         course: course._id,
+        status: "active", // ← Add this check
       });
 
+      if (!hasPurchased && !isInstructor && !isPreview) {
+        return res.status(403).json({ error: "Purchase required" });
+      }
       const hasAccess = isInstructor || isPreview || hasPurchased;
 
       console.log(
@@ -237,6 +239,7 @@ router.get(
       );
 
       // Generate signed URL
+
       const signedUrl = bunnyService.generateVideoUrl(
         lesson.videoId,
         expiryTime

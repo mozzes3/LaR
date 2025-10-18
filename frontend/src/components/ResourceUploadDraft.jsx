@@ -24,7 +24,7 @@ const ResourceUploadDraft = ({
 
     if (file.size > 50 * 1024 * 1024) {
       // 50MB limit
-      toast.error("Resource must be less than 50MB");
+      toast.error("Resource must be less than 10MB");
       return;
     }
 
@@ -124,7 +124,7 @@ const ResourceUploadDraft = ({
             Select course resource
           </p>
           <p className="text-sm text-gray-500 mb-4">
-            PDF, DOC, XLS, ZIP, TXT. Max 50MB.
+            PDF, DOC, XLS, ZIP, TXT. Max 10MB.
           </p>
           <button
             onClick={() => fileInputRef.current?.click()}

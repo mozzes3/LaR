@@ -3,7 +3,7 @@ const User = require("../models/User");
 const Purchase = require("../models/Purchase");
 const Review = require("../models/Review");
 const videoService = require("../services/videoService");
-
+const validator = require("validator");
 // Create new course
 const createCourse = async (req, res) => {
   try {
@@ -87,11 +87,9 @@ const getCourses = async (req, res) => {
 
     // Search filter
     if (search && search.trim()) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-        { subtitle: { $regex: search, $options: "i" } },
-      ];
+      // ✅ Sanitize input
+      const sanitized = validator.escape(search.trim());
+      query.$or = [{ title: { $regex: sanitized, $options: "i" } }];
     }
 
     // Category filter

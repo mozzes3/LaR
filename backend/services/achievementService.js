@@ -43,12 +43,9 @@ const checkAchievements = async (userId, userData = null) => {
     const newlyUnlocked = [];
 
     for (const achievement of achievements) {
-      // Skip if already unlocked
       if (unlockedIds.includes(achievement.id)) continue;
 
-      // Check if achievement condition is met
       if (checkCondition(achievement.condition, userData, user)) {
-        // Unlock achievement
         user.unlockedAchievements.push({
           achievementId: achievement.id,
           unlockedAt: new Date(),
@@ -60,11 +57,16 @@ const checkAchievements = async (userId, userData = null) => {
         user.totalXP = (user.totalXP || 0) + achievement.xpReward;
         user.tokensEarned = (user.tokensEarned || 0) + achievement.fdrReward;
 
+        // ✅ ADD THIS: Update level based on totalXP
+        const { getLevelFromXP } = require("../config/levels");
+        user.level = getLevelFromXP(user.totalXP);
+
         newlyUnlocked.push(achievement);
 
         console.log(
           `🏆 Achievement unlocked: ${achievement.title} for user ${userId}`
         );
+        console.log(`⬆️ Level updated to ${user.level} (${user.totalXP} XP)`);
       }
     }
 

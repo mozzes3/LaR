@@ -165,8 +165,6 @@ const AnalyticsPage = () => {
 
   const maxWeeklyHours = Math.max(...weeklyActivity.map((d) => d.hours), 1);
 
-  // Simple achievements based on real data
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-8">
       <div className="container-custom">
@@ -280,7 +278,7 @@ const AnalyticsPage = () => {
           </div>
         </div>
 
-        {/* Weekly Activity & Level Progress - Keep the same structure but use real weeklyActivity data */}
+        {/* Weekly Activity & Level Progress */}
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
           {/* Weekly Activity Chart */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
@@ -338,7 +336,7 @@ const AnalyticsPage = () => {
             )}
           </div>
 
-          {/* Level Progress - Keep same UI but use real stats */}
+          {/* Level Progress - NOW USING DYNAMIC DATA */}
           <div className="bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-2xl p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
               Level Progress
@@ -365,7 +363,10 @@ const AnalyticsPage = () => {
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 56}`}
                     strokeDashoffset={`${
-                      2 * Math.PI * 56 * (1 - stats.totalXP / 5000)
+                      2 *
+                      Math.PI *
+                      56 *
+                      (1 - (stats.levelProgress?.progressPercentage || 0) / 100)
                     }`}
                     className="text-primary-400"
                     strokeLinecap="round"
@@ -374,7 +375,7 @@ const AnalyticsPage = () => {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
                     <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {stats.level}
+                      {stats.levelProgress?.currentLevel || stats.level}
                     </div>
                     <div className="text-xs text-gray-500">Level</div>
                   </div>
@@ -383,10 +384,18 @@ const AnalyticsPage = () => {
 
               <div className="mb-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  {stats.totalXP} / 5000 XP
+                  {stats.levelProgress?.xpInCurrentLevel || 0} /{" "}
+                  {stats.levelProgress?.xpNeededForNextLevel || 100} XP
                 </p>
                 <p className="text-xs text-gray-500">
-                  {5000 - stats.totalXP} XP to level {stats.level + 1}
+                  {stats.levelProgress?.isMaxLevel
+                    ? "Max level reached!"
+                    : `${
+                        (stats.levelProgress?.xpNeededForNextLevel || 100) -
+                        (stats.levelProgress?.xpInCurrentLevel || 0)
+                      } XP to level ${
+                        (stats.levelProgress?.currentLevel || 1) + 1
+                      }`}
                 </p>
               </div>
             </div>
@@ -548,7 +557,6 @@ const AnalyticsPage = () => {
           </div>
 
           {/* Achievements */}
-          {/* Achievements */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -566,7 +574,7 @@ const AnalyticsPage = () => {
             {analytics.achievements && analytics.achievements.length > 0 ? (
               <>
                 {/* Filter by category */}
-                <div className="flex items-center space-x-2 mb-4 overflow-x-auto  pb-2">
+                <div className="flex items-center space-x-2 mb-4 overflow-x-auto pb-2">
                   {[
                     "all",
                     "getting_started",
