@@ -3,6 +3,7 @@ const Course = require("../models/Course");
 const User = require("../models/User");
 const { checkAchievements } = require("../services/achievementService");
 const { generateCertificate } = require("../services/certificateService");
+
 // Purchase course with wallet
 const purchaseCourse = async (req, res) => {
   try {
@@ -87,7 +88,7 @@ const getMyPurchases = async (req, res) => {
       .populate({
         path: "course",
         select:
-          "title slug thumbnail instructor totalLessons totalDuration averageRating sections", // ✅ ADD 'sections'
+          "title slug thumbnail instructor totalLessons totalDuration averageRating sections",
         populate: {
           path: "instructor",
           select: "username avatar",
@@ -142,9 +143,7 @@ const completeLesson = async (req, res) => {
 
     // Fix: Ensure both are strings
     const purchaseUserId = purchase.user.toString();
-    const requestUserId = req.userId.toString
-      ? req.userId.toString()
-      : req.userId;
+    const requestUserId = req.userId.toString();
 
     console.log("👤 Purchase user ID:", purchaseUserId);
     console.log("🔑 Request user ID:", requestUserId);
@@ -242,8 +241,7 @@ const completeLesson = async (req, res) => {
     // Check achievements AFTER saving
     const newAchievements = await checkAchievements(req.userId);
 
-    // ✅ ADD THIS: Refresh user data to get updated level
-    const User = require("../models/User");
+    // Refresh user data to get updated level
     const updatedUser = await User.findById(req.userId).select("level totalXP");
 
     console.log(
@@ -254,7 +252,6 @@ const completeLesson = async (req, res) => {
       success: true,
       purchase,
       newAchievements,
-      // ✅ ADD THIS: Return updated level info
       levelInfo: {
         level: updatedUser.level,
         totalXP: updatedUser.totalXP,
