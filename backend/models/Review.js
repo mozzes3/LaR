@@ -87,7 +87,7 @@ const reviewSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["published", "pending", "flagged", "removed"],
-      default: "published",
+      default: "pending",
     },
     flagReason: String,
 

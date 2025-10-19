@@ -50,14 +50,17 @@ const createReview = async (req, res) => {
       contentQuality,
       instructorQuality,
       valueForMoney,
+      status: "pending", // ← Explicitly set to pending
     });
 
-    // Update course rating
-    const course = await Course.findById(courseId);
-    course.updateRating(rating);
-    await course.save();
+    // DO NOT update course rating until review is published
+    // Only update when admin approves the review
 
-    res.status(201).json({ success: true, review });
+    res.status(201).json({
+      success: true,
+      review,
+      message: "Review submitted for moderation", // ← Let user know
+    });
   } catch (error) {
     console.error("Create review error:", error);
     res.status(500).json({ error: "Failed to create review" });

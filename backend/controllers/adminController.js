@@ -131,6 +131,13 @@ const getAllUsers = async (req, res) => {
     if (isBanned !== undefined) query.isBanned = isBanned === "true";
     if (isActive !== undefined) query.isActive = isActive === "true";
 
+    console.log("🔍 Admin getAllUsers query:", query);
+    console.log("📄 Pagination:", { page, limit });
+
+    // First, check total users in database
+    const totalUsersInDB = await User.countDocuments({});
+    console.log("👥 Total users in database:", totalUsersInDB);
+
     const users = await User.find(query)
       .select("-__v")
       .populate("roleRef", "name displayName")
@@ -139,6 +146,9 @@ const getAllUsers = async (req, res) => {
       .skip((page - 1) * limit);
 
     const total = await User.countDocuments(query);
+
+    console.log("✅ Found users:", users.length);
+    console.log("📊 Total matching query:", total);
 
     res.json({
       success: true,
@@ -151,11 +161,87 @@ const getAllUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get users error:", error);
+    console.error("❌ Get users error:", error);
     res.status(500).json({ error: "Failed to fetch users" });
   }
 };
 
+const updateUserDetails = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const {
+      username,
+      displayName,
+      email,
+      bio,
+      instructorBio,
+      expertise,
+      socialLinks,
+    } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if username is being changed and if it's unique
+    if (username && username !== user.username) {
+      const existingUser = await User.findOne({ username });
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+      user.username = username;
+    }
+
+    // Update fields
+    if (displayName !== undefined) user.displayName = displayName;
+    if (email !== undefined) user.email = email;
+    if (bio !== undefined) user.bio = bio;
+    if (instructorBio !== undefined) user.instructorBio = instructorBio;
+    if (expertise !== undefined) user.expertise = expertise;
+    if (socialLinks !== undefined) user.socialLinks = socialLinks;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "User details updated successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Update user details error:", error);
+    res.status(500).json({ error: "Failed to update user details" });
+  }
+};
+const toggleInstructorStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { isInstructor } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    user.isInstructor = isInstructor;
+
+    // If making instructor, also set verified
+    if (isInstructor) {
+      user.instructorVerified = true;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: `User ${isInstructor ? "granted" : "removed"} instructor status`,
+      user,
+    });
+  } catch (error) {
+    console.error("Toggle instructor status error:", error);
+    res.status(500).json({ error: "Failed to update instructor status" });
+  }
+};
 const getUserDetails = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -436,13 +522,36 @@ const updateReviewStatus = async (req, res) => {
       return res.status(404).json({ error: "Review not found" });
     }
 
+    const oldStatus = review.status;
     review.status = status;
-    if (flagReason) review.flagReason = flagReason;
+
+    if (status === "flagged" && flagReason) {
+      review.flagReason = flagReason;
+    }
+
     await review.save();
+
+    // Update course rating when publishing a review
+    if (status === "published" && oldStatus !== "published") {
+      const course = await Course.findById(review.course);
+      if (course) {
+        course.updateRating(review.rating);
+        await course.save();
+      }
+    }
+
+    // Remove from course rating if unpublishing
+    if (oldStatus === "published" && status !== "published") {
+      const course = await Course.findById(review.course);
+      if (course) {
+        course.updateRating(0, review.rating); // Remove this rating
+        await course.save();
+      }
+    }
 
     res.json({
       success: true,
-      message: `Review status updated to ${status}`,
+      message: `Review ${status}`,
       review,
     });
   } catch (error) {
@@ -707,4 +816,6 @@ module.exports = {
   getAllPurchases,
   // Dashboard
   getAdminDashboardStats,
+  updateUserDetails,
+  toggleInstructorStatus,
 };

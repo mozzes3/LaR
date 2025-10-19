@@ -36,7 +36,7 @@ import toast from "react-hot-toast";
 
 const BecomeInstructorPage = () => {
   const navigate = useNavigate();
-  const { user } = useWallet(); // Assuming useWallet provides user info
+  const { user, isConnected, connectWallet } = useWallet();
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -147,6 +147,12 @@ const BecomeInstructorPage = () => {
   };
 
   const handleSubmit = async () => {
+    // Check wallet connection FIRST
+    if (!isConnected) {
+      toast.error("Please connect your wallet to submit application");
+      return;
+    }
+
     // Validation
     if (!formData.displayName || !formData.email || !formData.bio) {
       toast.error("Please fill in all required fields");
@@ -192,12 +198,8 @@ const BecomeInstructorPage = () => {
         motivation: formData.whyTeach || "",
       };
 
-      console.log("📤 Submitting application:", applicationData);
-
       // Submit to API
       const response = await instructorApi.apply(applicationData);
-
-      console.log("✅ Application submitted:", response.data);
 
       toast.success(
         "Application submitted successfully! We'll review it within 3-5 business days."
@@ -208,11 +210,11 @@ const BecomeInstructorPage = () => {
         navigate("/dashboard");
       }, 2000);
     } catch (error) {
-      console.error("❌ Application submission error:", error);
-
-      // Handle specific error messages
+      // Handle specific error messages - NO console logs
       if (error.response?.status === 400 && error.response?.data?.error) {
         toast.error(error.response.data.error);
+      } else if (error.response?.status === 401) {
+        toast.error("Please connect your wallet to submit application");
       } else {
         toast.error("Failed to submit application. Please try again.");
       }
@@ -700,10 +702,14 @@ const BecomeInstructorPage = () => {
             </button>
             {currentStep < 3 ? (
               <button
-                onClick={nextStep}
+                onClick={!isConnected ? connectWallet : nextStep}
                 className="px-6 py-3 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition flex items-center space-x-2"
               >
-                <span>Continue</span>
+                <span>
+                  {!isConnected && currentStep === 1
+                    ? "Connect Wallet to Continue"
+                    : "Continue"}
+                </span>
                 <ArrowRight className="w-5 h-5" />
               </button>
             ) : (

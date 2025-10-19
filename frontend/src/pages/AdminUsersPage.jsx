@@ -38,16 +38,49 @@ const AdminUsersPage = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await adminApi.getAllUsers({
+
+      console.log("🔍 Loading users with params:", {
         page: pagination.page,
         limit: pagination.limit,
         search,
         ...filters,
       });
-      setUsers(response.data.users);
-      setPagination(response.data.pagination);
+
+      const cleanFilters = {};
+      Object.keys(filters).forEach((key) => {
+        if (
+          filters[key] !== "" &&
+          filters[key] !== null &&
+          filters[key] !== undefined
+        ) {
+          cleanFilters[key] = filters[key];
+        }
+      });
+
+      const response = await adminApi.getAllUsers({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: search || undefined, // Don't send empty string
+        ...cleanFilters, // Only send non-empty filters
+      });
+
+      console.log("✅ Users response:", response.data);
+      console.log("📊 Users count:", response.data.users?.length);
+      console.log("📄 Pagination:", response.data.pagination);
+
+      setUsers(response.data.users || []);
+      setPagination(
+        response.data.pagination || {
+          page: 1,
+          limit: 20,
+          total: 0,
+          pages: 0,
+        }
+      );
     } catch (error) {
-      console.error("Load users error:", error);
+      console.error("❌ Load users error:", error);
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error status:", error.response?.status);
       toast.error("Failed to load users");
     } finally {
       setLoading(false);

@@ -67,9 +67,10 @@ const ReviewModal = ({
           instructorQuality: rating,
           valueForMoney: rating,
         });
-        toast.success("Review submitted successfully! 🎉");
+        toast.success(
+          "Review submitted for approval! Our team will review it shortly."
+        ); // ← Updated message
       }
-
       // Call success callback to refresh data
       if (onSuccess) {
         onSuccess();

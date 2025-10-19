@@ -25,6 +25,22 @@ const AdminUserEditPage = () => {
   const [notes, setNotes] = useState("");
   const [userPermissions, setUserPermissions] = useState([]);
 
+  const [editMode, setEditMode] = useState(false);
+  const [userDetails, setUserDetails] = useState({
+    username: "",
+    displayName: "",
+    email: "",
+    bio: "",
+    isInstructor: false,
+    instructorBio: "",
+    expertise: [],
+    socialLinks: {
+      twitter: "",
+      linkedin: "",
+      website: "",
+    },
+  });
+
   const availableResources = [
     {
       name: "users",
@@ -69,18 +85,36 @@ const AdminUserEditPage = () => {
     try {
       setLoading(true);
       const response = await adminApi.getUserDetails(userId);
-      setUser(response.data.user);
-      setSelectedRole(response.data.user.roleRef?._id || "");
+      const userData = response.data.user;
+
+      setUser(userData);
+      setSelectedRole(userData.roleRef?._id || "");
       setUserPermissions(response.data.permissions || []);
 
-      if (response.data.user.customPermissions) {
+      // Populate edit form
+      setUserDetails({
+        username: userData.username || "",
+        displayName: userData.displayName || "",
+        email: userData.email || "",
+        bio: userData.bio || "",
+        isInstructor: userData.isInstructor || false,
+        instructorBio: userData.instructorBio || "",
+        expertise: userData.expertise || [],
+        socialLinks: {
+          twitter: userData.socialLinks?.twitter || "",
+          linkedin: userData.socialLinks?.linkedin || "",
+          website: userData.socialLinks?.website || "",
+        },
+      });
+
+      if (userData.customPermissions) {
         setCustomPermissions(
-          response.data.user.customPermissions.customPermissions || []
+          userData.customPermissions.customPermissions || []
         );
         setDeniedPermissions(
-          response.data.user.customPermissions.deniedPermissions || []
+          userData.customPermissions.deniedPermissions || []
         );
-        setNotes(response.data.user.customPermissions.notes || "");
+        setNotes(userData.customPermissions.notes || "");
       }
     } catch (error) {
       console.error("Load user error:", error);
@@ -90,7 +124,61 @@ const AdminUserEditPage = () => {
       setLoading(false);
     }
   };
+  const handleUpdateUserDetails = async () => {
+    try {
+      setSaving(true);
+      await adminApi.updateUserDetails(userId, userDetails);
+      toast.success("User details updated successfully");
+      loadUserDetails();
+      setEditMode(false);
+    } catch (error) {
+      console.error("Update user details error:", error);
+      toast.error(
+        error.response?.data?.error || "Failed to update user details"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
+  const handleToggleInstructor = async () => {
+    try {
+      setSaving(true);
+      const newStatus = !userDetails.isInstructor;
+      await adminApi.toggleInstructorStatus(userId, {
+        isInstructor: newStatus,
+      });
+      toast.success(
+        `User ${newStatus ? "granted" : "removed"} instructor status`
+      );
+      loadUserDetails();
+    } catch (error) {
+      console.error("Toggle instructor error:", error);
+      toast.error("Failed to update instructor status");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addExpertise = () => {
+    setUserDetails({
+      ...userDetails,
+      expertise: [...userDetails.expertise, ""],
+    });
+  };
+
+  const updateExpertise = (index, value) => {
+    const updated = [...userDetails.expertise];
+    updated[index] = value;
+    setUserDetails({ ...userDetails, expertise: updated });
+  };
+
+  const removeExpertise = (index) => {
+    setUserDetails({
+      ...userDetails,
+      expertise: userDetails.expertise.filter((_, i) => i !== index),
+    });
+  };
   const loadRoles = async () => {
     try {
       const response = await adminApi.getAllRoles();
@@ -270,6 +358,344 @@ const AdminUserEditPage = () => {
               </span>
             )}
           </div>
+        </div>
+
+        {/* User Profile Section */}
+        <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              User Profile
+            </h2>
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            >
+              {editMode ? "Cancel" : "Edit Profile"}
+            </button>
+          </div>
+
+          {!editMode ? (
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                    Username
+                  </label>
+                  <p className="text-gray-900 dark:text-white">
+                    {user?.username}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                    Display Name
+                  </label>
+                  <p className="text-gray-900 dark:text-white">
+                    {user?.displayName || "Not set"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                    Email
+                  </label>
+                  <p className="text-gray-900 dark:text-white">
+                    {user?.email || "Not set"}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                    Wallet Address
+                  </label>
+                  <p className="text-gray-900 dark:text-white font-mono text-xs">
+                    {user?.walletAddress}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                  Bio
+                </label>
+                <p className="text-gray-900 dark:text-white">
+                  {user?.bio || "No bio"}
+                </p>
+              </div>
+
+              {/* Instructor Status Toggle */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white">
+                      Instructor Status
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {userDetails.isInstructor
+                        ? "This user is an instructor"
+                        : "This user is not an instructor"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleInstructor}
+                    disabled={saving}
+                    className={`px-6 py-3 rounded-xl font-bold transition disabled:opacity-50 ${
+                      userDetails.isInstructor
+                        ? "bg-red-500 hover:bg-red-600 text-white"
+                        : "bg-green-500 hover:bg-green-600 text-white"
+                    }`}
+                  >
+                    {saving
+                      ? "Updating..."
+                      : userDetails.isInstructor
+                      ? "Remove Instructor"
+                      : "Make Instructor"}
+                  </button>
+                </div>
+              </div>
+
+              {userDetails.isInstructor && (
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
+                  <h3 className="font-bold text-gray-900 dark:text-white">
+                    Instructor Details
+                  </h3>
+                  <div>
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                      Instructor Bio
+                    </label>
+                    <p className="text-gray-900 dark:text-white">
+                      {user?.instructorBio || "Not set"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                      Expertise
+                    </label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {user?.expertise?.length > 0 ? (
+                        user.expertise.map((exp, i) => (
+                          <span
+                            key={i}
+                            className="px-3 py-1 bg-primary-500/10 text-primary-500 rounded-lg text-sm font-bold"
+                          >
+                            {exp}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-gray-500">No expertise set</p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                      Social Links
+                    </label>
+                    <div className="space-y-2 mt-2">
+                      {user?.socialLinks?.twitter && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Twitter: {user.socialLinks.twitter}
+                        </p>
+                      )}
+                      {user?.socialLinks?.linkedin && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          LinkedIn: {user.socialLinks.linkedin}
+                        </p>
+                      )}
+                      {user?.socialLinks?.website && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Website: {user.socialLinks.website}
+                        </p>
+                      )}
+                      {!user?.socialLinks?.twitter &&
+                        !user?.socialLinks?.linkedin &&
+                        !user?.socialLinks?.website && (
+                          <p className="text-gray-500">No social links set</p>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    value={userDetails.username}
+                    onChange={(e) =>
+                      setUserDetails({
+                        ...userDetails,
+                        username: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={userDetails.displayName}
+                    onChange={(e) =>
+                      setUserDetails({
+                        ...userDetails,
+                        displayName: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={userDetails.email}
+                    onChange={(e) =>
+                      setUserDetails({ ...userDetails, email: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                  Bio
+                </label>
+                <textarea
+                  value={userDetails.bio}
+                  onChange={(e) =>
+                    setUserDetails({ ...userDetails, bio: e.target.value })
+                  }
+                  rows={3}
+                  className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black resize-none"
+                />
+              </div>
+
+              {userDetails.isInstructor && (
+                <>
+                  <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+                    <h3 className="font-bold text-gray-900 dark:text-white mb-4">
+                      Instructor Details
+                    </h3>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                      Instructor Bio
+                    </label>
+                    <textarea
+                      value={userDetails.instructorBio}
+                      onChange={(e) =>
+                        setUserDetails({
+                          ...userDetails,
+                          instructorBio: e.target.value,
+                        })
+                      }
+                      rows={4}
+                      className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                      Expertise
+                    </label>
+                    {userDetails.expertise.map((exp, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center space-x-2 mb-2"
+                      >
+                        <input
+                          type="text"
+                          value={exp}
+                          onChange={(e) =>
+                            updateExpertise(index, e.target.value)
+                          }
+                          className="flex-1 px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                          placeholder="e.g., Smart Contracts, DeFi"
+                        />
+                        <button
+                          onClick={() => removeExpertise(index)}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={addExpertise}
+                      className="text-primary-500 hover:text-primary-600 font-bold text-sm"
+                    >
+                      + Add Expertise
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                      Social Links
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={userDetails.socialLinks.twitter}
+                        onChange={(e) =>
+                          setUserDetails({
+                            ...userDetails,
+                            socialLinks: {
+                              ...userDetails.socialLinks,
+                              twitter: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="Twitter handle"
+                        className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                      />
+                      <input
+                        type="url"
+                        value={userDetails.socialLinks.linkedin}
+                        onChange={(e) =>
+                          setUserDetails({
+                            ...userDetails,
+                            socialLinks: {
+                              ...userDetails.socialLinks,
+                              linkedin: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="LinkedIn URL"
+                        className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                      />
+                      <input
+                        type="url"
+                        value={userDetails.socialLinks.website}
+                        onChange={(e) =>
+                          setUserDetails({
+                            ...userDetails,
+                            socialLinks: {
+                              ...userDetails.socialLinks,
+                              website: e.target.value,
+                            },
+                          })
+                        }
+                        placeholder="Website URL"
+                        className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <button
+                onClick={handleUpdateUserDetails}
+                disabled={saving}
+                className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl font-bold hover:bg-primary-600 transition disabled:opacity-50"
+              >
+                <Save className="w-5 h-5" />
+                <span>{saving ? "Saving..." : "Save Changes"}</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">

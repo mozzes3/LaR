@@ -79,6 +79,10 @@ export const adminApi = {
 
   // Purchases
   getAllPurchases: (params) => api.get("/admin/purchases", { params }),
+  updateUserDetails: (userId, data) =>
+    api.put(`/admin/users/${userId}/details`, data),
+  toggleInstructorStatus: (userId, data) =>
+    api.post(`/admin/users/${userId}/toggle-instructor`, data),
 };
 
 export const certificateApi = {

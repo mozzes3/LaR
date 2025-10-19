@@ -101,7 +101,17 @@ router.delete(
   hasPermission("applications", "delete"),
   adminController.deleteApplication
 );
+router.put(
+  "/users/:userId/details",
+  hasPermission("users", "update"),
+  adminController.updateUserDetails
+);
 
+router.post(
+  "/users/:userId/toggle-instructor",
+  hasPermission("users", "update"),
+  adminController.toggleInstructorStatus
+);
 // ===== PURCHASES =====
 router.get("/purchases", adminController.getAllPurchases);
 

@@ -75,7 +75,54 @@ const CreateCoursePage = () => {
     targetAudience: [""],
   });
   const [errors, setErrors] = useState({});
+  const canEditCourse = (currentUser, course) => {
+    if (!currentUser) return false;
 
+    // Super admin can edit anything
+    if (currentUser.isSuperAdmin) return true;
+
+    // Course owner can edit
+    const instructorId =
+      typeof course.instructor === "string"
+        ? course.instructor
+        : course.instructor?._id || course.instructor;
+    const currentUserId = currentUser?._id || currentUser?.id;
+
+    if (instructorId === currentUserId) return true;
+
+    // Check if user has Courses update permission via role
+    if (currentUser.roleRef?.permissions) {
+      const hasCoursesUpdate = currentUser.roleRef.permissions.some(
+        (perm) => perm.resource === "Courses" && perm.actions.includes("update")
+      );
+      if (hasCoursesUpdate) return true;
+    }
+
+    // Check custom permissions
+    if (currentUser.customPermissions?.customPermissions) {
+      const hasCustomUpdate =
+        currentUser.customPermissions.customPermissions.some(
+          (perm) =>
+            perm.resource === "Courses" &&
+            perm.actions.includes("update") &&
+            perm.granted
+        );
+      if (hasCustomUpdate) return true;
+    }
+
+    // Check if denied
+    if (currentUser.customPermissions?.deniedPermissions) {
+      const isDenied = currentUser.customPermissions.deniedPermissions.some(
+        (perm) => perm.resource === "Courses" && perm.actions.includes("update")
+      );
+      if (isDenied) return false;
+    }
+
+    // Legacy admin check
+    if (currentUser.role === "admin") return true;
+
+    return false;
+  };
   // Check if user is instructor
   useEffect(() => {
     if (!currentUser?.isInstructor) {
@@ -127,6 +174,12 @@ const CreateCoursePage = () => {
           const course = response.data.course;
 
           console.log("📝 Loading course for edit:", course);
+          if (!canEditCourse(currentUser, course)) {
+            toast.dismiss();
+            toast.error("You don't have permission to edit this course");
+            navigate("/instructor");
+            return;
+          }
 
           // Check if user owns this course - handle both string and populated instructor
           const instructorId =
