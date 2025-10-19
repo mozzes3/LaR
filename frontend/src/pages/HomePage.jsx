@@ -100,7 +100,12 @@ const HomePage = () => {
                 course.instructor?.avatar ||
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${course._id}`,
               verified: course.instructor?.instructorVerified || false,
-              followers: "0", // You can add this to backend if needed
+              followers: "0",
+              // ✅ ADD THESE 3 LINES:
+              badges:
+                course.instructor?.badges && course.instructor.badges.length > 0
+                  ? course.instructor.badges
+                  : ["Instructor"],
             },
             thumbnail: course.thumbnail,
             price: course.price,
@@ -109,12 +114,11 @@ const HomePage = () => {
             duration: formatDuration(course.totalDuration || 0),
             category: course.category,
             level: course.level,
-            trending: course.enrollmentCount > 500, // Mark as trending if > 500 students
+            trending: course.enrollmentCount > 500,
             lessons: course.totalLessons || 0,
             lastUpdated: formatDate(course.updatedAt),
           })
         );
-
         setTrendingCourses(transformedCourses);
         setLoading(false);
       } catch (error) {

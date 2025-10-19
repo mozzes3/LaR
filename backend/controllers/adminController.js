@@ -139,7 +139,9 @@ const getAllUsers = async (req, res) => {
     console.log("👥 Total users in database:", totalUsersInDB);
 
     const users = await User.find(query)
-      .select("-__v")
+      .select(
+        "username displayName email avatar isInstructor instructorVerified badges isActive isBanned createdAt roleRef"
+      ) // ✅ ADD badges
       .populate("roleRef", "name displayName")
       .sort({ createdAt: -1 })
       .limit(limit * 1)
@@ -177,7 +179,40 @@ const updateUserDetails = async (req, res) => {
       instructorBio,
       expertise,
       socialLinks,
+      badges,
     } = req.body;
+    // Validate badges if being updated
+    if (badges !== undefined) {
+      const validBadges = [
+        "Instructor",
+        "Creator",
+        "KOL",
+        "Professional",
+        "Expert",
+      ];
+
+      if (!Array.isArray(badges)) {
+        return res.status(400).json({ error: "Badges must be an array" });
+      }
+
+      const invalidBadges = badges.filter((b) => !validBadges.includes(b));
+      if (invalidBadges.length > 0) {
+        return res.status(400).json({
+          error: `Invalid badges: ${invalidBadges.join(", ")}`,
+        });
+      }
+
+      if (badges.length === 0) {
+        badges = ["Instructor"]; // Ensure at least Instructor badge
+      }
+
+      // Sort so Instructor is always first
+      badges.sort((a, b) => {
+        if (a === "Instructor") return -1;
+        if (b === "Instructor") return 1;
+        return 0;
+      });
+    }
 
     const user = await User.findById(userId);
     if (!user) {
@@ -199,6 +234,7 @@ const updateUserDetails = async (req, res) => {
     if (bio !== undefined) user.bio = bio;
     if (instructorBio !== undefined) user.instructorBio = instructorBio;
     if (expertise !== undefined) user.expertise = expertise;
+    if (badges !== undefined) user.badges = badges;
     if (socialLinks !== undefined) user.socialLinks = socialLinks;
 
     await user.save();

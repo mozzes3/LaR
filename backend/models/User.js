@@ -95,6 +95,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       maxlength: 1000,
     },
+    badges: [
+      {
+        type: String,
+        enum: ["Instructor", "Creator", "KOL", "Professional", "Expert"],
+      },
+    ],
     expertise: [
       {
         type: String,
@@ -238,6 +244,30 @@ userSchema.methods.calculateLevel = function () {
   this.level = Math.floor(Math.sqrt(this.experience / 100)) + 1;
   return this.level;
 };
+
+userSchema.virtual("primaryBadge").get(function () {
+  if (!this.badges || this.badges.length === 0) return "Instructor";
+  if (this.badges.includes("Instructor")) return "Instructor";
+  return this.badges[0];
+});
+
+// Method to get sorted badges (Instructor first)
+userSchema.methods.getSortedBadges = function () {
+  if (!this.badges || this.badges.length === 0) return ["Instructor"];
+
+  const badges = [...this.badges];
+  badges.sort((a, b) => {
+    if (a === "Instructor") return -1;
+    if (b === "Instructor") return 1;
+    return 0;
+  });
+
+  return badges;
+};
+
+// Enable virtuals in JSON
+userSchema.set("toJSON", { virtuals: true });
+userSchema.set("toObject", { virtuals: true });
 
 // Add experience and update level
 userSchema.methods.addExperience = function (amount) {

@@ -198,9 +198,15 @@ const CourseDetailPage = () => {
               response.data.course.instructor?.totalCoursesCreated || 0,
             rating: response.data.course.instructor?.averageRating || 0,
             followers: "0",
-            badge:
-              response.data.course.instructor?.expertise?.[0] || "Instructor",
-            badgeColor: "blue",
+            badges:
+              response.data.course.instructor?.badges &&
+              response.data.course.instructor.badges.length > 0
+                ? response.data.course.instructor.badges
+                : ["Instructor"], // ✅ Use badges array
+            badge: response.data.course.instructor?.badges?.[0] || "Instructor", // Keep for compatibility
+            badgeColor: getBadgeColorFromBadge(
+              response.data.course.instructor?.badges?.[0] || "Instructor"
+            ),
             bio:
               response.data.course.instructor?.bio ||
               response.data.course.instructor?.instructorBio ||
@@ -409,6 +415,22 @@ const CourseDetailPage = () => {
         return "bg-pink-500/10 text-pink-400 border-pink-500/30";
       default:
         return "bg-primary-400/10 text-primary-400 border-primary-400/30";
+    }
+  };
+
+  const getBadgeColorFromBadge = (badge) => {
+    switch (badge?.toLowerCase()) {
+      case "kol":
+        return "purple";
+      case "professional":
+        return "blue";
+      case "expert":
+        return "green";
+      case "creator":
+        return "pink";
+      case "instructor":
+      default:
+        return "primary";
     }
   };
 
@@ -991,22 +1013,26 @@ const CourseDetailPage = () => {
                     className="w-32 h-32 rounded-full ring-4 ring-primary-400/20"
                   />
                   <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">
+                    <div className="flex items-center space-x-2 mb-2 flex-wrap">
+                      <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
                         {course.instructor.displayName ||
                           course.instructor.username}
                       </h2>
                       {course.instructor.verified && (
                         <Award className="w-6 h-6 text-primary-400" />
                       )}
-                      <div
-                        className={`inline-flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-bold border ${getBadgeColors(
-                          course.instructor.badgeColor
-                        )}`}
-                      >
-                        {getBadgeIcon(course.instructor.badge)}
-                        <span>{course.instructor.badge}</span>
-                      </div>
+                      {/* ✅ Multiple badges */}
+                      {course.instructor.badges?.map((badge, index) => (
+                        <div
+                          key={index}
+                          className={`inline-flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-bold border ${getBadgeColors(
+                            getBadgeColorFromBadge(badge)
+                          )}`}
+                        >
+                          {getBadgeIcon(badge)}
+                          <span>{badge}</span>
+                        </div>
+                      ))}
                     </div>
                     <p className="text-gray-600 dark:text-gray-400 mb-4">
                       {course.instructor.bio}

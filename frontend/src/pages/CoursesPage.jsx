@@ -163,6 +163,7 @@ const CoursesPage = () => {
           thumbnail: course.thumbnail,
           price: course.price,
           rating: course.averageRating || 0,
+          totalRatings: course.totalRatings || 0,
           students: course.enrollmentCount || 0,
           duration: formatDuration(course.totalDuration || 0),
           category: course.category,
@@ -185,7 +186,14 @@ const CoursesPage = () => {
               `https://api.dicebear.com/7.x/avataaars/svg?seed=${course._id}`,
             verified: course.instructor?.instructorVerified || false,
             followers: "0",
-            badge: course.instructor?.expertise?.[0] || "Instructor",
+            badges:
+              course.instructor?.badges && course.instructor.badges.length > 0
+                ? course.instructor.badges
+                : ["Instructor"], // ✅ Badges array
+            badge: course.instructor?.badges?.[0] || "Instructor", // Single for compatibility
+            badgeColor: getBadgeColorFromBadge(
+              course.instructor?.badges?.[0] || "Instructor"
+            ),
           },
         })
       );
@@ -268,6 +276,22 @@ const CoursesPage = () => {
     }
   };
 
+  const getBadgeColorFromBadge = (badge) => {
+    switch (badge?.toLowerCase()) {
+      case "kol":
+        return "purple";
+      case "professional":
+        return "blue";
+      case "expert":
+        return "green";
+      case "creator":
+        return "pink";
+      case "instructor":
+      default:
+        return "primary";
+    }
+  };
+
   const featuredCourses = courses.filter((c) => c.featured);
   const trendingCourses = courses.filter((c) => c.trending);
   return (
@@ -337,6 +361,7 @@ const CoursesPage = () => {
                       course={course}
                       getBadgeIcon={getBadgeIcon}
                       getBadgeColors={getBadgeColors}
+                      getBadgeColorFromBadge={getBadgeColorFromBadge}
                       compact={false}
                     />
                   ))}
@@ -366,6 +391,7 @@ const CoursesPage = () => {
                       course={course}
                       getBadgeIcon={getBadgeIcon}
                       getBadgeColors={getBadgeColors}
+                      getBadgeColorFromBadge={getBadgeColorFromBadge}
                       compact={false}
                     />
                   ))}
@@ -785,6 +811,7 @@ const CoursesPage = () => {
                     course={course}
                     getBadgeIcon={getBadgeIcon}
                     getBadgeColors={getBadgeColors}
+                    getBadgeColorFromBadge={getBadgeColorFromBadge}
                     compact={true}
                   />
                 ))}
@@ -797,7 +824,13 @@ const CoursesPage = () => {
   );
 };
 
-const CourseCard = ({ course, getBadgeIcon, getBadgeColors, compact }) => {
+const CourseCard = ({
+  course,
+  getBadgeIcon,
+  getBadgeColors,
+  compact,
+  getBadgeColorFromBadge,
+}) => {
   const [isHovered, setIsHovered] = useState(false);
   return (
     <Link
@@ -896,16 +929,24 @@ const CourseCard = ({ course, getBadgeIcon, getBadgeColors, compact }) => {
                   <Award className="w-3 h-3 text-primary-400 flex-shrink-0" />
                 )}
               </div>
-              <div
-                className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-xs font-bold border ${getBadgeColors(
-                  course.instructor.badgeColor
-                )}`}
-              >
-                {getBadgeIcon(course.instructor.badge)}
-                <span>{course.instructor.badge}</span>
+              {/* ✅ Multiple badges */}
+              <div className="flex flex-wrap gap-1 mt-1">
+                {course.instructor.badges?.map((badge, index) => (
+                  <div
+                    key={index}
+                    className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-xs font-bold border ${getBadgeColors(
+                      getBadgeColorFromBadge(badge)
+                    )}`}
+                  >
+                    {getBadgeIcon(badge)}
+                    <span>{badge}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
+          {/* Stats */}
+          {/* Stats */}
           {/* Stats */}
           <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center space-x-1">
@@ -916,7 +957,7 @@ const CourseCard = ({ course, getBadgeIcon, getBadgeColors, compact }) => {
                 {course.rating}
               </span>
               <span className="text-xs text-gray-500">
-                ({course.students.toLocaleString()})
+                ({(course.totalRatings || 0).toLocaleString()})
               </span>
             </div>
             <div className="flex items-center space-x-1 text-xs text-gray-500">

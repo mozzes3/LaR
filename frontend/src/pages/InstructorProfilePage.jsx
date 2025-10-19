@@ -174,23 +174,25 @@ const InstructorProfilePage = () => {
               <div className="flex-1">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-4">
                   <div>
-                    <div className="flex items-center space-x-2 mb-2">
+                    <div className="flex items-center space-x-2 mb-2 flex-wrap gap-2">
                       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                         {instructor.displayName || instructor.username}
                       </h1>
                       {instructor.instructorVerified && (
                         <Award className="w-6 h-6 text-primary-400" />
                       )}
-                      {instructor.badge && (
+                      {/* ✅ Multiple badges */}
+                      {instructor.badges?.map((badge, index) => (
                         <div
+                          key={index}
                           className={`inline-flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-bold border ${getBadgeColors(
-                            instructor.badge
+                            badge
                           )}`}
                         >
-                          {getBadgeIcon(instructor.badge)}
-                          <span>{instructor.badge}</span>
+                          {getBadgeIcon(badge)}
+                          <span>{badge}</span>
                         </div>
-                      )}
+                      ))}
                     </div>
                     {instructor.displayName &&
                       instructor.displayName !== instructor.username && (

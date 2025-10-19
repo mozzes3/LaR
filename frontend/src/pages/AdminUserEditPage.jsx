@@ -8,6 +8,10 @@ import {
   CheckCircle,
   AlertCircle,
   Crown,
+  Award,
+  Zap,
+  Sparkles,
+  Trophy,
 } from "lucide-react";
 import { adminApi } from "@services/api";
 import toast from "react-hot-toast";
@@ -33,7 +37,9 @@ const AdminUserEditPage = () => {
     bio: "",
     isInstructor: false,
     instructorBio: "",
+
     expertise: [],
+    badges: ["Instructor"],
     socialLinks: {
       twitter: "",
       linkedin: "",
@@ -76,6 +82,69 @@ const AdminUserEditPage = () => {
     { name: "analytics", label: "Analytics", actions: ["read"] },
   ];
 
+  const availableBadges = [
+    { value: "Instructor", label: "Instructor", color: "gray" },
+    { value: "Creator", label: "Creator", color: "pink" },
+    { value: "KOL", label: "KOL", color: "purple" },
+    { value: "Professional", label: "Professional", color: "blue" },
+    { value: "Expert", label: "Expert", color: "green" },
+  ];
+
+  const toggleBadge = (badge) => {
+    setUserDetails((prev) => {
+      const currentBadges = prev.badges || [];
+
+      // Special handling for Instructor badge
+      if (badge === "Instructor") {
+        if (
+          currentBadges.includes("Instructor") &&
+          currentBadges.length === 1
+        ) {
+          return prev; // Don't allow removing if it's the only badge
+        }
+        if (currentBadges.includes("Instructor")) {
+          return {
+            ...prev,
+            badges: currentBadges.filter((b) => b !== "Instructor"),
+          };
+        } else {
+          return { ...prev, badges: ["Instructor", ...currentBadges] };
+        }
+      }
+
+      // For other badges
+      if (currentBadges.includes(badge)) {
+        const newBadges = currentBadges.filter((b) => b !== badge);
+        return {
+          ...prev,
+          badges: newBadges.length === 0 ? ["Instructor"] : newBadges,
+        };
+      } else {
+        const withoutInstructor = currentBadges.filter(
+          (b) => b !== "Instructor"
+        );
+        const hasInstructor = currentBadges.includes("Instructor");
+        return {
+          ...prev,
+          badges: hasInstructor
+            ? ["Instructor", ...withoutInstructor, badge]
+            : [...currentBadges, badge],
+        };
+      }
+    });
+  };
+
+  const getBadgeColor = (color) => {
+    const colors = {
+      gray: "bg-gray-500/10 text-gray-400 border-gray-500/30",
+      pink: "bg-pink-500/10 text-pink-400 border-pink-500/30",
+      purple: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+      blue: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+      green: "bg-green-500/10 text-green-400 border-green-500/30",
+    };
+    return colors[color] || colors.gray;
+  };
+
   useEffect(() => {
     loadUserDetails();
     loadRoles();
@@ -100,6 +169,10 @@ const AdminUserEditPage = () => {
         isInstructor: userData.isInstructor || false,
         instructorBio: userData.instructorBio || "",
         expertise: userData.expertise || [],
+        badges:
+          userData.badges && userData.badges.length > 0
+            ? userData.badges
+            : ["Instructor"],
         socialLinks: {
           twitter: userData.socialLinks?.twitter || "",
           linkedin: userData.socialLinks?.linkedin || "",

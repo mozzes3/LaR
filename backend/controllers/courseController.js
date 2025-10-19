@@ -145,7 +145,7 @@ const getCourses = async (req, res) => {
     const courses = await Course.find(query)
       .populate(
         "instructor",
-        "username displayName avatar instructorVerified expertise"
+        "username displayName avatar instructorVerified expertise badges"
       ) // ADD displayName here
       .sort(sortQuery)
       .limit(Number(limit))
@@ -181,7 +181,7 @@ const getCourse = async (req, res) => {
 
     const course = await Course.findOne({ slug }).populate(
       "instructor",
-      "username displayName avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks"
+      "username displayName avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks badges"
     );
 
     console.log("3. Course found:", course ? "YES" : "NO");
@@ -508,7 +508,7 @@ const getCoursesByInstructor = async (req, res) => {
       instructor: instructor._id,
       status: "published", // ← CHANGE FROM isPublished to status
     })
-      .populate("instructor", "username avatar instructorVerified")
+      .populate("instructor", "username avatar instructorVerified badges")
       .sort({ createdAt: -1 })
       .lean();
 
