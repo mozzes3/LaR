@@ -49,7 +49,8 @@ const CourseLearningPage = () => {
   const [note, setNote] = useState("");
   const [showQuestionsModal, setShowQuestionsModal] = useState(false);
   const [totalCourseDuration, setTotalCourseDuration] = useState(0);
-
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completedCertificateId, setCompletedCertificateId] = useState(null);
   const formatDuration = (seconds) => {
     if (isNaN(seconds) || seconds < 0) return "0m";
     const hours = Math.floor(seconds / 3600);
@@ -213,6 +214,16 @@ const CourseLearningPage = () => {
     try {
       console.log(`✅ Marking lesson complete`);
 
+      // Check if this is the last lesson BEFORE making the API call
+      const isLastLesson = currentLessonIndex === allLessons.length - 1;
+      const willCompleteCourse =
+        isLastLesson && !completedLessons.includes(currentLesson.id);
+
+      // Show modal IMMEDIATELY if completing the course
+      if (willCompleteCourse) {
+        setShowCompletionModal(true);
+      }
+
       const response = await purchaseApi.completeLesson({
         purchaseId: purchase._id,
         lessonId: currentLesson.id,
@@ -230,36 +241,26 @@ const CourseLearningPage = () => {
         completedLessons: updatedPurchase.completedLessons?.length || 0,
       }));
 
-      toast.success("Lesson completed! 🎉");
+      if (!willCompleteCourse) {
+        toast.success("Lesson completed! 🎉");
+      }
 
-      // ✨ CHECK IF COURSE IS COMPLETED
-      if (response.data.purchase.isCompleted && response.data.certificate) {
+      // Store certificate ID if available
+      if (response.data.certificate) {
         console.log("🎉 COURSE COMPLETED! Certificate generated!");
         console.log("📜 Certificate ID:", response.data.certificate._id);
-
-        // Store certificate ID
         setCompletedCertificateId(response.data.certificate._id);
-
-        // Show completion modal
-        setShowCompletionModal(true);
-
-        // Don't show review modal yet - let completion modal handle flow
         return;
       }
 
       // Auto-advance to next lesson if not completed
       if (currentLessonIndex < allLessons.length - 1) {
         setTimeout(() => handleNextLesson(), 1500);
-      } else if (!response.data.purchase.isCompleted) {
-        // All lessons done but course not marked complete (shouldn't happen)
-        toast.success(
-          "🎓 All lessons complete! Processing your certificate..."
-        );
-        setShowReviewModal(true);
       }
     } catch (error) {
       console.error("Error completing lesson:", error);
       toast.error("Failed to save progress");
+      setShowCompletionModal(false); // Close modal on error
     }
   };
 

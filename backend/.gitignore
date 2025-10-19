@@ -58,3 +58,8 @@ build/
 *.pid
 *.seed
 *.pid.lock
+
+# Wallet files - CRITICAL SECURITY
+secure/
+wallet.json
+*.json.enc

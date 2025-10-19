@@ -128,6 +128,8 @@ const getPurchase = async (req, res) => {
 };
 
 // Mark lesson as completed
+// Replace ONLY the completeLesson function in purchaseController.js
+
 const completeLesson = async (req, res) => {
   try {
     const { purchaseId, lessonId } = req.body;
@@ -151,90 +153,92 @@ const completeLesson = async (req, res) => {
 
     if (purchaseUserId !== requestUserId) {
       console.error("❌ User ID mismatch!");
-      return res.status(403).json({ error: "Not authorized" });
+      return res.status(403).json({ error: "Unauthorized" });
     }
 
     // Check if lesson already completed
     if (purchase.completedLessons.includes(lessonId)) {
-      return res.json({
-        success: true,
-        message: "Lesson already completed",
-        purchase,
-        newAchievements: [],
-      });
+      return res.status(400).json({ error: "Lesson already completed" });
     }
 
-    // Add to completed lessons
+    // Add lesson to completed array
     purchase.completedLessons.push(lessonId);
 
-    // Find lesson duration
+    // Get the lesson duration
+    const course = purchase.course;
     let lessonDuration = 0;
-    for (const section of purchase.course.sections) {
-      const lesson = section.lessons.find((l) => l._id.toString() === lessonId);
+
+    // Handle both 'sections' and 'modules' naming
+    const courseSections = course.sections || course.modules || [];
+
+    for (const section of courseSections) {
+      const lesson = section.lessons?.find(
+        (l) => l._id.toString() === lessonId.toString()
+      );
       if (lesson) {
         lessonDuration = lesson.duration || 0;
         break;
       }
     }
 
-    // Update watch time
-    purchase.totalWatchTime = (purchase.totalWatchTime || 0) + lessonDuration;
+    // Update total time spent
+    purchase.timeSpentSeconds =
+      (purchase.timeSpentSeconds || 0) + lessonDuration;
     console.log(
-      `⏱️ Added ${lessonDuration}s (lesson duration). Total: ${purchase.totalWatchTime}s`
+      `⏱️ Added ${lessonDuration}s (lesson duration). Total: ${purchase.timeSpentSeconds}s`
     );
 
-    // Calculate progress - Remove duplicates first
-    const uniqueCompletedLessons = [
-      ...new Set(purchase.completedLessons.map((id) => id.toString())),
-    ];
-    purchase.completedLessons = uniqueCompletedLessons;
-
-    const totalLessons = purchase.course.sections.reduce(
-      (sum, section) => sum + section.lessons.length,
+    // Calculate progress
+    const totalLessons = courseSections.reduce(
+      (acc, section) => acc + (section.lessons?.length || 0),
       0
     );
-    const completedCount = uniqueCompletedLessons.length;
-
-    // Cap progress at 100
-    purchase.progress = Math.min(
-      100,
-      Math.round((completedCount / totalLessons) * 100)
+    const completedCount = purchase.completedLessons.length;
+    const calculatedProgress = Math.round(
+      (completedCount / totalLessons) * 100
     );
 
-    console.log("📊 Progress calculation:");
-    console.log(`  - Total lessons: ${totalLessons}`);
-    console.log(`  - Completed lessons: ${completedCount}`);
-    console.log(`  - Calculated progress: ${purchase.progress}`);
+    purchase.progress = calculatedProgress;
 
     // Check if course is completed
-    if (purchase.progress === 100 && !purchase.isCompleted) {
+    const isCompleted = completedCount === totalLessons;
+    if (isCompleted && !purchase.isCompleted) {
       purchase.isCompleted = true;
       purchase.completedAt = new Date();
-
-      // Update user stats
-      await User.findByIdAndUpdate(req.userId, {
-        $inc: { coursesCompleted: 1, certificatesEarned: 1 },
-      });
-
       console.log("🎓 Course completed!");
     }
+
+    console.log("📊 Progress calculation:");
+    console.log("  - Total lessons:", totalLessons);
+    console.log("  - Completed lessons:", completedCount);
+    console.log("  - Calculated progress:", calculatedProgress);
 
     // Save purchase FIRST
     await purchase.save();
     console.log("✅ Lesson marked complete");
 
+    // Variable to store certificate
+    let certificateData = null;
+
     // Generate certificate if completed
     if (purchase.isCompleted && purchase.progress === 100) {
       try {
+        console.log("🎖️ Generating certificate...");
         const certificate = await generateCertificate(
           req.userId,
           purchase.course._id
         );
-        console.log(
-          `🎖️ Certificate generated: ${certificate.certificateNumber}`
-        );
+
+        if (certificate) {
+          certificateData = certificate;
+          console.log(
+            `✅ Certificate generated: ${certificate.certificateNumber}`
+          );
+          console.log(`📜 Certificate ID: ${certificate._id}`);
+        }
       } catch (certError) {
         console.error("❌ Error generating certificate:", certError);
+        // Continue without certificate - don't fail the whole request
       }
     }
 
@@ -248,9 +252,11 @@ const completeLesson = async (req, res) => {
       `📊 User stats: Level ${updatedUser.level}, ${updatedUser.totalXP} XP`
     );
 
+    // Return response with certificate if available
     res.json({
       success: true,
       purchase,
+      certificate: certificateData, // ✅ RETURN CERTIFICATE
       newAchievements,
       levelInfo: {
         level: updatedUser.level,

@@ -46,7 +46,8 @@ const calculateGrade = (score) => {
 };
 
 /**
- * Create certificate image
+ * PERFECT 16:9 Certificate Design
+ * Fully customizable with background image, logo, signature
  */
 const createCertificateImage = async (data) => {
   const {
@@ -63,165 +64,322 @@ const createCertificateImage = async (data) => {
     totalLessons,
   } = data;
 
-  const width = 2480;
-  const height = 3508;
+  // 16:9 aspect ratio - Full HD
+  const width = 1920;
+  const height = 1080;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  // Background gradient
-  const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, "#0a0a0a");
-  gradient.addColorStop(0.5, "#1a1a1a");
-  gradient.addColorStop(1, "#0a0a0a");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
+  // ═══════════════════════════════════════════════════════
+  // BACKGROUND
+  // ═══════════════════════════════════════════════════════
 
-  // Border
-  ctx.strokeStyle = "#00ff87";
-  ctx.lineWidth = 20;
-  ctx.strokeRect(100, 100, width - 200, height - 200);
+  try {
+    // Option 1: Try to load custom background from URL or file
+    const backgroundUrl = process.env.CERTIFICATE_BACKGROUND_URL || null;
 
-  // Inner border
-  ctx.strokeStyle = "#00ff87";
-  ctx.lineWidth = 4;
-  ctx.strokeRect(150, 150, width - 300, height - 300);
+    if (backgroundUrl) {
+      try {
+        const background = await loadImage(backgroundUrl);
+        ctx.drawImage(background, 0, 0, width, height);
+      } catch (bgError) {
+        console.log("Using gradient background (custom bg not found)");
+        throw bgError;
+      }
+    } else {
+      throw new Error("No background URL, using gradient");
+    }
+  } catch (error) {
+    // Fallback: Beautiful gradient background
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#0a0a0a");
+    gradient.addColorStop(0.3, "#1a1a2e");
+    gradient.addColorStop(0.7, "#16213e");
+    gradient.addColorStop(1, "#0a0a0a");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
 
-  // Logo/Badge area
-  ctx.fillStyle = "#00ff87";
-  ctx.beginPath();
-  ctx.arc(width / 2, 500, 120, 0, Math.PI * 2);
-  ctx.fill();
-
-  // "LIZARD ACADEMY" text
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "bold 140px Poppins Bold";
-  ctx.textAlign = "center";
-  ctx.fillText("LIZARD ACADEMY", width / 2, 800);
-
-  // "Certificate of Completion"
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "80px Poppins";
-  ctx.fillText("CERTIFICATE OF COMPLETION", width / 2, 950);
-
-  // Divider line
-  ctx.strokeStyle = "#00ff87";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(width / 2 - 400, 1000);
-  ctx.lineTo(width / 2 + 400, 1000);
-  ctx.stroke();
-
-  // "This certifies that"
-  ctx.fillStyle = "#cccccc";
-  ctx.font = "50px Poppins";
-  ctx.fillText("This certifies that", width / 2, 1150);
-
-  // Student name
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "bold 120px Poppins Bold";
-  wrapText(ctx, studentName, width / 2, 1300, width - 500, 140);
-
-  // "Has successfully completed"
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "50px Poppins";
-  ctx.fillText("has successfully completed", width / 2, 1500);
-
-  // Course title
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 90px Poppins Bold";
-  wrapText(ctx, courseTitle, width / 2, 1650, width - 400, 110);
-
-  // Category badge
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "40px Poppins SemiBold";
-  const categoryWidth = ctx.measureText(category).width + 60;
-  ctx.fillRect(width / 2 - categoryWidth / 2, 1850, categoryWidth, 60);
-  ctx.fillStyle = "#000000";
-  ctx.fillText(category, width / 2, 1895);
-
-  // Stats section
-  const statsY = 2050;
-  const statsSpacing = 450;
-
-  // Grade
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "60px Poppins Bold";
-  ctx.fillText(grade, width / 2 - statsSpacing, statsY);
-  ctx.fillStyle = "#999999";
-  ctx.font = "35px Poppins";
-  ctx.fillText("GRADE", width / 2 - statsSpacing, statsY + 50);
-
-  // Score
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "60px Poppins Bold";
-  ctx.fillText(`${finalScore}%`, width / 2, statsY);
-  ctx.fillStyle = "#999999";
-  ctx.font = "35px Poppins";
-  ctx.fillText("SCORE", width / 2, statsY + 50);
-
-  // Hours
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "60px Poppins Bold";
-  ctx.fillText(`${totalHours}h`, width / 2 + statsSpacing, statsY);
-  ctx.fillStyle = "#999999";
-  ctx.font = "35px Poppins";
-  ctx.fillText(
-    `${totalLessons} LESSONS`,
-    width / 2 + statsSpacing,
-    statsY + 50
-  );
-
-  // Skills section
-  if (skills && skills.length > 0) {
-    ctx.fillStyle = "#cccccc";
-    ctx.font = "40px Poppins";
-    ctx.fillText("Skills Mastered:", width / 2, 2300);
-
-    ctx.fillStyle = "#00ff87";
-    ctx.font = "45px Poppins SemiBold";
-    const skillsText = skills.slice(0, 5).join(" • ");
-    wrapText(ctx, skillsText, width / 2, 2380, width - 400, 60);
+    // Add subtle pattern overlay
+    ctx.fillStyle = "rgba(0, 255, 135, 0.02)";
+    for (let i = 0; i < width; i += 40) {
+      for (let j = 0; j < height; j += 40) {
+        ctx.fillRect(i, j, 20, 20);
+      }
+    }
   }
 
-  // Bottom section
-  const bottomY = height - 600;
+  // ═══════════════════════════════════════════════════════
+  // BORDER & FRAME
+  // ═══════════════════════════════════════════════════════
 
-  // Date
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "40px Poppins";
-  ctx.textAlign = "left";
-  ctx.fillText("Completed:", 400, bottomY);
+  // Outer border - Neon green
+  ctx.strokeStyle = "#00ff87";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(40, 40, width - 80, height - 80);
+
+  // Inner border - Elegant
+  ctx.strokeStyle = "rgba(0, 255, 135, 0.3)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(60, 60, width - 120, height - 120);
+
+  // Corner decorations
+  const drawCornerDecoration = (x, y, rotation) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rotation);
+
+    // Corner lines
+    ctx.strokeStyle = "#00ff87";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(60, 0);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 60);
+    ctx.stroke();
+
+    ctx.restore();
+  };
+
+  drawCornerDecoration(100, 100, 0);
+  drawCornerDecoration(width - 100, 100, Math.PI / 2);
+  drawCornerDecoration(width - 100, height - 100, Math.PI);
+  drawCornerDecoration(100, height - 100, -Math.PI / 2);
+
+  // ═══════════════════════════════════════════════════════
+  // LOGO / BADGE
+  // ═══════════════════════════════════════════════════════
+
+  try {
+    // Try to load custom logo
+    const logoUrl = process.env.CERTIFICATE_LOGO_URL || null;
+
+    if (logoUrl) {
+      const logo = await loadImage(logoUrl);
+      // Draw logo at top center
+      const logoSize = 120;
+      ctx.drawImage(logo, width / 2 - logoSize / 2, 80, logoSize, logoSize);
+    } else {
+      throw new Error("No logo, using badge");
+    }
+  } catch (error) {
+    // Fallback: Draw badge
+    const badgeX = width / 2;
+    const badgeY = 140;
+    const badgeRadius = 60;
+
+    // Badge circle
+    ctx.fillStyle = "#00ff87";
+    ctx.beginPath();
+    ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Badge inner circle
+    ctx.fillStyle = "#0a0a0a";
+    ctx.beginPath();
+    ctx.arc(badgeX, badgeY, badgeRadius - 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Badge icon/text
+    ctx.fillStyle = "#00ff87";
+    ctx.font = "bold 48px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("LA", badgeX, badgeY);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // HEADER - "LIZARD ACADEMY"
+  // ═══════════════════════════════════════════════════════
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // Main title
   ctx.fillStyle = "#00ff87";
-  ctx.font = "bold 45px Poppins Bold";
+  ctx.font = "bold 72px Poppins Bold, Arial";
+  ctx.fillText("LIZARD ACADEMY", width / 2, 260);
+
+  // Subtitle
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "32px Poppins, Arial";
+  ctx.fillText("CERTIFICATE OF COMPLETION", width / 2, 320);
+
+  // Decorative line
+  ctx.strokeStyle = "#00ff87";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(width / 2 - 250, 350);
+  ctx.lineTo(width / 2 + 250, 350);
+  ctx.stroke();
+
+  // ═══════════════════════════════════════════════════════
+  // MAIN CONTENT - Student & Course
+  // ═══════════════════════════════════════════════════════
+
+  // "This certifies that"
+  ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+  ctx.font = "24px Poppins, Arial";
+  ctx.fillText("This certifies that", width / 2, 405);
+
+  // Student Name - LARGE & PROMINENT
+  ctx.fillStyle = "#00ff87";
+  ctx.font = "bold 56px Poppins Bold, Arial";
+  const maxNameWidth = width - 400;
+  wrapText(ctx, studentName || "Student", width / 2, 475, maxNameWidth, 65);
+
+  // "Has successfully completed"
+  ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+  ctx.font = "24px Poppins, Arial";
+  ctx.fillText("has successfully completed", width / 2, 550);
+
+  // Course Title - PROMINENT
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 42px Poppins Bold, Arial";
+  const maxCourseWidth = width - 300;
+  wrapText(ctx, courseTitle || "Course", width / 2, 620, maxCourseWidth, 52);
+
+  // Category Badge
+  ctx.fillStyle = "#00ff87";
+  ctx.font = "20px Poppins SemiBold, Arial";
+  const categoryWidth = ctx.measureText(category).width + 40;
+  ctx.fillRect(width / 2 - categoryWidth / 2, 700, categoryWidth, 36);
+  ctx.fillStyle = "#000000";
+  ctx.font = "bold 18px Poppins Bold, Arial";
+  ctx.fillText(category, width / 2, 718);
+
+  // ═══════════════════════════════════════════════════════
+  // STATS ROW - Grade, Score, Hours
+  // ═══════════════════════════════════════════════════════
+
+  const statsY = 800;
+  const spacing = 400;
+
+  // Left: Grade
+  ctx.fillStyle = "#00ff87";
+  ctx.font = "bold 40px Poppins Bold, Arial";
+  ctx.fillText(grade, width / 2 - spacing, statsY);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.font = "18px Poppins, Arial";
+  ctx.fillText("GRADE", width / 2 - spacing, statsY + 35);
+
+  // Center: Score
+  ctx.fillStyle = "#00ff87";
+  ctx.font = "bold 40px Poppins Bold, Arial";
+  ctx.fillText(`${finalScore}%`, width / 2, statsY);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.font = "18px Poppins, Arial";
+  ctx.fillText("FINAL SCORE", width / 2, statsY + 35);
+
+  // Right: Hours
+  ctx.fillStyle = "#00ff87";
+  ctx.font = "bold 40px Poppins Bold, Arial";
+  ctx.fillText(`${totalHours}h`, width / 2 + spacing, statsY);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.font = "18px Poppins, Arial";
+  ctx.fillText(`${totalLessons} LESSONS`, width / 2 + spacing, statsY + 35);
+
+  // ═══════════════════════════════════════════════════════
+  // FOOTER - Date, Instructor, Certificate Number
+  // ═══════════════════════════════════════════════════════
+
+  const footerY = 930;
+
+  // Left: Completion Date
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+  ctx.font = "18px Poppins, Arial";
+  ctx.fillText("Completion Date", 150, footerY);
+
+  ctx.fillStyle = "#00ff87";
+  ctx.font = "bold 22px Poppins Bold, Arial";
   const dateStr = new Date(completedDate).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
-  ctx.fillText(dateStr, 400, bottomY + 60);
+  ctx.fillText(dateStr, 150, footerY + 28);
 
-  // Instructor
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "40px Poppins";
+  // Right: Instructor
   ctx.textAlign = "right";
-  ctx.fillText("Instructor:", width - 400, bottomY);
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "bold 45px Poppins Bold";
-  ctx.fillText(instructor, width - 400, bottomY + 60);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+  ctx.font = "18px Poppins, Arial";
+  ctx.fillText("Instructor", width - 150, footerY);
 
-  // Certificate number
-  ctx.fillStyle = "#666666";
-  ctx.font = "35px Poppins";
+  ctx.fillStyle = "#00ff87";
+  ctx.font = "bold 22px Poppins Bold, Arial";
+  ctx.fillText(instructor, width - 150, footerY + 28);
+
+  // Try to load signature image
+  try {
+    const signatureUrl = process.env.CERTIFICATE_SIGNATURE_URL || null;
+    if (signatureUrl) {
+      const signature = await loadImage(signatureUrl);
+      ctx.drawImage(signature, width - 300, footerY + 40, 150, 40);
+    }
+  } catch (error) {
+    // Draw signature line instead
+    ctx.textAlign = "right";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(width - 280, footerY + 60);
+    ctx.lineTo(width - 120, footerY + 60);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.font = "14px Poppins, Arial";
+    ctx.fillText("Authorized Signature", width - 200, footerY + 75);
+  }
+
+  // Center: Certificate Number & Blockchain
   ctx.textAlign = "center";
-  ctx.fillText(`Certificate No: ${certificateNumber}`, width / 2, height - 300);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.font = "16px Poppins, Arial";
+  ctx.fillText(`Certificate No: ${certificateNumber}`, width / 2, 1010);
 
-  // Verification text
   ctx.fillStyle = "#00ff87";
-  ctx.font = "30px Poppins";
-  ctx.fillText("Verified on Blockchain", width / 2, height - 230);
+  ctx.font = "14px Poppins, Arial";
+  ctx.fillText("✓ Verified on Somnia Blockchain", width / 2, 1035);
 
   return canvas.toBuffer("image/png");
 };
+
+/**
+ * Helper function for text wrapping
+ */
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  // Handle undefined or null text
+  if (!text) {
+    text = "";
+  }
+
+  // Convert to string if not already
+  text = String(text);
+
+  const words = text.split(" ");
+  let line = "";
+  const lines = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + words[i] + " ";
+    const metrics = ctx.measureText(testLine);
+    const testWidth = metrics.width;
+
+    if (testWidth > maxWidth && i > 0) {
+      lines.push(line);
+      line = words[i] + " ";
+    } else {
+      line = testLine;
+    }
+  }
+  lines.push(line);
+
+  const startY = y - ((lines.length - 1) * lineHeight) / 2;
+  lines.forEach((line, index) => {
+    ctx.fillText(line.trim(), x, startY + index * lineHeight);
+  });
+}
 
 /**
  * Generate certificate for completed course
@@ -354,31 +512,6 @@ const generateCertificate = async (userId, courseId) => {
     throw error;
   }
 };
-
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-  const words = text.split(" ");
-  let line = "";
-  const lines = [];
-
-  for (let i = 0; i < words.length; i++) {
-    const testLine = line + words[i] + " ";
-    const metrics = ctx.measureText(testLine);
-    const testWidth = metrics.width;
-
-    if (testWidth > maxWidth && i > 0) {
-      lines.push(line);
-      line = words[i] + " ";
-    } else {
-      line = testLine;
-    }
-  }
-  lines.push(line);
-
-  const startY = y - ((lines.length - 1) * lineHeight) / 2;
-  lines.forEach((line, index) => {
-    ctx.fillText(line.trim(), x, startY + index * lineHeight);
-  });
-}
 
 module.exports = {
   generateCertificate,
