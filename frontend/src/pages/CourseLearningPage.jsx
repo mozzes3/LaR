@@ -4,6 +4,7 @@ import { purchaseApi, courseApi, reviewApi } from "@services/api";
 import ReviewModal from "@components/ReviewModal";
 import VideoPlayer from "@components/VideoPlayer";
 import { useWallet } from "@contexts/WalletContext";
+import CourseQuestionsModal from "@components/CourseQuestionsModal";
 import toast from "react-hot-toast";
 import {
   Play,
@@ -22,6 +23,7 @@ import {
   X,
   Sparkles,
   Trophy,
+  MessageSquare,
   BookOpen,
   TrendingUp,
   Target,
@@ -44,6 +46,7 @@ const CourseLearningPage = () => {
   const [showSidebar, setShowSidebar] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [note, setNote] = useState("");
+  const [showQuestionsModal, setShowQuestionsModal] = useState(false);
   const [totalCourseDuration, setTotalCourseDuration] = useState(0);
 
   const formatDuration = (seconds) => {
@@ -493,6 +496,7 @@ const CourseLearningPage = () => {
                 { id: "overview", label: "Overview", icon: BookOpen },
                 { id: "notes", label: "Notes", icon: FileText },
                 { id: "resources", label: "Resources", icon: Download },
+                { id: "qa", label: "Q&A", icon: MessageSquare },
                 { id: "review", label: "Review", icon: Star },
               ].map((tab) => (
                 <button
@@ -609,7 +613,84 @@ const CourseLearningPage = () => {
                 </button>
               </div>
             )}
+            {activeTab === "qa" && (
+              <div className="max-w-3xl">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      Course Q&A
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Ask questions and get answers from the instructor
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowQuestionsModal(true)}
+                    className="px-4 py-2 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition flex items-center space-x-2"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Open Q&A</span>
+                  </button>
+                </div>
 
+                {/* Preview/Teaser */}
+                <div className="space-y-4">
+                  <div className="p-6 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-500/20 rounded-xl">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <MessageSquare className="w-8 h-8 text-blue-500" />
+                      <div>
+                        <h4 className="font-bold text-gray-900 dark:text-white">
+                          Interactive Learning
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Get help when you need it
+                        </p>
+                      </div>
+                    </div>
+                    <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                      <li className="flex items-start space-x-2">
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Ask questions about any lesson</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Get direct answers from the instructor</span>
+                      </li>
+                      <li className="flex items-start space-x-2">
+                        <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>See what other students are asking</span>
+                      </li>
+                    </ul>
+                    <button
+                      onClick={() => setShowQuestionsModal(true)}
+                      className="mt-6 w-full px-6 py-3 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition"
+                    >
+                      View All Questions & Answers
+                    </button>
+                  </div>
+
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
+                      <MessageSquare className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                        Open
+                      </div>
+                      <div className="text-xs text-gray-500">Q&A Available</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
+                      <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                        Fast
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Instructor Replies
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {activeTab === "resources" && (
               <div className="max-w-3xl">
                 <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
@@ -853,6 +934,13 @@ const CourseLearningPage = () => {
           }
         }}
       />
+      {showQuestionsModal && (
+        <CourseQuestionsModal
+          course={course}
+          onClose={() => setShowQuestionsModal(false)}
+          hasPurchased={true} // They must have purchased to be on this page
+        />
+      )}
     </div>
   );
 };

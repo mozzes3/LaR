@@ -21,6 +21,17 @@ api.interceptors.request.use(
   }
 );
 
+export const questionApi = {
+  getCourseQuestions: (courseId) => api.get(`/questions/course/${courseId}`),
+  createQuestion: (data) => api.post("/questions", data),
+  replyToQuestion: (questionId, text) =>
+    api.post(`/questions/${questionId}/reply`, { text }),
+  deleteQuestion: (questionId) => api.delete(`/questions/${questionId}`),
+  updateQuestion: (questionId, question) =>
+    api.put(`/questions/${questionId}`, { question }),
+  updateReply: (questionId, replyId, text) =>
+    api.put(`/questions/${questionId}/reply/${replyId}`, { text }),
+};
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,

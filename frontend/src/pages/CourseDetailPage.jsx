@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { courseApi, reviewApi } from "@services/api";
+import CourseQuestionsModal from "@components/CourseQuestionsModal";
 import {
   Star,
   Clock,
@@ -52,6 +53,7 @@ const CourseDetailPage = () => {
   const [userReview, setUserReview] = useState(null); // ← ADD THIS LINE
   const [reviewTitle, setReviewTitle] = useState("");
   const [reviewComment, setReviewComment] = useState("");
+  const [showQuestionsModal, setShowQuestionsModal] = useState(false);
   const [previewVideoLoading, setPreviewVideoLoading] = useState(false);
   // Mock crypto prices (in production, fetch from API)
   const cryptoPrices = {
@@ -746,24 +748,28 @@ const CourseDetailPage = () => {
             {/* Tabs */}
             <div className="border-b border-gray-200 dark:border-gray-800 mb-8">
               <div className="flex space-x-8">
-                {["overview", "curriculum", "instructor", "reviews"].map(
-                  (tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`pb-4 font-medium capitalize transition relative ${
-                        activeTab === tab
-                          ? "text-primary-400"
-                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                      }`}
-                    >
-                      {tab}
-                      {activeTab === tab && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-400"></div>
-                      )}
-                    </button>
-                  )
-                )}
+                {[
+                  "overview",
+                  "curriculum",
+                  "instructor",
+                  "reviews",
+                  "questions",
+                ].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`pb-4 font-medium capitalize transition relative ${
+                      activeTab === tab
+                        ? "text-primary-400"
+                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    }`}
+                  >
+                    {tab}
+                    {activeTab === tab && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-400"></div>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
             {/* Tab Content - Overview */}
@@ -1215,6 +1221,95 @@ const CourseDetailPage = () => {
                 )}
               </div>
             )}
+
+            {/* Questions Tab */}
+            {activeTab === "questions" && (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      Questions & Answers
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {hasPurchased || isInstructor
+                        ? "Ask questions and get answers from the instructor"
+                        : "Preview student questions (purchase course to ask your own)"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowQuestionsModal(true)}
+                    className="px-4 py-2 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition flex items-center space-x-2"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>
+                      {hasPurchased || isInstructor
+                        ? "Open Q&A"
+                        : "View Questions"}
+                    </span>
+                  </button>
+                </div>
+
+                {hasPurchased || isInstructor ? (
+                  <div className="border-2 border-gray-200 dark:border-gray-800 rounded-xl p-12 text-center">
+                    <MessageSquare className="w-20 h-20 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                      Ask Questions & Get Answers
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                      Have questions about the course? Ask here and get direct
+                      answers from the instructor. See what other students are
+                      asking too!
+                    </p>
+                    <button
+                      onClick={() => setShowQuestionsModal(true)}
+                      className="px-6 py-3 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition"
+                    >
+                      Open Q&A Section
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="p-6 bg-gradient-to-br from-orange-500/10 to-red-500/10 border-2 border-orange-500/20 rounded-xl">
+                      <div className="flex items-start space-x-3">
+                        <Lock className="w-6 h-6 text-orange-500 flex-shrink-0 mt-1" />
+                        <div className="flex-1">
+                          <h4 className="font-bold text-gray-900 dark:text-white mb-2">
+                            Purchase Required to Ask Questions
+                          </h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            You can browse existing questions, but you'll need
+                            to enroll in this course to ask your own questions
+                            and get answers from the instructor.
+                          </p>
+                          <button
+                            onClick={() => navigate(`/checkout/${course.slug}`)}
+                            className="px-4 py-2 bg-primary-400 text-black rounded-lg font-bold hover:bg-primary-500 transition"
+                          >
+                            Enroll Now to Ask Questions
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-2 border-gray-200 dark:border-gray-800 rounded-xl p-8 text-center">
+                      <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                        Browse Student Questions
+                      </h4>
+                      <p className="text-gray-600 dark:text-gray-400 mb-6">
+                        See what other students are asking about this course
+                      </p>
+                      <button
+                        onClick={() => setShowQuestionsModal(true)}
+                        className="px-6 py-3 bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-700 transition"
+                      >
+                        View Questions (Read Only)
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div className="lg:col-span-1"></div>
         </div>
@@ -1259,6 +1354,13 @@ const CourseDetailPage = () => {
             </div>
           </div>
         </div>
+      )}
+      {showQuestionsModal && (
+        <CourseQuestionsModal
+          course={course}
+          onClose={() => setShowQuestionsModal(false)}
+          hasPurchased={hasPurchased || isInstructor} // Instructor always has access
+        />
       )}
     </div>
   );

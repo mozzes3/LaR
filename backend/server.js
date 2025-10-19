@@ -48,7 +48,7 @@ app.use("/api/instructor", require("./routes/instructor"));
 app.use("/api/purchases", require("./routes/purchases"));
 app.use("/api/reviews", require("./routes/reviews"));
 app.use("/api/enrollments", require("./routes/enrollments")); // ← ADD THIS
-
+app.use("/api/questions", require("./routes/questions"));
 app.use("/api/certificates", certificateRoutes);
 app.use("/api/levels", levelRoutes);
 app.use("/api/upload", uploadRoutes);
