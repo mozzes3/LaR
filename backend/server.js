@@ -65,7 +65,7 @@ app.use("/api/reviews", require("./routes/reviews"));
 app.use("/api/enrollments", require("./routes/enrollments")); // ← ADD THIS
 app.use("/api/questions", require("./routes/questions"));
 app.use("/api/certificates", certificateRoutes);
-app.use("/api/notes", require("./routes/notes"));
+app.use("/api/notes", require("./routes/Notes"));
 app.use("/api/levels", levelRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/categories", categoryRoutes);

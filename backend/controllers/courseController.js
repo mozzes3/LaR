@@ -636,6 +636,315 @@ const publishCourse = async (req, res) => {
   }
 };
 
+/**
+ * Get analytics for all instructor's courses
+ */
+const getAllCoursesAnalytics = async (req, res) => {
+  try {
+    const instructorId = req.userId;
+
+    const courses = await Course.find({ instructor: instructorId }).lean();
+    const courseIds = courses.map((c) => c._id);
+
+    const Purchase = require("../models/Purchase");
+    const Review = require("../models/Review");
+
+    const purchases = await Purchase.find({
+      course: { $in: courseIds },
+      status: "active",
+    }).populate("course", "price title");
+
+    // Calculate overall stats
+    const totalRevenue = purchases.reduce(
+      (sum, p) => sum + (p.course?.price?.usd || 0),
+      0
+    );
+    const totalStudents = new Set(purchases.map((p) => p.user.toString())).size;
+    const completedPurchases = purchases.filter((p) => p.isCompleted).length;
+    const completionRate =
+      purchases.length > 0
+        ? Math.round((completedPurchases / purchases.length) * 100)
+        : 0;
+
+    // Get all reviews
+    const reviews = await Review.find({ course: { $in: courseIds } }).lean();
+    const avgRating =
+      reviews.length > 0
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+        : 0;
+
+    // Revenue by month (last 3 months)
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const thisMonthRevenue = purchases
+      .filter((p) => new Date(p.createdAt) >= thisMonth)
+      .reduce((sum, p) => sum + (p.course?.price?.usd || 0), 0);
+
+    const lastMonthRevenue = purchases
+      .filter(
+        (p) =>
+          new Date(p.createdAt) >= lastMonth &&
+          new Date(p.createdAt) < thisMonth
+      )
+      .reduce((sum, p) => sum + (p.course?.price?.usd || 0), 0);
+
+    const revenueGrowth =
+      lastMonthRevenue > 0
+        ? (
+            ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) *
+            100
+          ).toFixed(1)
+        : 0;
+
+    // Student progress distribution
+    const progressRanges = [
+      { range: "0-25%", count: 0 },
+      { range: "26-50%", count: 0 },
+      { range: "51-75%", count: 0 },
+      { range: "76-99%", count: 0 },
+      { range: "100%", count: 0 },
+    ];
+
+    purchases.forEach((p) => {
+      const progress = p.progress || 0;
+      if (progress <= 25) progressRanges[0].count++;
+      else if (progress <= 50) progressRanges[1].count++;
+      else if (progress <= 75) progressRanges[2].count++;
+      else if (progress < 100) progressRanges[3].count++;
+      else progressRanges[4].count++;
+    });
+
+    progressRanges.forEach((range) => {
+      range.percentage =
+        purchases.length > 0
+          ? ((range.count / purchases.length) * 100).toFixed(1)
+          : 0;
+    });
+
+    // Reviews breakdown
+    const reviewsBreakdown = {
+      total: reviews.length,
+      fiveStar: reviews.filter((r) => r.rating === 5).length,
+      fourStar: reviews.filter((r) => r.rating === 4).length,
+      threeStar: reviews.filter((r) => r.rating === 3).length,
+      twoStar: reviews.filter((r) => r.rating === 2).length,
+      oneStar: reviews.filter((r) => r.rating === 1).length,
+      averageRating: Math.round(avgRating * 10) / 10,
+    };
+
+    res.json({
+      success: true,
+      analytics: {
+        overview: {
+          totalRevenue: Math.round(totalRevenue),
+          totalStudents,
+          completionRate,
+          averageRating: Math.round(avgRating * 10) / 10,
+        },
+        revenue: {
+          thisMonth: Math.round(thisMonthRevenue),
+          lastMonth: Math.round(lastMonthRevenue),
+          growth: revenueGrowth,
+          averagePerStudent:
+            totalStudents > 0 ? Math.round(totalRevenue / totalStudents) : 0,
+          totalEarnings: Math.round(totalRevenue),
+        },
+        studentProgress: progressRanges,
+        reviews: reviewsBreakdown,
+        engagement: {
+          averageWatchTime:
+            purchases.length > 0
+              ? Math.round(
+                  purchases.reduce(
+                    (sum, p) => sum + (p.totalWatchTime || 0),
+                    0
+                  ) /
+                    purchases.length /
+                    60
+                )
+              : 0,
+          returningStudents: 0, // Would need session tracking
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get all courses analytics error:", error);
+    res.status(500).json({ error: "Failed to get analytics" });
+  }
+};
+
+/**
+ * Get analytics for specific course
+ */
+const getCourseAnalytics = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const instructorId = req.userId;
+
+    console.log("🔍 Analytics request - courseId/slug:", courseId);
+    console.log("🔍 Instructor ID:", instructorId);
+
+    // Find course by slug or _id
+    let course;
+    if (courseId.match(/^[0-9a-fA-F]{24}$/)) {
+      // It's a valid ObjectId
+      course = await Course.findOne({
+        _id: courseId,
+        instructor: instructorId,
+      }).lean();
+    } else {
+      // It's a slug
+      course = await Course.findOne({
+        slug: courseId,
+        instructor: instructorId,
+      }).lean();
+    }
+
+    console.log("🔍 Course found:", course ? "YES" : "NO");
+
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    const Purchase = require("../models/Purchase");
+    const Review = require("../models/Review");
+
+    const purchases = await Purchase.find({
+      course: course._id,
+      status: "active",
+    }).lean();
+
+    console.log("🔍 Purchases found:", purchases.length);
+
+    const totalRevenue = purchases.reduce(
+      (sum, p) => sum + (course.price?.usd || 0),
+      0
+    );
+    const totalStudents = purchases.length;
+    const completedPurchases = purchases.filter((p) => p.isCompleted).length;
+    const completionRate =
+      totalStudents > 0
+        ? Math.round((completedPurchases / totalStudents) * 100)
+        : 0;
+
+    const reviews = await Review.find({ course: course._id }).lean();
+    const avgRating =
+      reviews.length > 0
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+        : 0;
+
+    // Revenue by month
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const thisMonthRevenue = purchases
+      .filter((p) => new Date(p.createdAt) >= thisMonth)
+      .reduce((sum) => sum + (course.price?.usd || 0), 0);
+
+    const lastMonthRevenue = purchases
+      .filter(
+        (p) =>
+          new Date(p.createdAt) >= lastMonth &&
+          new Date(p.createdAt) < thisMonth
+      )
+      .reduce((sum) => sum + (course.price?.usd || 0), 0);
+
+    const revenueGrowth =
+      lastMonthRevenue > 0
+        ? (
+            ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) *
+            100
+          ).toFixed(1)
+        : 0;
+
+    // Student progress distribution
+    const progressRanges = [
+      { range: "0-25%", count: 0 },
+      { range: "26-50%", count: 0 },
+      { range: "51-75%", count: 0 },
+      { range: "76-99%", count: 0 },
+      { range: "100%", count: 0 },
+    ];
+
+    purchases.forEach((p) => {
+      const progress = p.progress || 0;
+      if (progress <= 25) progressRanges[0].count++;
+      else if (progress <= 50) progressRanges[1].count++;
+      else if (progress <= 75) progressRanges[2].count++;
+      else if (progress < 100) progressRanges[3].count++;
+      else progressRanges[4].count++;
+    });
+
+    progressRanges.forEach((range) => {
+      range.percentage =
+        totalStudents > 0
+          ? ((range.count / totalStudents) * 100).toFixed(1)
+          : 0;
+    });
+
+    // Reviews breakdown
+    const reviewsBreakdown = {
+      total: reviews.length,
+      fiveStar: reviews.filter((r) => r.rating === 5).length,
+      fourStar: reviews.filter((r) => r.rating === 4).length,
+      threeStar: reviews.filter((r) => r.rating === 3).length,
+      twoStar: reviews.filter((r) => r.rating === 2).length,
+      oneStar: reviews.filter((r) => r.rating === 1).length,
+      averageRating: Math.round(avgRating * 10) / 10,
+    };
+
+    console.log("✅ Analytics calculated successfully");
+
+    res.json({
+      success: true,
+      course: {
+        id: course._id,
+        title: course.title,
+        thumbnail: course.thumbnail,
+      },
+      analytics: {
+        overview: {
+          totalRevenue: Math.round(totalRevenue),
+          totalStudents,
+          completionRate,
+          averageRating: Math.round(avgRating * 10) / 10,
+        },
+        revenue: {
+          thisMonth: Math.round(thisMonthRevenue),
+          lastMonth: Math.round(lastMonthRevenue),
+          growth: revenueGrowth,
+          averagePerStudent:
+            totalStudents > 0 ? Math.round(totalRevenue / totalStudents) : 0,
+          totalEarnings: Math.round(totalRevenue),
+        },
+        studentProgress: progressRanges,
+        reviews: reviewsBreakdown,
+        engagement: {
+          averageWatchTime:
+            totalStudents > 0
+              ? Math.round(
+                  purchases.reduce(
+                    (sum, p) => sum + (p.totalWatchTime || 0),
+                    0
+                  ) /
+                    totalStudents /
+                    60
+                )
+              : 0,
+          returningStudents: 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ Get course analytics error:", error);
+    console.error("❌ Error stack:", error.stack);
+    res.status(500).json({ error: "Failed to get analytics" });
+  }
+};
+
 module.exports = {
   createCourse,
   getCourses,
@@ -647,4 +956,6 @@ module.exports = {
   getCoursesByInstructor,
   getInstructorCoursesWithStats,
   publishCourse,
+  getAllCoursesAnalytics,
+  getCourseAnalytics,
 };

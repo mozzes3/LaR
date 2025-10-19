@@ -34,6 +34,7 @@ import AdminReviewsPage from "@pages/AdminReviewsPage";
 import AdminPurchasesPage from "@pages/AdminPurchasesPage";
 import AdminApplicationsPage from "@pages/AdminApplicationsPage";
 import CertificateVerificationPage from "@pages/CertificateVerificationPage";
+import InstructorEarningsPage from "@pages/InstructorEarningsPage";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 // Protected Route
@@ -134,6 +135,14 @@ function App() {
               element={
                 <ProtectedRoute requireInstructor>
                   <StudentsManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="instructor/earnings"
+              element={
+                <ProtectedRoute requireInstructor>
+                  <InstructorEarningsPage />
                 </ProtectedRoute>
               }
             />

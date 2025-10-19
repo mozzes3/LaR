@@ -145,6 +145,9 @@ export const courseApi = {
     api.get(`/courses/${slug}/lessons/${lessonId}/video`, {
       params: { sessionToken },
     }),
+  getAllCoursesAnalytics: () => api.get("/courses/instructor/analytics/all"),
+  getCourseAnalytics: (courseId) =>
+    api.get(`/courses/instructor/analytics/${courseId}`),
 };
 
 // Purchase endpoints
@@ -256,10 +259,22 @@ export const userApi = {
     api.get("/users/instructor/dashboard-stats"),
   getInstructorRecentActivity: (limit = 10) =>
     api.get(`/users/instructor/recent-activity?limit=${limit}`),
+  getInstructorEarningsHistory: (period) =>
+    api.get(`/users/instructor/earnings-history?period=${period}`),
   getAllStudents: () => api.get("/users/instructor/all-students"),
   getStudentAnalytics: () => api.get("/users/analytics"),
   getInstructorStats: (username) =>
     api.get(`/users/instructor/${username}/stats`),
+  getInstructorEarningsTransactions: () =>
+    api.get("/users/instructor/earnings-transactions"),
+  getStudentDetails: (studentId) =>
+    api.get(`/users/instructor/students/${studentId}`),
+  getPaymentWallets: () => api.get("/users/payment-wallets"),
+  addPaymentWallet: (data) => api.post("/users/payment-wallets", data),
+  removePaymentWallet: (walletId) =>
+    api.delete(`/users/payment-wallets/${walletId}`),
+  setPrimaryWallet: (walletId) =>
+    api.post("/users/payment-wallets/set-primary", { walletId }),
 };
 
 // Instructor endpoints

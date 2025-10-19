@@ -450,6 +450,87 @@ const getInstructorDashboardStats = async (req, res) => {
 };
 
 /**
+ * Get instructor earnings history for chart
+ */
+const getInstructorEarningsHistory = async (req, res) => {
+  try {
+    const instructorId = req.userId;
+    const { period = "30days" } = req.query;
+
+    const instructor = await User.findById(instructorId);
+    if (!instructor || !instructor.isInstructor) {
+      return res.status(403).json({ error: "Not authorized as instructor" });
+    }
+
+    const Course = require("../models/Course");
+    const Purchase = require("../models/Purchase");
+
+    const courses = await Course.find({ instructor: instructorId });
+    const courseIds = courses.map((c) => c._id);
+
+    // Calculate date range
+    let daysBack = 30;
+    if (period === "7days") daysBack = 7;
+    else if (period === "30days") daysBack = 30;
+    else if (period === "90days") daysBack = 90;
+    else if (period === "1year") daysBack = 365;
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+
+    // Get all purchases within date range
+    const purchases = await Purchase.find({
+      course: { $in: courseIds },
+      status: "active",
+      createdAt: { $gte: startDate },
+    })
+      .populate("course", "price")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    // Group purchases by date
+    const earningsByDate = {};
+    purchases.forEach((purchase) => {
+      const date = new Date(purchase.createdAt);
+      const dateKey = date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+
+      if (!earningsByDate[dateKey]) {
+        earningsByDate[dateKey] = 0;
+      }
+
+      earningsByDate[dateKey] += purchase.course?.price?.usd || 0;
+    });
+
+    // Create array with all dates in range (fill missing dates with 0)
+    const earningsData = [];
+    for (let i = daysBack - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+
+      earningsData.push({
+        date: dateKey,
+        earnings: Math.round((earningsByDate[dateKey] || 0) * 100) / 100,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: earningsData,
+    });
+  } catch (error) {
+    console.error("Get instructor earnings history error:", error);
+    res.status(500).json({ error: "Failed to get earnings history" });
+  }
+};
+
+/**
  * Get user stats
  */
 const getStats = async (req, res) => {
@@ -935,6 +1016,467 @@ const getStudentAnalytics = async (req, res) => {
   }
 };
 
+/**
+ * Get detailed earnings transactions
+ */
+const getInstructorEarningsTransactions = async (req, res) => {
+  try {
+    const instructorId = req.userId;
+
+    const instructor = await User.findById(instructorId);
+    if (!instructor || !instructor.isInstructor) {
+      return res.status(403).json({ error: "Not authorized as instructor" });
+    }
+
+    const Course = require("../models/Course");
+    const Purchase = require("../models/Purchase");
+
+    const courses = await Course.find({ instructor: instructorId });
+    const courseIds = courses.map((c) => c._id);
+
+    // Get all purchases with full details
+    const purchases = await Purchase.find({
+      course: { $in: courseIds },
+      status: "active",
+    })
+      .populate("course", "title thumbnail price")
+      .populate("user", "username")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Transform purchases into transaction format
+    const transactions = purchases.map((purchase) => {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const isInEscrow = purchase.createdAt > thirtyDaysAgo;
+
+      const amount = purchase.course?.price?.usd || 0;
+      const instructorRevenue = amount * 0.8;
+      const platformFee = amount * 0.2;
+
+      return {
+        id: purchase._id,
+        courseName: purchase.course?.title || "Unknown Course",
+        courseThumbnail: purchase.course?.thumbnail || "",
+        studentName: purchase.user?.username || "Unknown Student",
+        amount: instructorRevenue,
+        platformFee: platformFee,
+        date: purchase.createdAt,
+        status: isInEscrow ? "escrow" : "released",
+        transactionHash: purchase.transactionHash || null,
+      };
+    });
+
+    res.json({
+      success: true,
+      transactions,
+    });
+  } catch (error) {
+    console.error("Get instructor earnings transactions error:", error);
+    res.status(500).json({ error: "Failed to get earnings transactions" });
+  }
+};
+
+/**
+ * Get detailed student information
+ */
+const getStudentDetails = async (req, res) => {
+  try {
+    const instructorId = req.userId;
+    const { studentId } = req.params;
+
+    // Verify instructor
+    const instructor = await User.findById(instructorId);
+    if (!instructor || !instructor.isInstructor) {
+      return res.status(403).json({ error: "Not authorized as instructor" });
+    }
+
+    const Course = require("../models/Course");
+    const Purchase = require("../models/Purchase");
+
+    // Get instructor's courses
+    const courses = await Course.find({ instructor: instructorId });
+    const courseIds = courses.map((c) => c._id);
+
+    // Get student's purchases for instructor's courses
+    const purchases = await Purchase.find({
+      user: studentId,
+      course: { $in: courseIds },
+      status: "active",
+    })
+      .populate("course", "title thumbnail price totalLessons")
+      .lean();
+
+    if (purchases.length === 0) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Get student info
+    const student = await User.findById(studentId).select(
+      "username displayName avatar email lastLogin, createdAt"
+    );
+
+    // Calculate stats
+    const totalSpent = purchases.reduce(
+      (sum, p) => sum + (p.course?.price?.usd || 0),
+      0
+    );
+    const totalWatchTime = purchases.reduce(
+      (sum, p) => sum + (p.totalWatchTime || 0),
+      0
+    );
+    const averageProgress =
+      purchases.length > 0
+        ? Math.round(
+            purchases.reduce((sum, p) => sum + (p.progress || 0), 0) /
+              purchases.length
+          )
+        : 0;
+
+    // Course progress details
+    const courseProgress = purchases.map((purchase) => {
+      const completedLessons = purchase.completedLessons?.length || 0;
+      const totalLessons = purchase.course?.totalLessons || 0;
+      const timeSpent = purchase.totalWatchTime || 0;
+
+      return {
+        id: purchase.course._id,
+        title: purchase.course.title,
+        thumbnail: purchase.course.thumbnail,
+        progress: purchase.progress || 0,
+        completedLessons,
+        totalLessons,
+        lastAccessed: purchase.lastAccessedAt
+          ? formatTimeAgo(purchase.lastAccessedAt)
+          : "Never",
+        timeSpent: Math.floor(timeSpent / 60), // Convert to minutes
+        status: purchase.isCompleted ? "completed" : "in-progress",
+        completedDate: purchase.completedAt
+          ? new Date(purchase.completedAt).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })
+          : null,
+        certificateIssued: purchase.certificateIssued || false,
+      };
+    });
+
+    // Recent activity
+    const recentActivity = [];
+
+    purchases.forEach((purchase) => {
+      if (purchase.isCompleted && purchase.completedAt) {
+        recentActivity.push({
+          type: "completion",
+          text: `Completed ${purchase.course.title}`,
+          time: formatTimeAgo(purchase.completedAt),
+          date: purchase.completedAt,
+        });
+      }
+      if (purchase.certificateIssued) {
+        recentActivity.push({
+          type: "certificate",
+          text: `Earned certificate for ${purchase.course.title}`,
+          time: formatTimeAgo(purchase.completedAt || purchase.createdAt),
+          date: purchase.completedAt || purchase.createdAt,
+        });
+      }
+      recentActivity.push({
+        type: "purchase",
+        text: `Enrolled in ${purchase.course.title}`,
+        time: formatTimeAgo(purchase.createdAt),
+        date: purchase.createdAt,
+      });
+    });
+
+    // Sort by date (most recent first)
+    recentActivity.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json({
+      success: true,
+      studentDetails: {
+        id: student._id,
+        name: student.username,
+        displayName: student.displayName || student.username,
+        avatar:
+          student.avatar ||
+          `https://api.dicebear.com/7.x/avataaars/svg?seed=${student.username}`,
+        email: student.email || "No email provided",
+        lastActive: student.lastLogin
+          ? formatTimeAgo(student.lastLogin)
+          : "Never",
+        joinedDate: new Date(student.createdAt).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        }),
+        totalSpent: Math.round(totalSpent),
+        coursesEnrolled: purchases.length,
+        coursesCompleted: purchases.filter((p) => p.isCompleted).length,
+        averageProgress,
+        totalWatchTime: Math.floor(totalWatchTime / 60), // In minutes
+        loginStreak: calculateLoginStreak(student, purchases), // ← ADD THIS
+        courseProgress,
+        courseProgress,
+        recentActivity: recentActivity.slice(0, 10), // Last 10 activities
+        status: "active",
+      },
+    });
+  } catch (error) {
+    console.error("Get student details error:", error);
+    res.status(500).json({ error: "Failed to get student details" });
+  }
+};
+
+// Helper function to calculate login streak
+function calculateLoginStreak(user, purchases) {
+  // Get all unique activity dates from purchases
+  const activityDates = new Set();
+
+  purchases.forEach((purchase) => {
+    // Add purchase date
+    if (purchase.createdAt) {
+      const date = new Date(purchase.createdAt);
+      date.setHours(0, 0, 0, 0);
+      activityDates.add(date.getTime());
+    }
+
+    // Add last accessed date
+    if (purchase.lastAccessedAt) {
+      const date = new Date(purchase.lastAccessedAt);
+      date.setHours(0, 0, 0, 0);
+      activityDates.add(date.getTime());
+    }
+
+    // Add completed date
+    if (purchase.completedAt) {
+      const date = new Date(purchase.completedAt);
+      date.setHours(0, 0, 0, 0);
+      activityDates.add(date.getTime());
+    }
+  });
+
+  // Add last login date
+  if (user.lastLogin) {
+    const date = new Date(user.lastLogin);
+    date.setHours(0, 0, 0, 0);
+    activityDates.add(date.getTime());
+  }
+
+  if (activityDates.size === 0) return 0;
+
+  // Sort dates in descending order (most recent first)
+  const sortedDates = Array.from(activityDates).sort((a, b) => b - a);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTime = today.getTime();
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayTime = yesterday.getTime();
+
+  // Check if there's activity today or yesterday
+  const mostRecentActivity = sortedDates[0];
+  if (
+    mostRecentActivity !== todayTime &&
+    mostRecentActivity !== yesterdayTime
+  ) {
+    return 0; // Streak broken - no activity today or yesterday
+  }
+
+  // Count consecutive days
+  let streak = 0;
+  let expectedDate = todayTime;
+
+  for (const activityTime of sortedDates) {
+    if (activityTime === expectedDate) {
+      streak++;
+      expectedDate -= 24 * 60 * 60 * 1000; // Go back one day
+    } else if (activityTime < expectedDate) {
+      break; // Gap found, streak ends
+    }
+  }
+
+  return streak;
+}
+
+/**
+ * Get instructor's payment wallets
+ */
+const getPaymentWallets = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+
+    if (!user || !user.isInstructor) {
+      return res
+        .status(403)
+        .json({ error: "Only instructors can manage payment wallets" });
+    }
+
+    res.json({
+      success: true,
+      wallets: user.paymentWallets || [],
+    });
+  } catch (error) {
+    console.error("Get payment wallets error:", error);
+    res.status(500).json({ error: "Failed to get payment wallets" });
+  }
+};
+
+/**
+ * Add payment wallet (instructor only)
+ */
+const addPaymentWallet = async (req, res) => {
+  try {
+    const { blockchain, address, label } = req.body;
+    const userId = req.userId;
+
+    if (!blockchain || !address) {
+      return res.status(400).json({ error: "Blockchain and address required" });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user || !user.isInstructor) {
+      return res
+        .status(403)
+        .json({ error: "Only instructors can add payment wallets" });
+    }
+
+    // Initialize paymentWallets if not exists
+    if (!user.paymentWallets) {
+      user.paymentWallets = [];
+    }
+
+    // Check if wallet already exists
+    const existingWallet = user.paymentWallets.find(
+      (w) =>
+        w.address.toLowerCase() === address.toLowerCase() &&
+        w.blockchain === blockchain
+    );
+
+    if (existingWallet) {
+      return res.status(400).json({ error: "Wallet already added" });
+    }
+
+    // Basic address validation
+    if (blockchain === "evm" && !address.match(/^0x[a-fA-F0-9]{40}$/)) {
+      return res.status(400).json({ error: "Invalid EVM address format" });
+    }
+
+    if (
+      blockchain === "solana" &&
+      (address.length < 32 || address.length > 44)
+    ) {
+      return res.status(400).json({ error: "Invalid Solana address format" });
+    }
+
+    // Add new wallet
+    user.paymentWallets.push({
+      blockchain,
+      address,
+      label: label || `${blockchain.toUpperCase()} Wallet`,
+      isPrimary: user.paymentWallets.length === 0, // First wallet is primary
+      addedAt: new Date(),
+    });
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Wallet added successfully",
+      wallet: {
+        blockchain,
+        address,
+        label: label || `${blockchain.toUpperCase()} Wallet`,
+      },
+    });
+  } catch (error) {
+    console.error("Add wallet error:", error);
+    res.status(500).json({ error: "Failed to add wallet" });
+  }
+};
+
+/**
+ * Remove payment wallet
+ */
+const removePaymentWallet = async (req, res) => {
+  try {
+    const { walletId } = req.params;
+    const user = await User.findById(req.userId);
+
+    if (!user || !user.isInstructor) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    if (!user.paymentWallets || user.paymentWallets.length === 0) {
+      return res.status(400).json({ error: "No wallets found" });
+    }
+
+    const wallet = user.paymentWallets.id(walletId);
+    if (!wallet) {
+      return res.status(404).json({ error: "Wallet not found" });
+    }
+
+    const wasPrimary = wallet.isPrimary;
+    user.paymentWallets.pull(walletId);
+
+    // If removed wallet was primary, set first remaining wallet as primary
+    if (wasPrimary && user.paymentWallets.length > 0) {
+      user.paymentWallets[0].isPrimary = true;
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Wallet removed successfully",
+    });
+  } catch (error) {
+    console.error("Remove wallet error:", error);
+    res.status(500).json({ error: "Failed to remove wallet" });
+  }
+};
+
+/**
+ * Set primary payment wallet
+ */
+const setPrimaryWallet = async (req, res) => {
+  try {
+    const { walletId } = req.body;
+    const user = await User.findById(req.userId);
+
+    if (!user || !user.isInstructor) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    if (!user.paymentWallets || user.paymentWallets.length === 0) {
+      return res.status(400).json({ error: "No wallets found" });
+    }
+
+    // Set all wallets to non-primary
+    user.paymentWallets.forEach((w) => (w.isPrimary = false));
+
+    // Set selected wallet as primary
+    const wallet = user.paymentWallets.id(walletId);
+    if (!wallet) {
+      return res.status(404).json({ error: "Wallet not found" });
+    }
+
+    wallet.isPrimary = true;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Primary wallet updated",
+    });
+  } catch (error) {
+    console.error("Set primary wallet error:", error);
+    res.status(500).json({ error: "Failed to set primary wallet" });
+  }
+};
+
 // Helper function
 function formatTimeAgo(date) {
   const now = new Date();
@@ -953,8 +1495,15 @@ module.exports = {
   getUserDashboardStats,
   getInstructorDashboardStats,
   getInstructorRecentActivity,
+  getInstructorEarningsHistory,
   getAllStudents,
   getStudentAnalytics,
   getInstructorPublicStats,
+  getInstructorEarningsTransactions,
+  getStudentDetails,
   getStats,
+  getPaymentWallets,
+  addPaymentWallet,
+  removePaymentWallet,
+  setPrimaryWallet,
 };

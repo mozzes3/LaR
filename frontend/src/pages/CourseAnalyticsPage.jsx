@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { courseApi } from "@services/api";
+import toast from "react-hot-toast";
 import {
   ArrowLeft,
   TrendingUp,
@@ -23,6 +25,15 @@ import {
   ThumbsUp,
   AlertCircle,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 const CourseAnalyticsPage = () => {
   const navigate = useNavigate();
@@ -30,108 +41,56 @@ const CourseAnalyticsPage = () => {
   const isAllCourses = !courseId;
   const [selectedPeriod, setSelectedPeriod] = useState("30days");
   const [selectedMetric, setSelectedMetric] = useState("all");
-
-  // Mock course data
-
+  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState(null);
   const [course, setCourse] = useState(null);
 
   useEffect(() => {
-    if (courseId) {
-      // Load specific course data
-      setCourse({
-        id: courseId,
-        title: "NFT Marketing Masterclass: 0 to 10K Discord Members",
-        thumbnail:
-          "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&h=225&fit=crop",
-      });
-    }
-  }, [courseId]);
+    const loadAnalytics = async () => {
+      try {
+        setLoading(true);
 
-  // Mock analytics data
-  const analytics = {
-    overview: {
-      totalRevenue: 145413,
-      revenueChange: "+23.5%",
-      totalStudents: 487,
-      studentsChange: "+12.3%",
-      completionRate: 78,
-      completionChange: "+5.2%",
-      averageRating: 4.9,
-      ratingChange: "+0.2",
-    },
-    engagement: {
-      averageWatchTime: 85, // percentage
-      dropOffRate: 15,
-      mostWatchedLesson: "Setting Up Discord Server",
-      leastWatchedLesson: "Advanced Community Management",
-      averageSessionDuration: 45, // minutes
-      returningStudents: 92, // percentage
-    },
-    revenue: {
-      thisMonth: 18500,
-      lastMonth: 15200,
-      growth: 21.7,
-      averagePerStudent: 299,
-      refundRate: 2.3,
-      totalEarnings: 145413,
-    },
-    studentProgress: [
-      { range: "0-25%", count: 45, percentage: 9.2 },
-      { range: "26-50%", count: 78, percentage: 16.0 },
-      { range: "51-75%", count: 134, percentage: 27.5 },
-      { range: "76-99%", count: 150, percentage: 30.8 },
-      { range: "100%", count: 80, percentage: 16.5 },
-    ],
-    lessonPerformance: [
-      {
-        lesson: "Introduction to Discord",
-        views: 487,
-        completion: 95,
-        avgRating: 4.8,
-      },
-      {
-        lesson: "Server Setup Basics",
-        views: 463,
-        completion: 89,
-        avgRating: 4.7,
-      },
-      {
-        lesson: "Role Configuration",
-        views: 421,
-        completion: 82,
-        avgRating: 4.6,
-      },
-      { lesson: "Bot Integration", views: 398, completion: 78, avgRating: 4.5 },
-      {
-        lesson: "Community Growth",
-        views: 376,
-        completion: 75,
-        avgRating: 4.8,
-      },
-    ],
-    reviews: {
-      total: 128,
-      fiveStar: 95,
-      fourStar: 25,
-      threeStar: 6,
-      twoStar: 2,
-      oneStar: 0,
-      averageRating: 4.9,
-    },
-    trafficSources: [
-      { source: "Direct", students: 210, percentage: 43.1 },
-      { source: "Search", students: 145, percentage: 29.8 },
-      { source: "Social Media", students: 87, percentage: 17.9 },
-      { source: "Referral", students: 45, percentage: 9.2 },
-    ],
-  };
+        let response;
+        if (isAllCourses) {
+          response = await courseApi.getAllCoursesAnalytics();
+        } else {
+          response = await courseApi.getCourseAnalytics(courseId);
+          setCourse(response.data.course);
+        }
+
+        setAnalytics(response.data.analytics);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading analytics:", error);
+        toast.error("Failed to load analytics");
+        setLoading(false);
+      }
+    };
+
+    loadAnalytics();
+  }, [courseId, isAllCourses]);
+
+  if (loading || !analytics) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading analytics...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const statCards = [
     {
       label: "Total Revenue",
       value: `$${analytics.overview.totalRevenue.toLocaleString()}`,
-      change: analytics.overview.revenueChange,
-      trend: "up",
+      change: `${analytics.revenue.growth >= 0 ? "+" : ""}${
+        analytics.revenue.growth
+      }%`,
+      trend: analytics.revenue.growth >= 0 ? "up" : "down",
       icon: DollarSign,
       color: "text-green-500",
       bgColor: "bg-green-500/10",
@@ -139,7 +98,7 @@ const CourseAnalyticsPage = () => {
     {
       label: "Total Students",
       value: analytics.overview.totalStudents,
-      change: analytics.overview.studentsChange,
+      change: "Active",
       trend: "up",
       icon: Users,
       color: "text-blue-500",
@@ -148,7 +107,7 @@ const CourseAnalyticsPage = () => {
     {
       label: "Completion Rate",
       value: `${analytics.overview.completionRate}%`,
-      change: analytics.overview.completionChange,
+      change: "Overall",
       trend: "up",
       icon: Target,
       color: "text-purple-500",
@@ -156,15 +115,14 @@ const CourseAnalyticsPage = () => {
     },
     {
       label: "Average Rating",
-      value: analytics.overview.averageRating,
-      change: analytics.overview.ratingChange,
+      value: analytics.overview.averageRating.toFixed(1),
+      change: `${analytics.reviews.total} reviews`,
       trend: "up",
       icon: Star,
       color: "text-primary-400",
       bgColor: "bg-primary-400/10",
     },
   ];
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-8">
       <div className="container-custom">
@@ -247,11 +205,55 @@ const CourseAnalyticsPage = () => {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
               Revenue Overview
             </h2>
-            <div className="h-64 bg-gradient-to-br from-green-500/5 to-emerald-500/5 rounded-xl border-2 border-green-500/20 flex items-center justify-center mb-6">
-              <div className="text-center">
-                <BarChart3 className="w-16 h-16 text-green-500 mx-auto mb-3" />
-                <p className="text-gray-500">Revenue trend chart</p>
-              </div>
+            <div className="h-64 mb-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={[
+                    { month: "Jan", revenue: 0 },
+                    { month: "Feb", revenue: 0 },
+                    {
+                      month: "Last Month",
+                      revenue: analytics.revenue.lastMonth,
+                    },
+                    {
+                      month: "This Month",
+                      revenue: analytics.revenue.thisMonth,
+                    },
+                  ]}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#374151"
+                    opacity={0.1}
+                  />
+                  <XAxis
+                    dataKey="month"
+                    stroke="#9CA3AF"
+                    tick={{ fill: "#9CA3AF", fontSize: 12 }}
+                  />
+                  <YAxis
+                    stroke="#9CA3AF"
+                    tick={{ fill: "#9CA3AF", fontSize: 12 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1F2937",
+                      border: "none",
+                      borderRadius: "8px",
+                      color: "#fff",
+                    }}
+                    formatter={(value) => [`$${value}`, "Revenue"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#10B981"
+                    strokeWidth={3}
+                    dot={{ fill: "#10B981", r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
@@ -317,35 +319,27 @@ const CourseAnalyticsPage = () => {
                     Avg Watch Time
                   </span>
                   <span className="font-bold">
-                    {analytics.engagement.averageWatchTime}%
+                    {analytics.engagement.averageWatchTime} mins
                   </span>
-                </div>
-                <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500"
-                    style={{
-                      width: `${analytics.engagement.averageWatchTime}%`,
-                    }}
-                  />
                 </div>
               </div>
               <div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">
-                    Returning Students
+                    Total Students
                   </span>
                   <span className="font-bold text-green-500">
-                    {analytics.engagement.returningStudents}%
+                    {analytics.overview.totalStudents}
                   </span>
                 </div>
               </div>
               <div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">
-                    Drop-off Rate
+                    Completion Rate
                   </span>
-                  <span className="font-bold text-red-500">
-                    {analytics.engagement.dropOffRate}%
+                  <span className="font-bold text-blue-500">
+                    {analytics.overview.completionRate}%
                   </span>
                 </div>
               </div>
@@ -358,17 +352,17 @@ const CourseAnalyticsPage = () => {
             </h3>
             <div className="space-y-3">
               <div className="p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
-                <div className="text-xs text-gray-500 mb-1">Most Watched</div>
+                <div className="text-xs text-gray-500 mb-1">Total Revenue</div>
                 <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {analytics.engagement.mostWatchedLesson}
+                  ${analytics.revenue.totalEarnings.toLocaleString()}
                 </div>
               </div>
               <div className="p-3 bg-orange-500/5 border border-orange-500/20 rounded-lg">
                 <div className="text-xs text-gray-500 mb-1">
-                  Needs Improvement
+                  Avg Per Student
                 </div>
                 <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {analytics.engagement.leastWatchedLesson}
+                  ${analytics.revenue.averagePerStudent.toLocaleString()}
                 </div>
               </div>
             </div>
@@ -409,96 +403,6 @@ const CourseAnalyticsPage = () => {
                 );
               })}
             </div>
-          </div>
-        </div>
-
-        {/* Lesson Performance Table */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6 mb-8">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
-            Lesson Performance
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">
-                    Lesson
-                  </th>
-                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">
-                    Views
-                  </th>
-                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">
-                    Completion
-                  </th>
-                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">
-                    Rating
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                {analytics.lessonPerformance.map((lesson, index) => (
-                  <tr
-                    key={index}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800 transition"
-                  >
-                    <td className="px-6 py-4">
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {lesson.lesson}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {lesson.views}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span
-                        className={`font-bold ${
-                          lesson.completion >= 80
-                            ? "text-green-500"
-                            : lesson.completion >= 60
-                            ? "text-orange-500"
-                            : "text-red-500"
-                        }`}
-                      >
-                        {lesson.completion}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center space-x-1">
-                        <Star className="w-4 h-4 fill-primary-400 text-primary-400" />
-                        <span className="font-medium">{lesson.avgRating}</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Traffic Sources */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
-            Traffic Sources
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {analytics.trafficSources.map((source, index) => (
-              <div
-                key={index}
-                className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl text-center"
-              >
-                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                  {source.students}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  {source.source}
-                </div>
-                <div className="text-lg font-bold text-primary-400">
-                  {source.percentage}%
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>

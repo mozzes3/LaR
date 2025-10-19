@@ -92,6 +92,18 @@ router.get(
   userController.getInstructorDashboardStats
 );
 
+router.get(
+  "/instructor/earnings-history",
+  authenticate,
+  userController.getInstructorEarningsHistory
+);
+
+router.get(
+  "/instructor/earnings-transactions",
+  authenticate,
+  userController.getInstructorEarningsTransactions
+);
+
 /**
  * @route   GET /api/users/instructor/recent-activity
  * @desc    Get instructor recent activity
@@ -103,6 +115,12 @@ router.get(
   userController.getInstructorRecentActivity
 );
 
+router.get(
+  "/instructor/students/:studentId",
+  authenticate,
+  userController.getStudentDetails
+);
+
 /**
  * @route   GET /api/users/instructor/all-students
  * @desc    Get all students across all instructor's courses
@@ -112,6 +130,20 @@ router.get(
   "/instructor/all-students",
   authenticate,
   userController.getAllStudents
+);
+
+// Payment wallet management (instructor only)
+router.get("/payment-wallets", authenticate, userController.getPaymentWallets);
+router.post("/payment-wallets", authenticate, userController.addPaymentWallet);
+router.delete(
+  "/payment-wallets/:walletId",
+  authenticate,
+  userController.removePaymentWallet
+);
+router.post(
+  "/payment-wallets/set-primary",
+  authenticate,
+  userController.setPrimaryWallet
 );
 
 module.exports = router;

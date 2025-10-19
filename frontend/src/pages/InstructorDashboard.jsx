@@ -39,6 +39,16 @@ import {
   Bell,
   Activity,
 } from "lucide-react";
+// ADD THIS LINE:
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import toast from "react-hot-toast";
 import CourseQuestionsModal from "@components/CourseQuestionsModal";
 import CoursePreviewModal from "@components/CoursePreviewModal";
@@ -53,8 +63,7 @@ const InstructorDashboard = () => {
   const [deletingCourse, setDeletingCourse] = useState(null);
   const [questionsForCourse, setQuestionsForCourse] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Real data from API
+  const [earningsData, setEarningsData] = useState([]);
   const [instructorStats, setInstructorStats] = useState(null);
   const [courses, setCourses] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -82,9 +91,8 @@ const InstructorDashboard = () => {
 
         // Load recent activity
         const activityResponse = await userApi.getInstructorRecentActivity(5);
-        console.log("🔔 Recent activity:", activityResponse.data.activities);
         setRecentActivity(activityResponse.data.activities);
-
+        await loadEarningsData(selectedPeriod);
         setLoading(false);
       } catch (error) {
         console.error("Error loading dashboard:", error);
@@ -96,12 +104,31 @@ const InstructorDashboard = () => {
     loadDashboardData();
   }, [currentUser, navigate]);
 
+  useEffect(() => {
+    if (instructorStats) {
+      loadEarningsData(selectedPeriod);
+    }
+  }, [selectedPeriod]);
+
+  const loadEarningsData = async (period) => {
+    try {
+      const response = await userApi.getInstructorEarningsHistory(period);
+      setEarningsData(response.data.data);
+    } catch (error) {
+      console.error("Error loading earnings data:", error);
+      setEarningsData([]);
+    }
+  };
+
   const stats = instructorStats
     ? [
         {
           label: "Total Earnings",
           value: `$${instructorStats.totalEarnings.toLocaleString()}`,
-          change: "+12.5%", // Could be calculated from historical data
+          change:
+            instructorStats.totalCourses > 0
+              ? `${instructorStats.totalCourses} courses`
+              : "No courses",
           trend: "up",
           icon: DollarSign,
           color: "text-green-500",
@@ -111,7 +138,10 @@ const InstructorDashboard = () => {
         {
           label: "Total Students",
           value: instructorStats.totalStudents.toLocaleString(),
-          change: "+8.3%",
+          change:
+            instructorStats.publishedCourses > 0
+              ? `${instructorStats.publishedCourses} published`
+              : "No published",
           trend: "up",
           icon: Users,
           color: "text-blue-500",
@@ -260,11 +290,42 @@ const InstructorDashboard = () => {
                 <option value="1year">Last year</option>
               </select>
             </div>
-            <div className="h-64 bg-gradient-to-br from-primary-400/5 to-purple-500/5 rounded-xl border-2 border-primary-400/20 flex items-center justify-center mb-6">
-              <div className="text-center">
-                <BarChart3 className="w-16 h-16 text-primary-400 mx-auto mb-3" />
-                <p className="text-gray-500">Earnings chart visualization</p>
-              </div>
+            <div className="h-64 mb-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={earningsData}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#374151"
+                    opacity={0.1}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#9CA3AF"
+                    tick={{ fill: "#9CA3AF", fontSize: 12 }}
+                  />
+                  <YAxis
+                    stroke="#9CA3AF"
+                    tick={{ fill: "#9CA3AF", fontSize: 12 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1F2937",
+                      border: "none",
+                      borderRadius: "8px",
+                      color: "#fff",
+                    }}
+                    formatter={(value) => [`$${value}`, "Earnings"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="earnings"
+                    stroke="#8B5CF6"
+                    strokeWidth={3}
+                    dot={{ fill: "#8B5CF6", r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
@@ -280,7 +341,7 @@ const InstructorDashboard = () => {
                 </div>
               </div>
               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <div className="text-sm text-gray-500 mb-1">Available</div>
+                <div className="text-sm text-gray-500 mb-1">Withdrawn</div>
                 <div className="text-2xl font-bold text-green-500">
                   ${instructorStats.availableToWithdraw.toLocaleString()}
                 </div>
@@ -344,7 +405,7 @@ const InstructorDashboard = () => {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <button
-            onClick={() => toast.info("Withdraw feature coming soon")}
+            onClick={() => navigate("/instructor/earnings")}
             className="p-6 bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-2 border-green-500/20 rounded-2xl hover:shadow-lg transition text-left group"
           >
             <div className="flex items-center justify-between mb-4">
@@ -354,10 +415,10 @@ const InstructorDashboard = () => {
               <ArrowUpRight className="w-5 h-5 text-green-500 opacity-0 group-hover:opacity-100 transition" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              Withdraw Earnings
+              Earning Details
             </h3>
             <p className="text-sm text-gray-500">
-              ${instructorStats.availableToWithdraw.toLocaleString()} available
+              View detailed earnings breakdown
             </p>
           </button>
           <button

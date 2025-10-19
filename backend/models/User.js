@@ -24,6 +24,31 @@ const userSchema = new mongoose.Schema(
       type: String,
       maxlength: 500,
     },
+    paymentWallets: [
+      {
+        blockchain: {
+          type: String,
+          enum: ["evm", "solana", "bitcoin"],
+          required: true,
+        },
+        address: {
+          type: String,
+          required: true,
+        },
+        label: {
+          type: String, // e.g., "My Main Wallet"
+          default: "",
+        },
+        isPrimary: {
+          type: Boolean,
+          default: false,
+        },
+        addedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     avatar: {
       type: String,
       default: null,

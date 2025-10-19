@@ -186,6 +186,19 @@ router.delete(
   courseController.deleteCourse
 );
 
+router.get(
+  "/instructor/analytics/all",
+  authenticate,
+  isInstructor,
+  courseController.getAllCoursesAnalytics
+);
+
+router.get(
+  "/instructor/analytics/:courseId",
+  authenticate,
+  isInstructor,
+  courseController.getCourseAnalytics
+);
 /**
  * @route   GET /api/courses/:slug/lessons/:lessonId/video
  * @desc    Get signed video URL using session token
