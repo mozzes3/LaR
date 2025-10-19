@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const enrollmentController = require("../controllers/enrollmentController");
-const { authenticateToken } = require("../middleware/auth");
+const { authenticate } = require("../middleware/auth"); // ✅ CORRECT
 
 // Enroll in course
 router.post("/enroll", authenticateToken, enrollmentController.enrollCourse);
