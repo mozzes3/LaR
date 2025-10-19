@@ -66,6 +66,7 @@ const CertificatesPage = () => {
             totalLessons: cert.totalLessons,
             verificationUrl: cert.verificationUrl,
             blockchainHash: cert.blockchainHash,
+            blockchainExplorerUrl: cert.blockchainExplorerUrl,
             templateImage: cert.templateImage,
           })
         );

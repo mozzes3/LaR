@@ -8,7 +8,6 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   const [signedImageUrl, setSignedImageUrl] = useState(null);
   const [loadingToken, setLoadingToken] = useState(true);
 
-  // Fetch signed URL on mount
   useEffect(() => {
     setSignedImageUrl(certificate.templateImage);
     setLoadingToken(false);
@@ -21,11 +20,9 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
         return;
       }
 
-      // Fetch the image as blob using signed URL
       const response = await fetch(signedImageUrl);
       const blob = await response.blob();
 
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -47,18 +44,32 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
     toast.success("Verification link copied!");
   };
 
+  const handleCopyHash = () => {
+    if (certificate.blockchainHash) {
+      navigator.clipboard.writeText(certificate.blockchainHash);
+      toast.success("Transaction hash copied!");
+    }
+  };
+
+  const handleViewOnBlockchain = () => {
+    if (certificate.blockchainExplorerUrl) {
+      window.open(certificate.blockchainExplorerUrl, "_blank");
+    } else if (certificate.blockchainHash) {
+      // Fallback: construct Somnia explorer URL
+      const explorerUrl = `https://shannon-explorer.somnia.network/tx/${certificate.blockchainHash}`;
+      window.open(explorerUrl, "_blank");
+    }
+  };
+
   return (
     <>
-      {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div className="relative bg-white dark:bg-gray-900 rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden border-2 border-gray-200 dark:border-gray-800">
-          {/* Header */}
           <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
@@ -99,7 +110,6 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
             </div>
           </div>
 
-          {/* Certificate Image */}
           <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
             <div className="relative bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden">
               {(loadingToken || !imageLoaded) && (
@@ -109,57 +119,40 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                     <p className="text-sm text-gray-500">
                       {loadingToken
                         ? "Loading certificate..."
-                        : "Rendering image..."}
+                        : "Loading image..."}
                     </p>
                   </div>
                 </div>
               )}
+
               {signedImageUrl && (
                 <img
                   src={signedImageUrl}
-                  alt={certificate.courseTitle}
-                  className={`w-full h-auto transition-opacity duration-300 ${
+                  alt="Certificate"
+                  className={`w-full h-auto ${
                     imageLoaded ? "opacity-100" : "opacity-0"
-                  }`}
+                  } transition-opacity duration-300`}
                   onLoad={() => setImageLoaded(true)}
                   onError={(e) => {
-                    console.error("❌ Image failed to load");
-                    console.error("Image URL:", signedImageUrl);
-                    console.error("Error event:", e);
-                    setImageLoaded(true);
+                    console.error("Image load error:", e);
                     toast.error("Failed to load certificate image");
                   }}
                 />
               )}
             </div>
 
-            {/* Certificate Details */}
-            <div className="mt-6 grid md:grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Completed Date</p>
-                <p className="font-bold text-gray-900 dark:text-white">
-                  {new Date(certificate.completedDate).toLocaleDateString(
-                    "en-US",
-                    {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    }
-                  )}
-                </p>
-              </div>
-
+            <div className="grid grid-cols-3 gap-4 mt-6">
               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                 <p className="text-xs text-gray-500 mb-1">Grade</p>
                 <p className="font-bold text-gray-900 dark:text-white">
-                  {certificate.grade} - {certificate.finalScore}%
+                  {certificate.grade}
                 </p>
               </div>
 
               <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Instructor</p>
+                <p className="text-xs text-gray-500 mb-1">Score</p>
                 <p className="font-bold text-gray-900 dark:text-white">
-                  {certificate.instructor}
+                  {certificate.finalScore}%
                 </p>
               </div>
 
@@ -171,23 +164,44 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
               </div>
             </div>
 
-            {/* Verification */}
+            {/* Blockchain Verification Section */}
             <div className="mt-6 p-4 bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-xl">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <p className="font-bold text-gray-900 dark:text-white mb-1">
-                    Blockchain Verified
+                    Blockchain Verified on Somnia
                   </p>
                   <p className="text-xs text-gray-500">
-                    This certificate is permanently recorded on the blockchain
+                    This certificate is permanently recorded on Somnia
+                    blockchain
                   </p>
                 </div>
                 <div className="px-3 py-1 bg-green-500/20 text-green-500 text-xs font-bold rounded-lg border border-green-500/30">
-                  VERIFIED
+                  VERIFIED ✓
                 </div>
               </div>
 
+              {/* Transaction Hash */}
+              {certificate.blockchainHash && (
+                <div className="mb-3 p-3 bg-white dark:bg-gray-900 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Transaction Hash</p>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-xs font-mono text-gray-900 dark:text-white break-all flex-1">
+                      {certificate.blockchainHash}
+                    </p>
+                    <button
+                      onClick={handleCopyHash}
+                      className="p-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition flex-shrink-0"
+                      title="Copy transaction hash"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
+                {/* Verification URL */}
                 <div className="flex items-center space-x-2">
                   <input
                     type="text"
@@ -198,25 +212,25 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                   <button
                     onClick={handleCopyLink}
                     className="p-2 bg-primary-400 text-black rounded-lg hover:bg-primary-500 transition"
+                    title="Copy verification link"
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                 </div>
 
+                {/* View on Blockchain Explorer Button */}
                 <button
-                  onClick={() =>
-                    window.open(certificate.verificationUrl, "_blank")
-                  }
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-primary-400 text-primary-400 rounded-lg font-medium hover:bg-primary-400 hover:text-black transition"
+                  onClick={handleViewOnBlockchain}
+                  disabled={!certificate.blockchainHash}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-primary-400 text-primary-400 rounded-lg font-medium hover:bg-primary-400 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  <span>Verify on Blockchain</span>
+                  <span>View on Somnia Explorer</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Footer Actions */}
           <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4">
             <div className="flex items-center justify-end space-x-3">
               <button

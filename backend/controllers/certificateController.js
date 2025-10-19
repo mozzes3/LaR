@@ -1,10 +1,12 @@
+// backend/controllers/certificateController.js
 const { generateCertificate } = require("../services/certificateService");
 const Certificate = require("../models/Certificate");
+const crypto = require("crypto");
 
+// Get certificate image token
 const getCertificateImageToken = async (req, res) => {
   try {
     const { id } = req.params;
-
     console.log("🎫 Generating token for certificate:", id);
 
     const certificate = await Certificate.findById(id);
@@ -17,7 +19,6 @@ const getCertificateImageToken = async (req, res) => {
     console.log("👤 Certificate owner:", certificate.userId.toString());
     console.log("🔑 Request user:", req.userId);
 
-    // Verify ownership
     if (certificate.userId.toString() !== req.userId.toString()) {
       console.log("❌ Not authorized");
       return res
@@ -25,49 +26,23 @@ const getCertificateImageToken = async (req, res) => {
         .json({ error: "Not authorized to view this certificate" });
     }
 
-    // Generate Bunny token for the certificate image
-    const crypto = require("crypto");
-    const expires = Math.floor(Date.now() / 1000) + 24 * 60 * 60; // 24 hours
-
-    // Extract filename from URL
+    const expires = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
     const filename = certificate.templateImage.split("/").pop();
-
-    // IMPORTANT: The token path should match what Bunny expects
-    // If your CDN URL is: https://lizard-academy-certificates.b-cdn.net/FA-2025-E5D7E7.png
-    // Then token path should be: /FA-2025-E5D7E7.png
     const tokenPath = `/${filename}`;
 
-    console.log("📄 Filename:", filename);
-    console.log("🔗 Token path:", tokenPath);
-    console.log("⏰ Expires:", expires);
-
-    // Generate token hash
     const tokenKey = process.env.BUNNY_TOKEN_KEY_CERTIFICATES;
 
     if (!tokenKey) {
-      console.error("❌ BUNNY_TOKEN_KEY_CERTIFICATES not set in .env");
+      console.error("❌ BUNNY_TOKEN_KEY_CERTIFICATES not set");
       return res
         .status(500)
         .json({ error: "Certificate access not configured" });
     }
 
-    console.log(
-      "🔑 Token key (first 10 chars):",
-      tokenKey.substring(0, 10) + "..."
-    );
-
-    // Bunny.net token format: sha256(security_key + path + expires)
     const hashString = `${tokenKey}${tokenPath}${expires}`;
     const token = crypto.createHash("sha256").update(hashString).digest("hex");
 
-    console.log("🔐 Hash string format: [key][path][expires]");
-    console.log("🔐 Generated token:", token.substring(0, 20) + "...");
-
-    // Generate signed URL - parameter names must match Bunny's format
     const signedUrl = `${certificate.templateImage}?token=${token}&expires=${expires}`;
-
-    console.log("🔗 Full signed URL:", signedUrl);
-    console.log("✅ Signed URL generated");
 
     res.json({
       success: true,
@@ -118,7 +93,7 @@ const getCertificate = async (req, res) => {
   }
 };
 
-// Verify certificate by number (PUBLIC - no auth needed)
+// Verify certificate by number (PUBLIC)
 const verifyCertificate = async (req, res) => {
   try {
     const certificate = await Certificate.findOne({
@@ -148,6 +123,11 @@ const verifyCertificate = async (req, res) => {
 const generateCertificateManual = async (req, res) => {
   try {
     const { courseId } = req.body;
+
+    if (!courseId) {
+      return res.status(400).json({ error: "Course ID is required" });
+    }
+
     const certificate = await generateCertificate(req.userId, courseId);
 
     res.json({
@@ -161,9 +141,9 @@ const generateCertificateManual = async (req, res) => {
 };
 
 module.exports = {
+  getCertificateImageToken,
   getUserCertificates,
   getCertificate,
   verifyCertificate,
   generateCertificateManual,
-  getCertificateImageToken,
 };

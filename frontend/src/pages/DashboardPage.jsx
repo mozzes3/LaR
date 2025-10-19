@@ -255,6 +255,8 @@ const DashboardPage = () => {
           totalHours: cert.totalHours,
           totalLessons: cert.totalLessons,
           verificationUrl: cert.verificationUrl,
+          blockchainHash: cert.blockchainHash, // ADD THIS
+          blockchainExplorerUrl: cert.blockchainExplorerUrl,
           templateImage: cert.templateImage,
         };
 

@@ -1,21 +1,28 @@
+// backend/routes/certificateRoutes.js
 const express = require("express");
 const router = express.Router();
+const {
+  getUserCertificates,
+  getCertificate,
+  verifyCertificate,
+  generateCertificateManual,
+  getCertificateImageToken,
+} = require("../controllers/certificateController");
+const { authenticate } = require("../middleware/auth");
 
-// Placeholder routes - will implement later
-router.get("/my", (req, res) => {
-  res.json({ certificates: [] });
-});
+// Get user's certificates (protected)
+router.get("/my", authenticate, getUserCertificates);
 
-router.get("/:id", (req, res) => {
-  res.json({ certificate: null });
-});
+// Get certificate image token (protected)
+router.get("/:id/image-token", authenticate, getCertificateImageToken);
 
-router.get("/verify/:certificateNumber", (req, res) => {
-  res.json({ valid: false });
-});
+// Get single certificate (protected)
+router.get("/:id", authenticate, getCertificate);
 
-router.post("/generate", (req, res) => {
-  res.json({ message: "Certificate generation coming soon" });
-});
+// Verify certificate by number (PUBLIC - no auth)
+router.get("/verify/:certificateNumber", verifyCertificate);
+
+// Generate certificate manually (protected - for testing)
+router.post("/generate", authenticate, generateCertificateManual);
 
 module.exports = router;

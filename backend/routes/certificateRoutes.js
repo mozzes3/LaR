@@ -1,10 +1,21 @@
+// backend/routes/certificateRoutes.js
 const express = require("express");
 const router = express.Router();
 const certificateController = require("../controllers/certificateController");
-const { authenticate } = require("../middleware/auth"); // ← Changed from authenticateToken to authenticate
+const { authenticate } = require("../middleware/auth");
 
 // Get user's certificates (protected)
 router.get("/my", authenticate, certificateController.getUserCertificates);
+
+// Get certificate image token (protected)
+router.get(
+  "/:id/image-token",
+  authenticate,
+  certificateController.getCertificateImageToken
+);
+
+// Get single certificate (protected)
+router.get("/:id", authenticate, certificateController.getCertificate);
 
 // Verify certificate by number (PUBLIC - no auth)
 router.get(
@@ -18,12 +29,5 @@ router.post(
   authenticate,
   certificateController.generateCertificateManual
 );
-router.get(
-  "/:id/image-token",
-  authenticate,
-  certificateController.getCertificateImageToken
-);
-// Get single certificate (protected)
-router.get("/:id", authenticate, certificateController.getCertificate);
 
 module.exports = router;

@@ -5,6 +5,7 @@ import ReviewModal from "@components/ReviewModal";
 import VideoPlayer from "@components/VideoPlayer";
 import { useWallet } from "@contexts/WalletContext";
 import CourseQuestionsModal from "@components/CourseQuestionsModal";
+import CourseCompletionModal from "@components/CourseCompletionModal";
 import toast from "react-hot-toast";
 import {
   Play,
@@ -212,7 +213,6 @@ const CourseLearningPage = () => {
     try {
       console.log(`✅ Marking lesson complete`);
 
-      // ✅ No watchTime needed - backend will add lesson duration
       const response = await purchaseApi.completeLesson({
         purchaseId: purchase._id,
         lessonId: currentLesson.id,
@@ -232,11 +232,29 @@ const CourseLearningPage = () => {
 
       toast.success("Lesson completed! 🎉");
 
-      // Auto-advance to next lesson
+      // ✨ CHECK IF COURSE IS COMPLETED
+      if (response.data.purchase.isCompleted && response.data.certificate) {
+        console.log("🎉 COURSE COMPLETED! Certificate generated!");
+        console.log("📜 Certificate ID:", response.data.certificate._id);
+
+        // Store certificate ID
+        setCompletedCertificateId(response.data.certificate._id);
+
+        // Show completion modal
+        setShowCompletionModal(true);
+
+        // Don't show review modal yet - let completion modal handle flow
+        return;
+      }
+
+      // Auto-advance to next lesson if not completed
       if (currentLessonIndex < allLessons.length - 1) {
         setTimeout(() => handleNextLesson(), 1500);
-      } else {
-        toast.success("🎓 Congratulations! You've completed all lessons!");
+      } else if (!response.data.purchase.isCompleted) {
+        // All lessons done but course not marked complete (shouldn't happen)
+        toast.success(
+          "🎓 All lessons complete! Processing your certificate..."
+        );
         setShowReviewModal(true);
       }
     } catch (error) {
@@ -941,6 +959,17 @@ const CourseLearningPage = () => {
           hasPurchased={true} // They must have purchased to be on this page
         />
       )}
+      {/* ✨ ADD THIS NEW COMPLETION MODAL */}
+      <CourseCompletionModal
+        isOpen={showCompletionModal}
+        onClose={() => {
+          setShowCompletionModal(false);
+          // Optional: Show review modal after completion modal closes
+          setShowReviewModal(true);
+        }}
+        courseTitle={course?.title}
+        certificateId={completedCertificateId}
+      />
     </div>
   );
 };

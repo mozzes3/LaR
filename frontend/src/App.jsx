@@ -33,6 +33,7 @@ import AdminCoursesPage from "@pages/AdminCoursesPage";
 import AdminReviewsPage from "@pages/AdminReviewsPage";
 import AdminPurchasesPage from "@pages/AdminPurchasesPage";
 import AdminApplicationsPage from "@pages/AdminApplicationsPage";
+import CertificateVerificationPage from "@pages/CertificateVerificationPage";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 // Protected Route
@@ -227,6 +228,10 @@ function App() {
                 <AdminCoursesPage />
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="verify/:certificateNumber"
+            element={<CertificateVerificationPage />}
           />
           <Route
             path="admin/reviews"
