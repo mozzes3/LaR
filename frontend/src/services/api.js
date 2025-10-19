@@ -139,6 +139,12 @@ export const courseApi = {
     api.get("/courses/instructor/my-courses-stats"),
   getLessonVideo: (courseSlug, lessonId) =>
     api.get(`/courses/${courseSlug}/lessons/${lessonId}/video`),
+  createVideoSession: (slug) => api.post(`/courses/${slug}/video-session`),
+
+  getLessonVideoWithSession: (slug, lessonId, sessionToken) =>
+    api.get(`/courses/${slug}/lessons/${lessonId}/video`, {
+      params: { sessionToken },
+    }),
 };
 
 // Purchase endpoints

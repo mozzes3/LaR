@@ -11,6 +11,7 @@ const {
 const Course = require("../models/Course");
 const Purchase = require("../models/Purchase");
 const bunnyService = require("../services/bunnyService");
+const videoSessionService = require("../services/videoSessionService");
 
 const videoUrlLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
@@ -21,6 +22,54 @@ const videoUrlLimiter = rateLimit({
     console.log(`🚨 Rate limit hit by ${req.ip}`);
     res.status(429).json({ error: "Too many requests" });
   },
+});
+
+/**
+ * @route   POST /api/courses/:slug/video-session
+ * @desc    Create video session for entire course
+ * @access  Private (Must own course or be instructor)
+ */
+router.post("/:slug/video-session", authenticate, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const userId = req.userId;
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers["user-agent"] || "unknown";
+
+    console.log(`🎬 Video session request: ${slug}, user: ${userId}`);
+
+    // Get course
+    const course = await Course.findOne({ slug }).select(
+      "_id instructor sections"
+    );
+
+    if (!course) {
+      return res.status(404).json({ error: "Course not found" });
+    }
+
+    // Create session
+    const session = await videoSessionService.createSession(
+      userId,
+      course._id,
+      ipAddress,
+      userAgent
+    );
+
+    res.json({
+      success: true,
+      sessionToken: session.sessionToken,
+      expiresAt: session.expiresAt,
+      expiresIn: session.expiresIn,
+    });
+  } catch (error) {
+    console.error("❌ Video session error:", error);
+
+    if (error.message.includes("Access denied")) {
+      return res.status(403).json({ error: error.message });
+    }
+
+    res.status(500).json({ error: "Failed to create video session" });
+  }
 });
 
 /**
@@ -139,14 +188,8 @@ router.delete(
 
 /**
  * @route   GET /api/courses/:slug/lessons/:lessonId/video
- * @desc    Get signed video URL for a lesson
- * @access  Private (Must own course or be instructor)
- */
-
-/**
- * @route   GET /api/courses/:slug/lessons/:lessonId/video
- * @desc    Get signed video URL for a lesson (with user fingerprinting)
- * @access  Private (Must own course or be instructor)
+ * @desc    Get signed video URL using session token
+ * @access  Private (Must have valid session)
  */
 router.get(
   "/:slug/lessons/:lessonId/video",
@@ -155,22 +198,32 @@ router.get(
   async (req, res) => {
     try {
       const { slug, lessonId } = req.params;
+      const { sessionToken } = req.query;
+      const userId = req.userId;
+      const ipAddress = req.ip || req.connection.remoteAddress;
 
-      console.log(
-        `🎬 Video URL request: ${slug}, lesson: ${lessonId}, user: ${req.userId}`
-      );
+      if (!sessionToken) {
+        return res.status(400).json({ error: "Session token required" });
+      }
+
+      console.log(`🎬 Video URL request: ${slug}, lesson: ${lessonId}`);
 
       // Get course
-      const course = await Course.findOne({ slug }).populate(
-        "instructor",
-        "name username avatar"
+      const course = await Course.findOne({ slug }).select(
+        "_id instructor sections"
       );
 
       if (!course) {
         return res.status(404).json({ error: "Course not found" });
       }
 
-      // Find the lesson
+      const session = await videoSessionService.validateSession(
+        sessionToken,
+        userId,
+        course._id,
+        ipAddress
+      );
+      // Find lesson
       let lesson = null;
       for (const section of course.sections) {
         const foundLesson = section.lessons.find(
@@ -186,81 +239,41 @@ router.get(
         return res.status(404).json({ error: "Lesson not found" });
       }
 
-      console.log(
-        `📹 Found lesson: ${lesson.title}, videoId: ${lesson.videoId}`
-      );
-
       if (!lesson.videoId) {
         return res
           .status(404)
           .json({ error: "Video not found for this lesson" });
       }
 
-      // Check if user has access
-      const isInstructor = course.instructor._id.toString() === req.userId;
-      const isPreview = lesson.isPreview;
-      const hasPurchased = await Purchase.exists({
-        user: req.userId,
-        course: course._id,
-        status: "active", // ← Add this check
-      });
-
-      if (!hasPurchased && !isInstructor && !isPreview) {
-        return res.status(403).json({ error: "Purchase required" });
-      }
-      const hasAccess = isInstructor || isPreview || hasPurchased;
-
-      console.log(
-        `🔐 Access check: instructor=${isInstructor}, preview=${isPreview}, purchased=${hasPurchased}`
-      );
-
-      if (!hasAccess) {
-        return res
-          .status(403)
-          .json({ error: "You don't have access to this lesson" });
+      // Verify video is in session (security check)
+      if (!session.videoIds.includes(lesson.videoId)) {
+        return res.status(403).json({ error: "Video not in session" });
       }
 
-      // Different expiry times based on lesson type
-      const previewExpiry = 14400; // 4 hours for preview
-      const paidExpiry = 1800; // 30 minutes for paid lessons (shorter!)
-      const instructorExpiry = 28800; // 8 hours for instructors
-
-      let expiryTime;
-      if (isInstructor) {
-        expiryTime = instructorExpiry;
-      } else if (isPreview) {
-        expiryTime = previewExpiry;
-      } else {
-        expiryTime = paidExpiry; // Paid students get SHORT expiry
-      }
-
-      console.log(
-        `⏱️ Token expiry: ${expiryTime} seconds (${expiryTime / 60} minutes)`
-      );
-
-      // Generate signed URL
-
+      // Generate signed URL with remaining session time
+      const videoTokenExpiry = 30 * 60; // 30 minutes in seconds
       const signedUrl = bunnyService.generateVideoUrl(
         lesson.videoId,
-        expiryTime
+        videoTokenExpiry // ← Now only 30 minutes
       );
-
-      // Log access for security monitoring
-      console.log(
-        `✅ Video access granted: user=${req.userId}, lesson=${lessonId}, expires=${expiryTime}s`
-      );
+      console.log(`✅ Video URL generated, expires in ${videoTokenExpiry}s`);
 
       res.json({
         success: true,
         videoUrl: signedUrl,
-        expiresIn: expiryTime,
-        expiresAt: new Date(Date.now() + expiryTime * 1000).toISOString(),
-        // Don't send these to client, just for logging
-        // userId: req.userId,
-        // lessonId: lessonId,
+        expiresIn: videoTokenExpiry, // ← Change this
+        expiresAt: new Date(Date.now() + videoTokenExpiry * 1000), // ← Add this
       });
     } catch (error) {
-      console.error("Get video URL error:", error);
+      console.error("❌ Get video URL error:", error);
+
+      if (
+        error.message.includes("Invalid session") ||
+        error.message.includes("Session expired")
+      ) {
+        return res.status(401).json({ error: error.message });
+      }
+
       res.status(500).json({ error: "Failed to get video URL" });
     }
   }

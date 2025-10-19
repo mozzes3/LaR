@@ -417,10 +417,10 @@ const CourseLearningPage = () => {
         <div className="flex-1 w-full">
           <VideoPlayer
             courseSlug={course.slug}
+            courseId={course.id} // ADD THIS LINE
             lessonId={currentLessonData.id}
             lessonTitle={currentLessonData.title}
           />
-
           <div className="p-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">

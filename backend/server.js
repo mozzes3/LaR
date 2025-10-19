@@ -7,11 +7,12 @@ const uploadRoutes = require("./routes/upload");
 const certificateRoutes = require("./routes/certificateRoutes");
 const levelRoutes = require("./routes/levels");
 const categoryRoutes = require("./routes/categories");
+const { sanitizeInput } = require("./middleware/sanitize");
 const app = express();
 
 // Connect to MongoDB
 connectDB();
-
+app.use(sanitizeInput);
 // Middleware
 app.use(
   cors({
