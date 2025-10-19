@@ -113,7 +113,11 @@ const purchaseSchema = new mongoose.Schema(
 // Compound indexes
 purchaseSchema.index({ user: 1, course: 1 }, { unique: true });
 purchaseSchema.index({ user: 1, status: 1 });
+purchaseSchema.index({ user: 1, isCompleted: 1 }); // ✅ ADD THIS
 purchaseSchema.index({ course: 1, isCompleted: 1 });
+purchaseSchema.index({ course: 1, createdAt: -1 }); // ✅ ADD THIS
+purchaseSchema.index({ lastAccessedAt: -1 }); // ✅ ADD THIS
+purchaseSchema.index({ status: 1, createdAt: -1 }); // ✅ ADD THIS
 
 // Mark lesson as completed
 purchaseSchema.methods.completeLesson = function (lessonId) {

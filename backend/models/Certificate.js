@@ -32,4 +32,9 @@ const certificateSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+certificateSchema.index({ userId: 1, createdAt: -1 });
+certificateSchema.index({ courseId: 1 });
+certificateSchema.index({ certificateNumber: 1 }, { unique: true }); // Already unique in schema
+certificateSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model("Certificate", certificateSchema);

@@ -198,10 +198,14 @@ const userSchema = new mongoose.Schema(
 
 // Indexes
 userSchema.index({ username: 1 });
+userSchema.index({ walletAddress: 1 }); // ✅ Already unique, but ensure index
+userSchema.index({ email: 1 }, { sparse: true }); // ✅ ADD THIS
+userSchema.index({ isInstructor: 1, instructorVerified: 1 }); // ✅ ADD THIS
 userSchema.index({ isInstructor: 1 });
 userSchema.index({ level: -1 });
 userSchema.index({ roleRef: 1 });
 userSchema.index({ isSuperAdmin: 1 });
+userSchema.index({ createdAt: -1 }); // ✅ ADD THIS for sorting
 
 // Calculate level from experience
 userSchema.methods.calculateLevel = function () {

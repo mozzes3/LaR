@@ -6,8 +6,64 @@ const {
   generateNonce,
 } = require("../utils/verifyWallet");
 
-// Temporary storage for nonces (in production, use Redis)
-const nonceStore = new Map();
+// Redis client - initialized in server.js and passed via app.locals
+let redisClient = null;
+
+// Fallback to Map if Redis not available
+const nonceMapFallback = new Map();
+
+/**
+ * Initialize Redis client (called from server.js)
+ */
+const initRedis = (client) => {
+  redisClient = client;
+};
+
+/**
+ * Store nonce (Redis or Map fallback)
+ */
+const storeNonce = async (address, data) => {
+  if (redisClient?.isReady) {
+    await redisClient.setEx(
+      `nonce:${address}`,
+      300, // 5 minutes TTL
+      JSON.stringify(data)
+    );
+  } else {
+    nonceMapFallback.set(address, data);
+    // Clean up old nonces from Map
+    setTimeout(() => {
+      for (const [addr, storedData] of nonceMapFallback.entries()) {
+        if (Date.now() - storedData.timestamp > 5 * 60 * 1000) {
+          nonceMapFallback.delete(addr);
+        }
+      }
+    }, 5 * 60 * 1000);
+  }
+};
+
+/**
+ * Get nonce (Redis or Map fallback)
+ */
+const getNonceData = async (address) => {
+  if (redisClient?.isReady) {
+    const data = await redisClient.get(`nonce:${address}`);
+    return data ? JSON.parse(data) : null;
+  } else {
+    return nonceMapFallback.get(address) || null;
+  }
+};
+
+/**
+ * Delete nonce (Redis or Map fallback)
+ */
+const deleteNonce = async (address) => {
+  if (redisClient?.isReady) {
+    await redisClient.del(`nonce:${address}`);
+  } else {
+    nonceMapFallback.delete(address);
+  }
+};
 
 /**
  * Generate nonce for wallet authentication
@@ -29,19 +85,12 @@ const getNonce = async (req, res) => {
     const nonce = generateNonce();
     const message = generateSignMessage(walletAddress.toLowerCase(), nonce);
 
-    // Store nonce temporarily (expires in 5 minutes)
-    nonceStore.set(walletAddress.toLowerCase(), {
+    // Store nonce with timestamp
+    await storeNonce(walletAddress.toLowerCase(), {
       nonce,
       message,
       timestamp: Date.now(),
     });
-
-    // Clean up old nonces (older than 5 minutes)
-    for (const [address, data] of nonceStore.entries()) {
-      if (Date.now() - data.timestamp > 5 * 60 * 1000) {
-        nonceStore.delete(address);
-      }
-    }
 
     res.json({
       nonce,
@@ -70,7 +119,7 @@ const verifyAndLogin = async (req, res) => {
     const normalizedAddress = walletAddress.toLowerCase();
 
     // Get stored nonce
-    const storedData = nonceStore.get(normalizedAddress);
+    const storedData = await getNonceData(normalizedAddress);
 
     if (!storedData) {
       return res.status(400).json({
@@ -80,7 +129,7 @@ const verifyAndLogin = async (req, res) => {
 
     // Check nonce expiration (5 minutes)
     if (Date.now() - storedData.timestamp > 5 * 60 * 1000) {
-      nonceStore.delete(normalizedAddress);
+      await deleteNonce(normalizedAddress);
       return res.status(400).json({
         error: "Nonce expired. Please request a new nonce.",
       });
@@ -98,7 +147,7 @@ const verifyAndLogin = async (req, res) => {
     }
 
     // Delete used nonce
-    nonceStore.delete(normalizedAddress);
+    await deleteNonce(normalizedAddress);
 
     // Find or create user
     let user = await User.findOne({ walletAddress: normalizedAddress });
@@ -123,20 +172,32 @@ const verifyAndLogin = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // Generate JWT token
-    const token = jwt.sign(
+    // Generate JWT token - SHORT LIVED (15 minutes)
+    const accessToken = jwt.sign(
       {
         userId: user._id,
         walletAddress: user.walletAddress,
       },
       process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    // Generate refresh token (7 days)
+    const refreshToken = jwt.sign(
+      {
+        userId: user._id,
+        type: "refresh",
+      },
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
     res.json({
       success: true,
       isNewUser,
-      token,
+      token: accessToken,
+      refreshToken,
+      expiresIn: 900, // 15 minutes in seconds
       user: {
         id: user._id,
         walletAddress: user.walletAddress,
@@ -147,7 +208,7 @@ const verifyAndLogin = async (req, res) => {
         isInstructor: user.isInstructor,
         level: user.level,
         experience: user.experience,
-        bio: user.bio, // ← ADD THIS TOO
+        bio: user.bio,
         socialLinks: user.socialLinks,
       },
     });
@@ -158,11 +219,62 @@ const verifyAndLogin = async (req, res) => {
 };
 
 /**
+ * Refresh access token
+ */
+const refreshAccessToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ error: "Refresh token required" });
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET
+    );
+
+    if (decoded.type !== "refresh") {
+      return res.status(401).json({ error: "Invalid token type" });
+    }
+
+    const user = await User.findById(decoded.userId);
+
+    if (!user || !user.isActive || user.isBanned) {
+      return res.status(401).json({ error: "User not found or inactive" });
+    }
+
+    // Generate new access token
+    const accessToken = jwt.sign(
+      {
+        userId: user._id,
+        walletAddress: user.walletAddress,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    res.json({
+      success: true,
+      token: accessToken,
+      expiresIn: 900,
+    });
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Refresh token expired" });
+    }
+    console.error("Refresh token error:", error);
+    res.status(401).json({ error: "Invalid refresh token" });
+  }
+};
+
+/**
  * Get current authenticated user
  */
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select("-__v");
+    const user = await User.findById(req.userId).select("-__v").lean(); // ✅ OPTIMIZATION
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -173,7 +285,7 @@ const getMe = async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        displayName: user.displayName || user.username, // ← ADD THIS
+        displayName: user.displayName || user.username,
         walletAddress: user.walletAddress,
         avatar: user.avatar,
         bio: user.bio,
@@ -181,40 +293,33 @@ const getMe = async (req, res) => {
         socialLinks: user.socialLinks,
         isInstructor: user.isInstructor,
         instructorVerified: user.instructorVerified,
-        instructorBio: user.instructorBio,
-        expertise: user.expertise,
-        badge: user.badge,
+        role: user.role,
         level: user.level,
         experience: user.experience,
-        coursesEnrolled: user.coursesEnrolled,
-        coursesCompleted: user.coursesCompleted,
-        certificatesEarned: user.certificatesEarned,
-        learningPoints: user.learningPoints,
-        totalStudents: user.totalStudents,
-        totalCoursesCreated: user.totalCoursesCreated,
-        averageRating: user.averageRating,
-        role: user.role,
-        lastUsernameChange: user.lastUsernameChange,
+        totalXP: user.totalXP,
+        currentStreak: user.currentStreak,
       },
     });
   } catch (error) {
-    console.error("Get me error:", error);
-    res.status(500).json({ error: "Failed to fetch user data" });
+    console.error("Get user error:", error);
+    res.status(500).json({ error: "Failed to fetch user" });
   }
 };
 
 /**
- * Logout (client-side token removal, but we can blacklist token if needed)
+ * Logout user
  */
 const logout = async (req, res) => {
   try {
-    // In a production app, you might want to blacklist the token
-    // For now, client will just remove the token
+    // In a stateless JWT system, logout is handled client-side
+    // But we can blacklist the token if needed (requires Redis)
+
     res.json({
       success: true,
       message: "Logged out successfully",
     });
   } catch (error) {
+    console.error("Logout error:", error);
     res.status(500).json({ error: "Logout failed" });
   }
 };
@@ -222,6 +327,8 @@ const logout = async (req, res) => {
 module.exports = {
   getNonce,
   verifyAndLogin,
+  refreshAccessToken,
   getMe,
   logout,
+  initRedis, // Export for initialization
 };

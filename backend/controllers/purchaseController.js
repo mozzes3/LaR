@@ -93,7 +93,8 @@ const getMyPurchases = async (req, res) => {
           select: "username avatar",
         },
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({ purchases });
   } catch (error) {
@@ -110,7 +111,9 @@ const getPurchase = async (req, res) => {
     const purchase = await Purchase.findOne({
       user: req.userId,
       course: courseId,
-    }).populate("course");
+    })
+      .populate("course")
+      .lean();
 
     if (!purchase) {
       return res.status(404).json({ error: "Purchase not found" });

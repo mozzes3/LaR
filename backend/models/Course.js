@@ -239,10 +239,13 @@ const courseSchema = new mongoose.Schema(
 
 // Indexes
 courseSchema.index({ instructor: 1, status: 1 });
+courseSchema.index({ instructor: 1, createdAt: -1 }); // ✅ ADD THIS
 courseSchema.index({ category: 1, status: 1 });
+courseSchema.index({ "price.usd": 1 }); // ✅ ADD THIS for price filters
 courseSchema.index({ averageRating: -1 });
 courseSchema.index({ enrollmentCount: -1 });
 courseSchema.index({ slug: 1 }, { unique: true });
+courseSchema.index({ status: 1, publishedAt: -1 }); // ✅ ADD THIS
 
 // Generate slug from title
 courseSchema.pre("save", function (next) {

@@ -10,9 +10,9 @@ const getProfile = async (req, res) => {
   try {
     const { username } = req.params;
 
-    const user = await User.findOne({ username }).select(
-      "-walletAddress -nonce"
-    );
+    const user = await User.findOne({ username })
+      .select("-walletAddress -nonce")
+      .lean();
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });

@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const helmet = require("helmet");
+const redis = require("redis");
 const connectDB = require("./config/database");
 const uploadRoutes = require("./routes/upload");
 const certificateRoutes = require("./routes/certificateRoutes");
@@ -9,14 +11,26 @@ const levelRoutes = require("./routes/levels");
 const categoryRoutes = require("./routes/categories");
 const { sanitizeInput } = require("./middleware/sanitize");
 const app = express();
-
+app.use(helmet());
 // Connect to MongoDB
 connectDB();
 app.use(sanitizeInput);
 // Middleware
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:3000",
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
