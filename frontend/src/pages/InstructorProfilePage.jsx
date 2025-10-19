@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 // import { userApi, courseApi } from "@services/api"; // In a real app, these would be used
 import { useWallet } from "@contexts/WalletContext";
 import toast from "react-hot-toast";
+import { userApi, courseApi } from "@services/api";
 import {
   Award,
   Star,
@@ -42,63 +43,44 @@ const InstructorProfilePage = () => {
       try {
         setLoading(true);
 
-        // ✅ REAL API CALLS
-        const { userApi, courseApi } = await import("@services/api");
-
         // Load instructor profile
         const profileResponse = await userApi.getProfile(username);
         const instructorData = profileResponse.data.user;
 
         console.log("👨‍🏫 Instructor data:", instructorData);
 
-        // Check if user is actually an instructor
         if (!instructorData.isInstructor) {
           toast.error("This user is not an instructor");
           navigate("/courses");
           return;
         }
 
-        setInstructor(instructorData);
+        // Load instructor's courses and stats in parallel for performance
+        const [coursesResponse, statsResponse] = await Promise.all([
+          courseApi.getByInstructor(instructorData.username),
+          userApi.getInstructorStats(instructorData.username),
+        ]);
 
-        // Load instructor's courses
-        try {
-          const coursesResponse = await courseApi.getByInstructor(
-            instructorData.username
-          );
-          console.log("📚 Instructor courses:", coursesResponse.data.courses);
-          setCourses(coursesResponse.data.courses || []);
-        } catch (error) {
-          console.error("Error loading courses:", error);
-          // If endpoint doesn't exist, try filtering manually
-          try {
-            const allCoursesResponse = await courseApi.getAll({
-              page: 1,
-              limit: 100,
-            });
-            const instructorCourses = allCoursesResponse.data.courses.filter(
-              (course) =>
-                course.instructor?._id === instructorData._id ||
-                course.instructor?.username === instructorData.username
-            );
-            setCourses(instructorCourses);
-          } catch (fallbackError) {
-            console.error("Fallback error:", fallbackError);
-            setCourses([]);
-          }
-        }
+        console.log("📚 Instructor courses:", coursesResponse.data.courses);
+        console.log("📊 Instructor stats:", statsResponse.data.stats);
+
+        setCourses(coursesResponse.data.courses || []);
+
+        // Set instructor with REAL calculated stats from backend
+        setInstructor({
+          ...instructorData,
+          ...statsResponse.data.stats, // Overwrite with accurate stats
+        });
 
         setLoading(false);
       } catch (error) {
         console.error("Error loading instructor profile:", error);
         toast.error("Failed to load instructor profile");
         setLoading(false);
-        navigate("/courses");
       }
     };
 
-    if (username) {
-      loadInstructorProfile();
-    }
+    loadInstructorProfile();
   }, [username, navigate]);
 
   const getBadgeIcon = (badge) => {

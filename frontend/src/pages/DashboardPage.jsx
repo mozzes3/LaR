@@ -143,7 +143,7 @@ const DashboardPage = () => {
           totalCourses: apiStats.totalCourses,
           completedCourses: apiStats.completedCourses,
           inProgressCourses: apiStats.inProgressCourses,
-          totalWatchTime: apiStats.totalWatchTimeMinutes || 0,
+          totalWatchTime: Math.floor((apiStats.totalWatchTime || 0) / 60), // Convert seconds to minutes
           certificatesEarned: apiStats.certificatesEarned,
           currentStreak: apiStats.currentStreak,
           fdrEarned: apiStats.fdrEarned,

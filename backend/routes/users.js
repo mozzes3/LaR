@@ -53,6 +53,16 @@ router.get("/stats/me", authenticate, userController.getStats);
 router.get("/:username", userController.getProfile);
 
 /**
+ * @route   GET /api/users/instructor/:username/stats
+ * @desc    Get instructor's public statistics
+ * @access  Public
+ */
+router.get(
+  "/instructor/:username/stats",
+  userController.getInstructorPublicStats
+);
+
+/**
  * @route   PUT /api/users/profile
  * @desc    Update own profile
  * @access  Private

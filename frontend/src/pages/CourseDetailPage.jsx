@@ -211,11 +211,47 @@ const CourseDetailPage = () => {
               website: "",
             },
           },
+          lastUpdated: new Date(
+            response.data.course.updatedAt
+          ).toLocaleDateString("en-US", {
+            month: "long",
+            year: "numeric",
+          }),
+          language: "English",
         };
 
         setCourse(courseData);
         setHasPurchased(response.data.hasPurchased || false);
         setIsInstructor(response.data.isInstructor || false);
+
+        // ============================================
+        // ADD THIS CODE HERE - Load Real Instructor Stats
+        // ============================================
+        try {
+          const { userApi } = await import("@services/api");
+          const statsResponse = await userApi.getInstructorStats(
+            response.data.course.instructor.username
+          );
+
+          console.log("📊 Instructor stats loaded:", statsResponse.data.stats);
+
+          // Update course with real instructor stats
+          setCourse((prev) => ({
+            ...prev,
+            instructor: {
+              ...prev.instructor,
+              totalStudents: statsResponse.data.stats.totalStudents,
+              totalCoursesCreated: statsResponse.data.stats.totalCoursesCreated,
+              rating: statsResponse.data.stats.averageRating,
+              totalReviews: statsResponse.data.stats.totalReviews,
+            },
+          }));
+        } catch (statsError) {
+          console.error("Error loading instructor stats:", statsError);
+          // Continue without stats - not critical
+        }
+        // ============================================
+
         setLoading(false);
       } catch (error) {
         console.error("Error loading course:", error);
@@ -260,6 +296,22 @@ const CourseDetailPage = () => {
     loadReviews();
   }, [course, user]);
 
+  const formatLessonDuration = (seconds) => {
+    if (!seconds || seconds < 0) return "0s";
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
+  };
+
   // Helper function
   const formatDuration = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -296,34 +348,40 @@ const CourseDetailPage = () => {
   };
 
   const handlePreviewLesson = async (lesson) => {
-    if (lesson.isPreview || hasPurchased) {
-      try {
-        setPreviewVideoLoading(true);
-        setShowVideoPreview(true);
-
-        // Get signed video URL from backend
-        const response = await courseApi.getLessonVideo(
-          course.slug,
-          lesson._id
-        );
-
-        setCurrentPreviewVideo({
-          ...lesson,
-          videoUrl: response.data.videoUrl, // Use signed URL
-        });
-
-        setPreviewVideoLoading(false);
-      } catch (error) {
-        console.error("Error loading preview:", error);
-        toast.error("Failed to load video preview");
-        setShowVideoPreview(false);
-        setPreviewVideoLoading(false);
-      }
-    } else {
+    // Check if lesson is previewable
+    if (!lesson.isPreview && !hasPurchased) {
       toast.error("Please enroll to watch this lesson");
+      return;
+    }
+
+    try {
+      setPreviewVideoLoading(true);
+      setShowVideoPreview(true);
+
+      // Create video session first
+      const sessionResponse = await courseApi.createVideoSession(course.slug);
+      const sessionToken = sessionResponse.data.sessionToken;
+
+      // Get video URL with session token
+      const videoResponse = await courseApi.getLessonVideoWithSession(
+        course.slug,
+        lesson._id,
+        sessionToken
+      );
+
+      setCurrentPreviewVideo({
+        ...lesson,
+        videoUrl: videoResponse.data.videoUrl,
+      });
+
+      setPreviewVideoLoading(false);
+    } catch (error) {
+      console.error("Error loading preview:", error);
+      toast.error("Failed to load video preview");
+      setShowVideoPreview(false);
+      setPreviewVideoLoading(false);
     }
   };
-
   const getBadgeIcon = (badge) => {
     switch (badge) {
       case "KOL":
@@ -355,13 +413,19 @@ const CourseDetailPage = () => {
   };
 
   const getPreviewLessons = () => {
+    if (!course?.sections) return [];
+
     const allLessons = course.sections.flatMap((section) =>
       section.lessons.map((lesson) => ({
         ...lesson,
         sectionTitle: section.title,
       }))
     );
-    return allLessons.slice(0, 10);
+
+    // Only return lessons marked as preview
+    const previewLessons = allLessons.filter((lesson) => lesson.isPreview);
+
+    return previewLessons.slice(0, 10);
   };
 
   if (loading) {
@@ -444,13 +508,16 @@ const CourseDetailPage = () => {
               <div className="flex items-center space-x-4 p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
                 <img
                   src={course.instructor.avatar}
-                  alt={course.instructor.username}
+                  alt={
+                    course.instructor.displayName || course.instructor.username
+                  }
                   className="w-16 h-16 rounded-full ring-2 ring-primary-400/50"
                 />
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
                     <span className="font-bold text-lg">
-                      {course.instructor.username}
+                      {course.instructor.displayName ||
+                        course.instructor.username}
                     </span>
                     {course.instructor.verified && (
                       <Award className="w-5 h-5 text-primary-400" />
@@ -896,7 +963,7 @@ const CourseDetailPage = () => {
                               </div>
                               <div className="flex items-center space-x-4">
                                 <span className="text-sm text-gray-500">
-                                  {lesson.duration}
+                                  {formatLessonDuration(lesson.duration)}
                                 </span>
                                 {!lesson.isPreview && !hasPurchased && (
                                   <Lock className="w-4 h-4 text-gray-400" />
@@ -917,13 +984,17 @@ const CourseDetailPage = () => {
                 <div className="flex items-start space-x-6 mb-8">
                   <img
                     src={course.instructor.avatar}
-                    alt={course.instructor.username}
+                    alt={
+                      course.instructor.displayName ||
+                      course.instructor.username
+                    }
                     className="w-32 h-32 rounded-full ring-4 ring-primary-400/20"
                   />
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
-                      <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-                        {course.instructor.username}
+                      <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">
+                        {course.instructor.displayName ||
+                          course.instructor.username}
                       </h2>
                       {course.instructor.verified && (
                         <Award className="w-6 h-6 text-primary-400" />
@@ -967,14 +1038,6 @@ const CourseDetailPage = () => {
                           Courses
                         </div>
                       </div>
-                      <div>
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {course.instructor?.followers || "0"}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          Followers
-                        </div>
-                      </div>
                     </div>
                     <div className="mb-6">
                       <h3 className="font-bold mb-2 text-gray-900 dark:text-white">
@@ -1016,52 +1079,54 @@ const CourseDetailPage = () => {
                   </div>
                 </div>
                 {/* Preview Lessons */}
-                <div className="mt-12">
-                  <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
-                    Preview Lessons
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {getPreviewLessons().map((lesson) => (
-                      <button
-                        key={lesson.id}
-                        onClick={() => handlePreviewLesson(lesson)}
-                        disabled={!lesson.isPreview && !hasPurchased}
-                        className="group p-4 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <div className="flex items-start space-x-3 mb-2">
-                          <Play
-                            className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                              lesson.isPreview
-                                ? "text-primary-400"
-                                : "text-gray-400"
-                            }`}
-                          />
-                          <div className="flex-1">
-                            <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-primary-400 transition mb-1">
-                              {lesson.title}
-                            </h4>
-                            <p className="text-xs text-gray-500">
-                              {lesson.sectionTitle}
-                            </p>
+                {getPreviewLessons().length > 0 && (
+                  <div className="mt-12">
+                    <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
+                      Preview Lessons
+                    </h3>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {getPreviewLessons().map((lesson) => (
+                        <button
+                          key={lesson.id}
+                          onClick={() => handlePreviewLesson(lesson)}
+                          disabled={!lesson.isPreview && !hasPurchased}
+                          className="group p-4 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <div className="flex items-start space-x-3 mb-2">
+                            <Play
+                              className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                                lesson.isPreview
+                                  ? "text-primary-400"
+                                  : "text-gray-400"
+                              }`}
+                            />
+                            <div className="flex-1">
+                              <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-primary-400 transition mb-1">
+                                {lesson.title}
+                              </h4>
+                              <p className="text-xs text-gray-500">
+                                {lesson.sectionTitle}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center justify-between pl-8">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {lesson.duration}
-                          </span>
-                          {lesson.isPreview && (
-                            <span className="px-2 py-0.5 bg-primary-400/10 text-primary-400 text-xs font-bold rounded">
-                              FREE
+                          <div className="flex items-center justify-between pl-8">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              {formatLessonDuration(lesson.duration)}
                             </span>
-                          )}
-                          {!lesson.isPreview && !hasPurchased && (
-                            <Lock className="w-4 h-4 text-gray-400" />
-                          )}
-                        </div>
-                      </button>
-                    ))}
+                            {lesson.isPreview && (
+                              <span className="px-2 py-0.5 bg-primary-400/10 text-primary-400 text-xs font-bold rounded">
+                                FREE
+                              </span>
+                            )}
+                            {!lesson.isPreview && !hasPurchased && (
+                              <Lock className="w-4 h-4 text-gray-400" />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
             {/* Reviews Tab */}

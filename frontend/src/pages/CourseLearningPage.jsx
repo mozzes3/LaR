@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { purchaseApi, courseApi, reviewApi } from "@services/api";
+import { purchaseApi, courseApi, reviewApi, noteApi } from "@services/api";
 import ReviewModal from "@components/ReviewModal";
 import VideoPlayer from "@components/VideoPlayer";
 import { useWallet } from "@contexts/WalletContext";
@@ -29,6 +29,10 @@ import {
   TrendingUp,
   Target,
   User,
+  Save,
+  Edit3,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 const CourseLearningPage = () => {
@@ -51,6 +55,11 @@ const CourseLearningPage = () => {
   const [totalCourseDuration, setTotalCourseDuration] = useState(0);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completedCertificateId, setCompletedCertificateId] = useState(null);
+  const [notes, setNotes] = useState([]);
+  const [noteContent, setNoteContent] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [loadingNotes, setLoadingNotes] = useState(false);
+
   const formatDuration = (seconds) => {
     if (isNaN(seconds) || seconds < 0) return "0m";
     const hours = Math.floor(seconds / 3600);
@@ -64,6 +73,29 @@ const CourseLearningPage = () => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+  useEffect(() => {
+    const loadNotes = async () => {
+      if (!course || !user) return;
+
+      const allLessons = course.modules.flatMap((module) => module.lessons);
+      const currentLesson = allLessons[currentLessonIndex];
+
+      if (!currentLesson) return;
+
+      try {
+        setLoadingNotes(true);
+        const response = await noteApi.getNotes(course.id, currentLesson.id);
+        setNotes(response.data.notes || []);
+      } catch (error) {
+        console.error("Error loading notes:", error);
+      } finally {
+        setLoadingNotes(false);
+      }
+    };
+
+    loadNotes();
+  }, [course, currentLessonIndex, user]);
 
   useEffect(() => {
     const loadCourseData = async () => {
@@ -199,6 +231,76 @@ const CourseLearningPage = () => {
 
     loadCourseData();
   }, [courseSlug, user, navigate]);
+
+  const handleCreateNote = async () => {
+    if (!noteContent.trim()) {
+      toast.error("Please enter note content");
+      return;
+    }
+
+    const allLessons = course.modules.flatMap((module) => module.lessons);
+    const currentLesson = allLessons[currentLessonIndex];
+
+    try {
+      const response = await noteApi.createNote({
+        courseId: course.id,
+        lessonId: currentLesson.id,
+        content: noteContent.trim(),
+        timestamp: 0,
+      });
+
+      setNotes([response.data.note, ...notes]);
+      setNoteContent("");
+      toast.success("Note saved!");
+    } catch (error) {
+      console.error("Error creating note:", error);
+      toast.error("Failed to save note");
+    }
+  };
+
+  const handleUpdateNote = async (noteId) => {
+    if (!noteContent.trim()) {
+      toast.error("Note cannot be empty");
+      return;
+    }
+
+    try {
+      const response = await noteApi.updateNote(noteId, {
+        content: noteContent.trim(),
+      });
+
+      setNotes(notes.map((n) => (n._id === noteId ? response.data.note : n)));
+      setEditingNoteId(null);
+      setNoteContent("");
+      toast.success("Note updated!");
+    } catch (error) {
+      console.error("Error updating note:", error);
+      toast.error("Failed to update note");
+    }
+  };
+
+  const handleDeleteNote = async (noteId) => {
+    if (!confirm("Delete this note?")) return;
+
+    try {
+      await noteApi.deleteNote(noteId);
+      setNotes(notes.filter((n) => n._id !== noteId));
+      toast.success("Note deleted");
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      toast.error("Failed to delete note");
+    }
+  };
+
+  const startEditingNote = (note) => {
+    setEditingNoteId(note._id);
+    setNoteContent(note.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingNoteId(null);
+    setNoteContent("");
+  };
 
   const markAsComplete = async () => {
     if (!course) return;
@@ -617,19 +719,90 @@ const CourseLearningPage = () => {
             )}
 
             {activeTab === "notes" && (
-              <div className="max-w-3xl">
-                <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
-                  Your Notes
-                </h3>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Take notes while watching..."
-                  className="w-full h-64 p-4 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black resize-none focus:border-primary-400 transition"
-                />
-                <button className="mt-3 px-6 py-2 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition">
-                  Save Note
-                </button>
+              <div className="space-y-4">
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl">
+                  <textarea
+                    value={noteContent}
+                    onChange={(e) => setNoteContent(e.target.value)}
+                    placeholder="Take a note for this lesson..."
+                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-primary-400 focus:border-transparent resize-none"
+                    rows="4"
+                  />
+                  <div className="flex justify-end space-x-2 mt-3">
+                    {editingNoteId && (
+                      <button
+                        onClick={cancelEditing}
+                        className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition font-bold"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      onClick={
+                        editingNoteId
+                          ? () => handleUpdateNote(editingNoteId)
+                          : handleCreateNote
+                      }
+                      disabled={!noteContent.trim()}
+                      className="px-4 py-2 bg-primary-400 text-black rounded-lg hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition font-bold flex items-center space-x-2"
+                    >
+                      {editingNoteId ? (
+                        <>
+                          <Save className="w-4 h-4" />
+                          <span>Update</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          <span>Add Note</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {loadingNotes ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400 mx-auto"></div>
+                  </div>
+                ) : notes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No notes yet. Add your first note above!
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notes.map((note) => (
+                      <div
+                        key={note._id}
+                        className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700"
+                      >
+                        <p className="text-gray-900 dark:text-white mb-2 whitespace-pre-wrap">
+                          {note.content}
+                        </p>
+                        <div className="flex items-center justify-between text-sm text-gray-500">
+                          <span>
+                            {new Date(note.createdAt).toLocaleDateString()} at{" "}
+                            {new Date(note.createdAt).toLocaleTimeString()}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => startEditingNote(note)}
+                              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteNote(note._id)}
+                              className="p-1 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 rounded transition"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {activeTab === "qa" && (

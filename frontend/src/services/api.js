@@ -156,6 +156,13 @@ export const purchaseApi = {
   completeLesson: (data) => api.post("/purchases/complete-lesson", data),
 };
 
+export const noteApi = {
+  getNotes: (courseId, lessonId) => api.get(`/notes/${courseId}/${lessonId}`),
+  createNote: (data) => api.post("/notes", data),
+  updateNote: (noteId, data) => api.put(`/notes/${noteId}`, data),
+  deleteNote: (noteId) => api.delete(`/notes/${noteId}`),
+};
+
 // Review endpoints
 export const reviewApi = {
   create: (data) => api.post("/reviews", data),
@@ -251,6 +258,8 @@ export const userApi = {
     api.get(`/users/instructor/recent-activity?limit=${limit}`),
   getAllStudents: () => api.get("/users/instructor/all-students"),
   getStudentAnalytics: () => api.get("/users/analytics"),
+  getInstructorStats: (username) =>
+    api.get(`/users/instructor/${username}/stats`),
 };
 
 // Instructor endpoints

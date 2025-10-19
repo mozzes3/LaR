@@ -181,7 +181,7 @@ const getCourse = async (req, res) => {
 
     const course = await Course.findOne({ slug }).populate(
       "instructor",
-      "username avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks"
+      "username displayName avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks"
     );
 
     console.log("3. Course found:", course ? "YES" : "NO");

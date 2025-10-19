@@ -161,6 +161,84 @@ const updateProfile = async (req, res) => {
   }
 };
 
+/**
+ * Get instructor's public stats (optimized for profile page)
+ */
+const getInstructorPublicStats = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    // Find instructor
+    const instructor = await User.findOne({ username, isInstructor: true });
+    if (!instructor) {
+      return res.status(404).json({ error: "Instructor not found" });
+    }
+
+    const Course = require("../models/Course");
+    const Purchase = require("../models/Purchase");
+    const Review = require("../models/Review");
+
+    // Get only PUBLISHED courses
+    const courses = await Course.find({
+      instructor: instructor._id,
+      status: "published",
+    }).select("_id averageRating totalRatings enrollmentCount");
+
+    const courseIds = courses.map((c) => c._id);
+
+    // Calculate stats efficiently with aggregation
+    const [purchaseStats, reviewCount] = await Promise.all([
+      // Count unique students across all courses
+      Purchase.distinct("user", {
+        course: { $in: courseIds },
+        status: "active",
+      }),
+      // Count total reviews
+      Review.countDocuments({
+        course: { $in: courseIds },
+        status: "published",
+      }),
+    ]);
+
+    // Calculate average rating from published courses
+    let totalWeightedRating = 0;
+    let totalRatingsCount = 0;
+
+    courses.forEach((course) => {
+      if (course.averageRating && course.totalRatings) {
+        totalWeightedRating += course.averageRating * course.totalRatings;
+        totalRatingsCount += course.totalRatings;
+      }
+    });
+
+    const averageRating =
+      totalRatingsCount > 0 ? totalWeightedRating / totalRatingsCount : 0;
+
+    // Total students is unique count
+    const totalStudents = purchaseStats.length;
+
+    // Sum total ratings across all courses
+    const totalRatings = courses.reduce(
+      (sum, c) => sum + (c.totalRatings || 0),
+      0
+    );
+
+    res.json({
+      success: true,
+      stats: {
+        totalCoursesCreated: courses.length,
+        totalStudents,
+        averageRating: Math.round(averageRating * 10) / 10,
+        totalReviews: reviewCount,
+        totalRatings, // Total number of ratings across all courses
+      },
+    });
+  } catch (error) {
+    console.error("Get instructor public stats error:", error);
+    res.status(500).json({ error: "Failed to get instructor stats" });
+  }
+};
+
 const getUserDashboardStats = async (req, res) => {
   try {
     const userId = req.userId;
@@ -333,11 +411,18 @@ const getInstructorDashboardStats = async (req, res) => {
     const totalStudents = new Set(purchases.map((p) => p.user.toString())).size;
 
     // Get average rating across all courses
-    const totalRating = courses.reduce(
-      (sum, course) => sum + (course.averageRating || 0),
-      0
-    );
-    const averageRating = courses.length > 0 ? totalRating / courses.length : 0;
+    let totalWeightedRating = 0;
+    let totalRatingsCount = 0;
+
+    courses.forEach((course) => {
+      if (course.averageRating && course.totalRatings) {
+        totalWeightedRating += course.averageRating * course.totalRatings;
+        totalRatingsCount += course.totalRatings;
+      }
+    });
+
+    const averageRating =
+      totalRatingsCount > 0 ? totalWeightedRating / totalRatingsCount : 0;
 
     // Get total reviews
     const totalReviews = await Review.countDocuments({
@@ -870,5 +955,6 @@ module.exports = {
   getInstructorRecentActivity,
   getAllStudents,
   getStudentAnalytics,
+  getInstructorPublicStats,
   getStats,
 };

@@ -182,10 +182,9 @@ const completeLesson = async (req, res) => {
     }
 
     // Update total time spent
-    purchase.timeSpentSeconds =
-      (purchase.timeSpentSeconds || 0) + lessonDuration;
+    purchase.totalWatchTime = (purchase.totalWatchTime || 0) + lessonDuration;
     console.log(
-      `⏱️ Added ${lessonDuration}s (lesson duration). Total: ${purchase.timeSpentSeconds}s`
+      `⏱️ Added ${lessonDuration}s (lesson duration). Total: ${purchase.totalWatchTime}s`
     );
 
     // Calculate progress
