@@ -19,6 +19,19 @@ const upload = multer({
   },
 });
 
+// Payment wallet management (instructor only)
+router.get("/payment-wallets", authenticate, userController.getPaymentWallets);
+router.post("/payment-wallets", authenticate, userController.addPaymentWallet);
+router.delete(
+  "/payment-wallets/:walletId",
+  authenticate,
+  userController.removePaymentWallet
+);
+router.post(
+  "/payment-wallets/set-primary",
+  authenticate,
+  userController.setPrimaryWallet
+);
 /**
 /**
  * @route   GET /api/users/analytics
@@ -130,20 +143,6 @@ router.get(
   "/instructor/all-students",
   authenticate,
   userController.getAllStudents
-);
-
-// Payment wallet management (instructor only)
-router.get("/payment-wallets", authenticate, userController.getPaymentWallets);
-router.post("/payment-wallets", authenticate, userController.addPaymentWallet);
-router.delete(
-  "/payment-wallets/:walletId",
-  authenticate,
-  userController.removePaymentWallet
-);
-router.post(
-  "/payment-wallets/set-primary",
-  authenticate,
-  userController.setPrimaryWallet
 );
 
 module.exports = router;

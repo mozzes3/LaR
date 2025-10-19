@@ -7,7 +7,7 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor - attach token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
@@ -16,7 +16,47 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor - handle token expiration
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If 401 and haven't retried yet, try to refresh token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = localStorage.getItem("refreshToken");
+        if (!refreshToken) {
+          throw new Error("No refresh token");
+        }
+
+        const { data } = await axios.post(
+          `${
+            import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+          }/auth/refresh`,
+          { refreshToken }
+        );
+
+        localStorage.setItem("token", data.token);
+        api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+        originalRequest.headers.Authorization = `Bearer ${data.token}`;
+
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed, logout
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        window.location.href = "/";
+        return Promise.reject(refreshError);
+      }
+    }
+
     return Promise.reject(error);
   }
 );

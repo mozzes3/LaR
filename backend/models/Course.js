@@ -289,25 +289,46 @@ courseSchema.methods.calculateStats = function () {
 
 // Update rating
 courseSchema.methods.updateRating = function (newRating, oldRating = null) {
-  if (oldRating) {
-    // Update existing rating
+  if (oldRating !== null) {
+    // Updating existing review
+    const totalRatingPoints = this.averageRating * this.totalRatings;
+    const updatedTotalPoints = totalRatingPoints - oldRating + newRating;
+    this.averageRating = updatedTotalPoints / this.totalRatings;
+
+    // Update distribution
     this.ratingDistribution[oldRating]--;
     this.ratingDistribution[newRating]++;
+  } else if (newRating) {
+    // Adding new review
+    const totalRatingPoints = this.averageRating * this.totalRatings;
+    this.totalRatings += 1;
+    this.averageRating = (totalRatingPoints + newRating) / this.totalRatings;
+
+    // Update distribution
+    this.ratingDistribution[newRating] =
+      (this.ratingDistribution[newRating] || 0) + 1;
   } else {
-    // New rating
-    this.ratingDistribution[newRating]++;
-    this.totalRatings++;
+    // Removing review (oldRating exists, newRating is null)
+    if (this.totalRatings > 0) {
+      const totalRatingPoints = this.averageRating * this.totalRatings;
+      this.totalRatings -= 1;
+
+      if (this.totalRatings === 0) {
+        this.averageRating = 0;
+      } else {
+        this.averageRating =
+          (totalRatingPoints - oldRating) / this.totalRatings;
+      }
+
+      // Update distribution
+      this.ratingDistribution[oldRating] = Math.max(
+        0,
+        (this.ratingDistribution[oldRating] || 0) - 1
+      );
+    }
   }
 
-  // Calculate average
-  let sum = 0;
-  let count = 0;
-  for (let i = 1; i <= 5; i++) {
-    sum += i * this.ratingDistribution[i];
-    count += this.ratingDistribution[i];
-  }
-
-  this.averageRating = count > 0 ? sum / count : 0;
+  return this;
 };
 
 module.exports = mongoose.model("Course", courseSchema);

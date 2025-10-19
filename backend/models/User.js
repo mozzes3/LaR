@@ -24,11 +24,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       maxlength: 500,
     },
+
     paymentWallets: [
       {
         blockchain: {
           type: String,
-          enum: ["evm", "solana", "bitcoin"],
+          enum: ["evm"],
           required: true,
         },
         address: {
@@ -36,7 +37,7 @@ const userSchema = new mongoose.Schema(
           required: true,
         },
         label: {
-          type: String, // e.g., "My Main Wallet"
+          type: String,
           default: "",
         },
         isPrimary: {

@@ -26,6 +26,9 @@ import {
   ExternalLink,
   Camera,
   Loader,
+  Plus,
+  Copy,
+  Star,
 } from "lucide-react";
 import { useWallet } from "@contexts/WalletContext";
 import { userApi } from "@services/api";
@@ -278,6 +281,12 @@ const ProfilePage = () => {
       label: "Instructor Profile",
       icon: Award,
       requireInstructor: true,
+    },
+    {
+      id: "wallets", // ADD THIS
+      label: "Payment Wallets", // ADD THIS
+      icon: Wallet, // ADD THIS
+      requireInstructor: true, // ADD THIS
     },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "security", label: "Security", icon: Lock },
@@ -1052,6 +1061,9 @@ const ProfilePage = () => {
                   </div>
                 </div>
               )}
+              {activeTab === "wallets" && user?.isInstructor && (
+                <WalletsSection user={user} />
+              )}
             </div>
           </div>
         </div>
@@ -1059,5 +1071,260 @@ const ProfilePage = () => {
     </div>
   );
 };
+const WalletsSection = ({ user }) => {
+  const [wallets, setWallets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedBlockchain, setSelectedBlockchain] = useState("evm");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [walletLabel, setWalletLabel] = useState("");
+  const [adding, setAdding] = useState(false);
 
+  useEffect(() => {
+    loadWallets();
+  }, []);
+
+  const loadWallets = async () => {
+    try {
+      const response = await userApi.getPaymentWallets();
+      setWallets(response.data.wallets);
+    } catch (error) {
+      console.error("Error loading wallets:", error);
+      toast.error("Failed to load wallets");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddWallet = async () => {
+    if (!walletAddress.trim()) {
+      toast.error("Please enter wallet address");
+      return;
+    }
+
+    try {
+      setAdding(true);
+      await userApi.addPaymentWallet({
+        blockchain: selectedBlockchain,
+        address: walletAddress.trim(),
+        label: walletLabel.trim() || undefined,
+      });
+
+      toast.success("Wallet added successfully");
+      setShowAddModal(false);
+      setWalletAddress("");
+      setWalletLabel("");
+      loadWallets();
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to add wallet");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleRemoveWallet = async (walletId) => {
+    if (!confirm("Remove this wallet?")) return;
+
+    try {
+      await userApi.removePaymentWallet(walletId);
+      toast.success("Wallet removed");
+      loadWallets();
+    } catch (error) {
+      toast.error("Failed to remove wallet");
+    }
+  };
+
+  const handleSetPrimary = async (walletId) => {
+    try {
+      await userApi.setPrimaryWallet(walletId);
+      toast.success("Primary wallet updated");
+      loadWallets();
+    } catch (error) {
+      toast.error("Failed to set primary wallet");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+        Loading...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Payment Wallets
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Add wallet addresses to receive course payments
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition flex items-center space-x-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Wallet</span>
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {wallets.length > 0 ? (
+          wallets.map((wallet) => (
+            <div
+              key={wallet._id}
+              className="p-4 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2 flex-wrap">
+                    <Wallet className="w-5 h-5 text-primary-400" />
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {wallet.label}
+                    </span>
+                    {wallet.isPrimary && (
+                      <span className="px-2 py-0.5 bg-green-500/10 text-green-500 rounded text-xs font-bold">
+                        Primary
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 bg-gray-500/10 text-gray-500 rounded text-xs font-bold uppercase">
+                      {wallet.blockchain}
+                    </span>
+                  </div>
+                  <p className="text-sm font-mono text-gray-600 dark:text-gray-400 break-all">
+                    {wallet.address}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Added {new Date(wallet.addedAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2 ml-4">
+                  {!wallet.isPrimary && (
+                    <button
+                      onClick={() => handleSetPrimary(wallet._id)}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+                      title="Set as primary"
+                    >
+                      <Star className="w-4 h-4 text-gray-400 hover:text-yellow-500" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(wallet.address);
+                      toast.success("Address copied");
+                    }}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+                    title="Copy address"
+                  >
+                    <Copy className="w-4 h-4 text-gray-400" />
+                  </button>
+                  <button
+                    onClick={() => handleRemoveWallet(wallet._id)}
+                    className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition"
+                    title="Remove wallet"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-xl">
+            <Wallet className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              No payment wallets added yet
+            </p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-6 py-2 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition"
+            >
+              Add Your First Wallet
+            </button>
+          </div>
+        )}
+      </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Add Payment Wallet
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Blockchain
+                </label>
+                <select
+                  value={selectedBlockchain}
+                  onChange={(e) => setSelectedBlockchain(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black text-gray-900 dark:text-white"
+                >
+                  <option value="evm">
+                    EVM (Ethereum, Polygon, BSC, etc.)
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Wallet Address *
+                </label>
+                <input
+                  type="text"
+                  value={walletAddress}
+                  onChange={(e) => setWalletAddress(e.target.value)}
+                  placeholder={
+                    selectedBlockchain === "evm"
+                      ? "0x..."
+                      : selectedBlockchain === "solana"
+                      ? "Solana address..."
+                      : "Bitcoin address..."
+                  }
+                  className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black font-mono text-sm text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Label (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={walletLabel}
+                  onChange={(e) => setWalletLabel(e.target.value)}
+                  placeholder="e.g., My Main Wallet"
+                  className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 mt-6">
+              <button
+                onClick={() => setShowAddModal(false)}
+                disabled={adding}
+                className="flex-1 px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition font-medium text-gray-900 dark:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddWallet}
+                disabled={adding}
+                className="flex-1 px-4 py-2 bg-primary-400 text-black rounded-xl font-bold hover:bg-primary-500 transition disabled:opacity-50"
+              >
+                {adding ? "Adding..." : "Add Wallet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 export default ProfilePage;

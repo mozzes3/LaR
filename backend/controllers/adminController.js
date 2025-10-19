@@ -431,19 +431,28 @@ const getAllCoursesAdmin = async (req, res) => {
 const updateCourseStatus = async (req, res) => {
   try {
     const { courseId } = req.params;
-    const { status, reason } = req.body;
+    const { status } = req.body;
 
     const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({ error: "Course not found" });
     }
 
+    const oldStatus = course.status;
     course.status = status;
+
+    // Set publishedAt ONLY when approving for the first time
+    if (status === "published" && !course.publishedAt) {
+      course.publishedAt = new Date();
+    }
+
+    // If re-approving after edit, KEEP the original publishedAt date
+
     await course.save();
 
     res.json({
       success: true,
-      message: `Course status updated to ${status}`,
+      message: `Course ${status}`,
       course,
     });
   } catch (error) {
@@ -531,20 +540,18 @@ const updateReviewStatus = async (req, res) => {
 
     await review.save();
 
-    // Update course rating when publishing a review
-    if (status === "published" && oldStatus !== "published") {
-      const course = await Course.findById(review.course);
-      if (course) {
+    const course = await Course.findById(review.course);
+
+    if (course) {
+      // Add rating when publishing
+      if (status === "published" && oldStatus !== "published") {
         course.updateRating(review.rating);
         await course.save();
       }
-    }
 
-    // Remove from course rating if unpublishing
-    if (oldStatus === "published" && status !== "published") {
-      const course = await Course.findById(review.course);
-      if (course) {
-        course.updateRating(0, review.rating); // Remove this rating
+      // Remove rating when unpublishing
+      if (oldStatus === "published" && status !== "published") {
+        course.updateRating(null, review.rating);
         await course.save();
       }
     }
@@ -756,6 +763,8 @@ const getAdminDashboardStats = async (req, res) => {
       totalPurchases,
       totalRevenue,
       pendingApplications,
+      pendingCourses, // ADD THIS
+      pendingReviews,
       flaggedReviews,
     ] = await Promise.all([
       User.countDocuments(),
@@ -765,6 +774,8 @@ const getAdminDashboardStats = async (req, res) => {
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
       InstructorApplication.countDocuments({ status: "pending" }),
+      Course.countDocuments({ status: "pending" }), // ADD THIS
+      Review.countDocuments({ status: "pending" }),
       Review.countDocuments({ status: "flagged" }),
     ]);
 
@@ -776,6 +787,8 @@ const getAdminDashboardStats = async (req, res) => {
         totalPurchases,
         totalRevenue: totalRevenue[0]?.total || 0,
         pendingApplications,
+        pendingCourses, // ADD THIS
+        pendingReviews,
         flaggedReviews,
       },
     });
@@ -784,7 +797,6 @@ const getAdminDashboardStats = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch dashboard stats" });
   }
 };
-
 module.exports = {
   // Roles
   getAllRoles,

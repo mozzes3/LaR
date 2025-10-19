@@ -1301,12 +1301,11 @@ function calculateLoginStreak(user, purchases) {
   return streak;
 }
 
-/**
- * Get instructor's payment wallets
- */
 const getPaymentWallets = async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select(
+      "paymentWallets isInstructor"
+    );
 
     if (!user || !user.isInstructor) {
       return res
@@ -1324,19 +1323,15 @@ const getPaymentWallets = async (req, res) => {
   }
 };
 
-/**
- * Add payment wallet (instructor only)
- */
 const addPaymentWallet = async (req, res) => {
   try {
     const { blockchain, address, label } = req.body;
-    const userId = req.userId;
 
     if (!blockchain || !address) {
       return res.status(400).json({ error: "Blockchain and address required" });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(req.userId);
 
     if (!user || !user.isInstructor) {
       return res
@@ -1344,15 +1339,14 @@ const addPaymentWallet = async (req, res) => {
         .json({ error: "Only instructors can add payment wallets" });
     }
 
-    // Initialize paymentWallets if not exists
     if (!user.paymentWallets) {
       user.paymentWallets = [];
     }
 
-    // Check if wallet already exists
+    const normalizedAddress = address.toLowerCase();
     const existingWallet = user.paymentWallets.find(
       (w) =>
-        w.address.toLowerCase() === address.toLowerCase() &&
+        w.address.toLowerCase() === normalizedAddress &&
         w.blockchain === blockchain
     );
 
@@ -1360,8 +1354,8 @@ const addPaymentWallet = async (req, res) => {
       return res.status(400).json({ error: "Wallet already added" });
     }
 
-    // Basic address validation
-    if (blockchain === "evm" && !address.match(/^0x[a-fA-F0-9]{40}$/)) {
+    // Validate address format
+    if (blockchain === "evm" && !normalizedAddress.match(/^0x[a-f0-9]{40}$/)) {
       return res.status(400).json({ error: "Invalid EVM address format" });
     }
 
@@ -1372,12 +1366,18 @@ const addPaymentWallet = async (req, res) => {
       return res.status(400).json({ error: "Invalid Solana address format" });
     }
 
-    // Add new wallet
+    if (
+      blockchain === "bitcoin" &&
+      (address.length < 26 || address.length > 62)
+    ) {
+      return res.status(400).json({ error: "Invalid Bitcoin address format" });
+    }
+
     user.paymentWallets.push({
       blockchain,
       address,
       label: label || `${blockchain.toUpperCase()} Wallet`,
-      isPrimary: user.paymentWallets.length === 0, // First wallet is primary
+      isPrimary: user.paymentWallets.length === 0,
       addedAt: new Date(),
     });
 
@@ -1386,11 +1386,7 @@ const addPaymentWallet = async (req, res) => {
     res.json({
       success: true,
       message: "Wallet added successfully",
-      wallet: {
-        blockchain,
-        address,
-        label: label || `${blockchain.toUpperCase()} Wallet`,
-      },
+      wallet: user.paymentWallets[user.paymentWallets.length - 1],
     });
   } catch (error) {
     console.error("Add wallet error:", error);
@@ -1398,9 +1394,6 @@ const addPaymentWallet = async (req, res) => {
   }
 };
 
-/**
- * Remove payment wallet
- */
 const removePaymentWallet = async (req, res) => {
   try {
     const { walletId } = req.params;
@@ -1422,7 +1415,6 @@ const removePaymentWallet = async (req, res) => {
     const wasPrimary = wallet.isPrimary;
     user.paymentWallets.pull(walletId);
 
-    // If removed wallet was primary, set first remaining wallet as primary
     if (wasPrimary && user.paymentWallets.length > 0) {
       user.paymentWallets[0].isPrimary = true;
     }
@@ -1439,9 +1431,6 @@ const removePaymentWallet = async (req, res) => {
   }
 };
 
-/**
- * Set primary payment wallet
- */
 const setPrimaryWallet = async (req, res) => {
   try {
     const { walletId } = req.body;
@@ -1455,10 +1444,8 @@ const setPrimaryWallet = async (req, res) => {
       return res.status(400).json({ error: "No wallets found" });
     }
 
-    // Set all wallets to non-primary
     user.paymentWallets.forEach((w) => (w.isPrimary = false));
 
-    // Set selected wallet as primary
     const wallet = user.paymentWallets.id(walletId);
     if (!wallet) {
       return res.status(404).json({ error: "Wallet not found" });

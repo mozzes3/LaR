@@ -175,6 +175,10 @@ const CoursesPage = () => {
           language: "English",
           whatYouWillLearn: course.whatYouWillLearn || [],
           instructor: {
+            name:
+              course.instructor?.displayName ||
+              course.instructor?.username ||
+              "Unknown",
             username: course.instructor?.username || "Unknown",
             avatar:
               course.instructor?.avatar ||
@@ -182,7 +186,6 @@ const CoursesPage = () => {
             verified: course.instructor?.instructorVerified || false,
             followers: "0",
             badge: course.instructor?.expertise?.[0] || "Instructor",
-            badgeColor: "blue",
           },
         })
       );
@@ -887,7 +890,7 @@ const CourseCard = ({ course, getBadgeIcon, getBadgeColors, compact }) => {
                     compact ? "text-xs" : "text-sm"
                   } font-medium text-gray-700 dark:text-gray-300 truncate`}
                 >
-                  {course.instructor.username}
+                  {course.instructor.name}
                 </span>
                 {course.instructor.verified && (
                   <Award className="w-3 h-3 text-primary-400 flex-shrink-0" />

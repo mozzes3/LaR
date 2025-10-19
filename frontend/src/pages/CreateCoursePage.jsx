@@ -276,8 +276,6 @@ const CreateCoursePage = () => {
     { id: "usdt", name: "USDT", icon: "₮" },
     { id: "usdc", name: "USDC", icon: "$" },
     { id: "eth", name: "ETH", icon: "Ξ" },
-    { id: "btc", name: "BTC", icon: "₿" },
-    { id: "sol", name: "SOL", icon: "S" },
     { id: "fdr", name: "$FDR", icon: "F" },
   ];
 
@@ -856,7 +854,10 @@ const CreateCoursePage = () => {
       // Step 7: Publish the course
       await courseApi.publish(courseSlug);
 
-      toast.success("🎉 Course published successfully!");
+      toast.success("🎉 Course submitted for admin approval!");
+      setTimeout(() => {
+        navigate("/instructor");
+      }, 2000);
 
       // Step 8: Redirect to course page
       setTimeout(() => {

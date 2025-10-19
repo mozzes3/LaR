@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
 import api from "@services/api";
@@ -20,17 +26,32 @@ export const WalletProvider = ({ children }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token"));
+  const [refreshToken, setRefreshToken] = useState(
+    localStorage.getItem("refreshToken")
+  );
 
-  // Check if wallet is already connected on mount
+  // Auto-refresh token before expiration (every 10 minutes, token expires in 15)
   useEffect(() => {
-    checkConnection();
+    if (refreshToken) {
+      const interval = setInterval(() => {
+        refreshAccessToken();
+      }, 10 * 60 * 1000); // 10 minutes
+
+      return () => clearInterval(interval);
+    }
+  }, [refreshToken]);
+
+  // Check connection and sync wallet on mount
+  useEffect(() => {
+    initializeWallet();
   }, []);
 
-  // Listen for account changes
+  // Listen for account and network changes
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", handleAccountsChanged);
-      window.ethereum.on("chainChanged", () => window.location.reload());
+      window.ethereum.on("chainChanged", handleChainChanged);
+      window.ethereum.on("disconnect", handleDisconnect);
     }
 
     return () => {
@@ -39,40 +60,98 @@ export const WalletProvider = ({ children }) => {
           "accountsChanged",
           handleAccountsChanged
         );
+        window.ethereum.removeListener("chainChanged", handleChainChanged);
+        window.ethereum.removeListener("disconnect", handleDisconnect);
       }
     };
-  }, []);
+  }, [user]);
 
   // Auto-login if token exists
   useEffect(() => {
     if (token && !user) {
       fetchUser();
     }
-  }, [token, user]);
+  }, [token]);
 
-  const handleAccountsChanged = (accounts) => {
-    if (accounts.length === 0) {
-      disconnect();
-    } else {
-      setAccount(accounts[0]);
+  const initializeWallet = async () => {
+    if (!window.ethereum) return;
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.listAccounts();
+
+      if (accounts.length > 0 && token) {
+        setProvider(provider);
+        const signer = await provider.getSigner();
+        setSigner(signer);
+        const address = await signer.getAddress();
+        setAccount(address);
+
+        // Verify the connected wallet matches the logged-in user
+        if (
+          user &&
+          user.walletAddress.toLowerCase() !== address.toLowerCase()
+        ) {
+          console.warn("Wallet mismatch detected");
+          toast.error("Wallet address mismatch. Please reconnect.");
+          disconnect();
+        }
+      }
+    } catch (error) {
+      console.error("Error initializing wallet:", error);
     }
   };
 
-  const checkConnection = async () => {
-    if (window.ethereum) {
-      try {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const accounts = await provider.listAccounts();
+  const handleAccountsChanged = async (accounts) => {
+    console.log("Account changed:", accounts);
 
-        if (accounts.length > 0) {
-          setProvider(provider);
-          const signer = await provider.getSigner();
-          setSigner(signer);
-          setAccount(accounts[0].address);
-        }
-      } catch (error) {
-        console.error("Error checking connection:", error);
-      }
+    if (accounts.length === 0) {
+      // User disconnected wallet from MetaMask
+      disconnect();
+      return;
+    }
+
+    const newAddress = accounts[0];
+
+    if (user && user.walletAddress.toLowerCase() !== newAddress.toLowerCase()) {
+      // User switched to different wallet
+      toast.error("Wallet changed. Please sign in with the new wallet.");
+      disconnect();
+    } else {
+      // Same wallet, just update
+      setAccount(newAddress);
+    }
+  };
+
+  const handleChainChanged = () => {
+    // Reload page on network change
+    window.location.reload();
+  };
+
+  const handleDisconnect = () => {
+    console.log("Wallet disconnected");
+    disconnect();
+  };
+
+  const refreshAccessToken = async () => {
+    try {
+      const storedRefreshToken = localStorage.getItem("refreshToken");
+      if (!storedRefreshToken) return;
+
+      const { data } = await api.post("/auth/refresh", {
+        refreshToken: storedRefreshToken,
+      });
+
+      setToken(data.token);
+      localStorage.setItem("token", data.token);
+
+      // Update axios default header
+      api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      // If refresh fails, logout
+      disconnect();
+      toast.error("Session expired. Please reconnect your wallet.");
     }
   };
 
@@ -83,9 +162,9 @@ export const WalletProvider = ({ children }) => {
       localStorage.setItem("user", JSON.stringify(data.user));
     } catch (error) {
       console.error("Error fetching user:", error);
-      // If token is invalid, clear it
       if (error.response?.status === 401) {
-        disconnect();
+        // Try to refresh token
+        await refreshAccessToken();
       }
     }
   };
@@ -125,31 +204,48 @@ export const WalletProvider = ({ children }) => {
       });
 
       setToken(loginData.token);
+      setRefreshToken(loginData.refreshToken);
       setUser(loginData.user);
+
       localStorage.setItem("token", loginData.token);
+      localStorage.setItem("refreshToken", loginData.refreshToken);
       localStorage.setItem("user", JSON.stringify(loginData.user));
+      localStorage.setItem("connectedWallet", address.toLowerCase());
+
+      // Set default axios header
+      api.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${loginData.token}`;
 
       toast.success(
         loginData.isNewUser ? "Welcome to Lizard Academy!" : "Welcome back!"
       );
     } catch (error) {
       console.error("Wallet connection error:", error);
+      disconnect();
       toast.error(error.response?.data?.error || "Failed to connect wallet");
     } finally {
       setIsConnecting(false);
     }
   };
 
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
     setAccount(null);
     setProvider(null);
     setSigner(null);
     setUser(null);
     setToken(null);
+    setRefreshToken(null);
+
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
+    localStorage.removeItem("connectedWallet");
+
+    delete api.defaults.headers.common["Authorization"];
+
     toast.success("Wallet disconnected");
-  };
+  }, []);
 
   const value = {
     account,
@@ -159,7 +255,7 @@ export const WalletProvider = ({ children }) => {
     user,
     token,
     isConnecting,
-    isConnected: !!account,
+    isConnected: !!account && !!token && !!user,
     connectWallet,
     disconnect,
     refreshUser: fetchUser,

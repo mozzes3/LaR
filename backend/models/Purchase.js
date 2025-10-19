@@ -18,7 +18,7 @@ const purchaseSchema = new mongoose.Schema(
     // Payment details
     paymentMethod: {
       type: String,
-      enum: ["fdr", "usdt", "usdc", "eth", "btc", "sol"],
+      enum: ["fdr", "usdt", "usdc", "eth"],
       required: true,
     },
     amount: {

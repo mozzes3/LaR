@@ -21,6 +21,8 @@ const AdminDashboardPage = () => {
     totalCourses: 0,
     totalPurchases: 0,
     totalRevenue: 0,
+    pendingCourses: 0,
+    pendingReviews: 0,
     pendingApplications: 0,
     flaggedReviews: 0,
   });
@@ -76,6 +78,20 @@ const AdminDashboardPage = () => {
       icon: Clock,
       color: "yellow",
       link: "/admin/applications?status=pending",
+    },
+    {
+      title: "Pending Courses",
+      value: stats.pendingCourses,
+      icon: BookOpen,
+      color: "purple",
+      link: "/admin/courses?status=pending",
+    },
+    {
+      title: "Pending Reviews",
+      value: stats.pendingReviews,
+      icon: Star,
+      color: "blue",
+      link: "/admin/reviews?status=pending",
     },
     {
       title: "Flagged Reviews",

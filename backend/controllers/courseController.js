@@ -142,17 +142,17 @@ const getCourses = async (req, res) => {
         sortQuery = { createdAt: -1 };
     }
 
-    // Execute query
     const courses = await Course.find(query)
-      .populate("instructor", "username avatar instructorVerified expertise")
+      .populate(
+        "instructor",
+        "username displayName avatar instructorVerified expertise"
+      ) // ADD displayName here
       .sort(sortQuery)
       .limit(Number(limit))
       .skip((Number(page) - 1) * Number(limit))
       .lean();
 
     const total = await Course.countDocuments(query);
-
-    console.log(`✅ Found ${courses.length} courses (total: ${total})`);
 
     res.json({
       success: true,
@@ -585,10 +585,11 @@ const publishCourse = async (req, res) => {
     }
 
     console.log("🔍 Publishing course:", slug);
+    console.log("📋 Current status:", course.status);
     console.log("📋 Thumbnail:", course.thumbnail);
     console.log("📋 Sections:", course.sections?.length);
 
-    // Validation - check for empty, placeholder, or invalid URLs
+    // Validation
     if (
       !course.thumbnail ||
       course.thumbnail === "" ||
@@ -625,11 +626,34 @@ const publishCourse = async (req, res) => {
 
     console.log("✅ All validations passed");
 
-    course.status = "published";
-    course.publishedAt = new Date();
+    // CRITICAL FIX: Check if this is a NEW course or EDIT
+    const isNewCourse = course.status === "draft";
+    const isEdit = course.status === "published";
+
+    if (isNewCourse) {
+      // NEW COURSE: Set to pending for admin approval
+      course.status = "pending";
+      // Do NOT set publishedAt yet - will be set when admin approves
+    } else if (isEdit) {
+      // EDITED COURSE: Set to pending for re-approval
+      course.status = "pending";
+      // KEEP the original publishedAt date - don't change it
+    } else {
+      // Course was already pending, just keep it pending
+      course.status = "pending";
+    }
+
     await course.save();
 
-    res.json({ success: true, message: "Course published successfully" });
+    const message = isNewCourse
+      ? "Course submitted for admin approval"
+      : "Changes submitted for admin approval";
+
+    res.json({
+      success: true,
+      message,
+      requiresApproval: true, // Let frontend know
+    });
   } catch (error) {
     console.error("Publish course error:", error);
     res.status(500).json({ error: "Failed to publish course" });
