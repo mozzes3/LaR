@@ -12,6 +12,7 @@ import {
   Zap,
   Sparkles,
   Trophy,
+  X,
 } from "lucide-react";
 import { adminApi } from "@services/api";
 import toast from "react-hot-toast";
@@ -136,13 +137,13 @@ const AdminUserEditPage = () => {
 
   const getBadgeColor = (color) => {
     const colors = {
-      gray: "bg-gray-500/10 text-gray-400 border-gray-500/30",
+      yellow: "bg-primary-400/10 text-primary-400 border-primary-400/30",
       pink: "bg-pink-500/10 text-pink-400 border-pink-500/30",
       purple: "bg-purple-500/10 text-purple-400 border-purple-500/30",
       blue: "bg-blue-500/10 text-blue-400 border-blue-500/30",
       green: "bg-green-500/10 text-green-400 border-green-500/30",
     };
-    return colors[color] || colors.gray;
+    return colors[color] || colors.yellow;
   };
 
   useEffect(() => {
@@ -704,6 +705,51 @@ const AdminUserEditPage = () => {
                       + Add Expertise
                     </button>
                   </div>
+
+                  <div>
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 block">
+                      Instructor Badges
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableBadges.map((badge) => (
+                        <button
+                          key={badge.value}
+                          onClick={() => toggleBadge(badge.value)}
+                          type="button"
+                          className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg border-2 font-bold transition ${
+                            userDetails.badges?.includes(badge.value)
+                              ? getBadgeColor(badge.color) +
+                                " ring-2 ring-offset-2 ring-primary-400"
+                              : "border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-primary-400"
+                          }`}
+                        >
+                          {badge.value === "Instructor" && (
+                            <Award className="w-4 h-4" />
+                          )}
+                          {badge.value === "Creator" && (
+                            <Zap className="w-4 h-4" />
+                          )}
+                          {badge.value === "KOL" && (
+                            <Sparkles className="w-4 h-4" />
+                          )}
+                          {badge.value === "Professional" && (
+                            <Shield className="w-4 h-4" />
+                          )}
+                          {badge.value === "Expert" && (
+                            <Trophy className="w-4 h-4" />
+                          )}
+                          <span>{badge.label}</span>
+                          {userDetails.badges?.includes(badge.value) && (
+                            <CheckCircle className="w-4 h-4" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Instructor badge is always included and displayed first
+                    </p>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
                       Social Links

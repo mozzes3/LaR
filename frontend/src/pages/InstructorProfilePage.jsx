@@ -70,6 +70,7 @@ const InstructorProfilePage = () => {
         setInstructor({
           ...instructorData,
           ...statsResponse.data.stats, // Overwrite with accurate stats
+          badges: instructorData.badges || [], // Ensure badges are included
         });
 
         setLoading(false);
@@ -179,18 +180,26 @@ const InstructorProfilePage = () => {
                         {instructor.displayName || instructor.username}
                       </h1>
                       {instructor.instructorVerified && (
-                        <Award className="w-6 h-6 text-primary-400" />
+                        <div className="relative group">
+                          <Award className="w-6 h-6 text-primary-400" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap">
+                            Verified Instructor
+                          </div>
+                        </div>
                       )}
                       {/* ✅ Multiple badges */}
                       {instructor.badges?.map((badge, index) => (
-                        <div
-                          key={index}
-                          className={`inline-flex items-center space-x-1 px-3 py-1 rounded-lg text-sm font-bold border ${getBadgeColors(
-                            badge
-                          )}`}
-                        >
-                          {getBadgeIcon(badge)}
-                          <span>{badge}</span>
+                        <div key={index} className="relative group">
+                          <div
+                            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border ${getBadgeColors(
+                              badge
+                            )}`}
+                          >
+                            {getBadgeIcon(badge)}
+                          </div>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap capitalize">
+                            {badge}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -208,12 +217,12 @@ const InstructorProfilePage = () => {
                   </div>
 
                   {isOwnProfile && (
-                    <Link
-                      to="/instructor/dashboard"
+                    <button
+                      onClick={() => navigate("/instructor")}
                       className="mt-4 md:mt-0 px-6 py-3 bg-primary-400 text-black rounded-xl font-medium hover:bg-primary-500 transition"
                     >
                       Dashboard
-                    </Link>
+                    </button>
                   )}
                 </div>
 

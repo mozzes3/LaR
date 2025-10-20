@@ -33,6 +33,8 @@ import {
   Edit3,
   Plus,
   Trash2,
+  Shield,
+  Zap,
 } from "lucide-react";
 
 const CourseLearningPage = () => {
@@ -144,7 +146,7 @@ const CourseLearningPage = () => {
             username: courseData.instructor?.username || "Unknown",
             avatar: courseData.instructor?.avatar || "",
             verified: courseData.instructor?.instructorVerified || false,
-            badge: courseData.instructor?.expertise?.[0] || "Instructor",
+            badges: courseData.instructor?.badges || ["Instructor"],
             badgeColor: "purple",
           },
           thumbnail: courseData.thumbnail,
@@ -232,6 +234,35 @@ const CourseLearningPage = () => {
     loadCourseData();
   }, [courseSlug, user, navigate]);
 
+  const getBadgeIcon = (badge) => {
+    switch (badge?.toLowerCase()) {
+      case "kol":
+        return <Sparkles className="w-4 h-4" />;
+      case "professional":
+        return <Shield className="w-4 h-4" />;
+      case "expert":
+        return <Trophy className="w-4 h-4" />;
+      case "creator":
+        return <Zap className="w-4 h-4" />;
+      default:
+        return <Award className="w-4 h-4" />;
+    }
+  };
+
+  const getBadgeColors = (color) => {
+    switch (color) {
+      case "purple":
+        return "bg-purple-500/10 text-purple-400 border-purple-500/30";
+      case "blue":
+        return "bg-blue-500/10 text-blue-400 border-blue-500/30";
+      case "green":
+        return "bg-green-500/10 text-green-400 border-green-500/30";
+      case "pink":
+        return "bg-pink-500/10 text-pink-400 border-pink-500/30";
+      default:
+        return "bg-primary-400/10 text-primary-400 border-primary-400/30";
+    }
+  };
   const handleCreateNote = async () => {
     if (!noteContent.trim()) {
       toast.error("Please enter note content");
@@ -595,9 +626,17 @@ const CourseLearningPage = () => {
                   {course.instructor.verified && (
                     <Award className="w-4 h-4 text-primary-400" />
                   )}
-                  <span className="px-2 py-0.5 bg-purple-500/10 text-purple-400 text-xs font-bold rounded border border-purple-500/30">
-                    {course.instructor.badge}
-                  </span>
+                  {course.instructor.badges?.map((badge, index) => (
+                    <div
+                      key={index}
+                      className={`inline-flex items-center space-x-1 px-2 py-1 rounded-lg text-xs font-bold border ${getBadgeColors(
+                        badge
+                      )}`}
+                    >
+                      {getBadgeIcon(badge)}
+                      <span>{badge}</span>
+                    </div>
+                  ))}
                 </div>
                 <p className="text-sm text-gray-500">Course Instructor</p>
               </div>

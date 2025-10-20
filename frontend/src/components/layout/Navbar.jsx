@@ -56,14 +56,17 @@ const Navbar = () => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-lg flex items-center justify-center font-bold text-black transform group-hover:scale-110 transition">
-                LA
-              </div>
-              <span className="text-xl font-bold hidden sm:block">
-                Lizard Academy
-              </span>
+              <Link
+                to="/"
+                className="flex items-center space-x-3 group perspective-1000"
+              >
+                <img
+                  src="/logo2.png"
+                  alt="Lizard Academy"
+                  className="h-10 w-auto logo-pop"
+                />
+              </Link>
             </Link>
-
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
               <Link

@@ -188,14 +188,14 @@ const HomePage = () => {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
               <Link
                 to="/courses"
-                className="group inline-flex items-center space-x-2 px-10 py-5 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold text-lg hover:shadow-2xl hover:shadow-primary-400/50 transition-all transform hover:scale-105"
+                className="btn-glossy-hybrid inline-flex items-center space-x-2 px-10 py-5 rounded-xl font-bold text-lg group"
               >
                 <span>Explore Courses</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
               </Link>
               <Link
                 to="/become-instructor"
-                className="inline-flex items-center space-x-2 px-10 py-5 border-2 border-primary-400 text-primary-400 rounded-xl font-bold text-lg hover:bg-primary-400 hover:text-black transition-all"
+                className="btn-glossy-outline inline-flex items-center space-x-2 px-10 py-5 rounded-xl font-bold text-lg"
               >
                 <Zap className="w-5 h-5" />
                 <span>Teach & Earn</span>
