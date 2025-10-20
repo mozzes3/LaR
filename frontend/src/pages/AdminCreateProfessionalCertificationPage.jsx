@@ -16,7 +16,11 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-import { adminProfessionalCertificationApi, uploadApi } from "@services/api";
+import {
+  adminProfessionalCertificationApi,
+  uploadApi,
+  categoryApi,
+} from "@services/api";
 import toast from "react-hot-toast";
 
 const AdminCreateProfessionalCertificationPage = () => {
@@ -29,7 +33,7 @@ const AdminCreateProfessionalCertificationPage = () => {
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [thumbnailFile, setThumbnailFile] = useState(null); // Cache file
   const [thumbnailPreview, setThumbnailPreview] = useState(null); // Preview URL
-
+  const [currentSubcategory, setCurrentSubcategory] = useState("");
   const [formData, setFormData] = useState({
     title: "",
     slug: "",
@@ -37,14 +41,21 @@ const AdminCreateProfessionalCertificationPage = () => {
     thumbnail: "",
     originalThumbnailUrl: "", // ADD THIS
     category: "Blockchain Fundamentals",
-    subcategory: "",
+    subcategories: [],
     level: "intermediate",
     tags: [],
     duration: 60,
     passingScore: 70,
     maxAttempts: 3,
+    questionsPerTest: 10, // NEW
+    attemptResetPrice: { usd: 2 },
+    attemptResetEnabled: true,
     certificatePrice: { usd: 5 },
     discountPrice: { usd: 0 },
+    paymentMethods: {
+      usdt: true,
+      usdc: true,
+    },
     discountEndDate: "",
     allowCopyPaste: false,
     allowTabSwitch: false,
@@ -99,7 +110,15 @@ const AdminCreateProfessionalCertificationPage = () => {
 
       setFormData({
         ...cert,
-        originalThumbnailUrl: cert.thumbnail, // CAPTURE ORIGINAL
+        originalThumbnailUrl: cert.thumbnail,
+        subcategories: cert.subcategories || [], // ADD
+        questionsPerTest: cert.questionsPerTest || 10, // ADD
+        attemptResetPrice: cert.attemptResetPrice || { usd: 2 }, // ADD
+        attemptResetEnabled: cert.attemptResetEnabled !== false, // ADD
+        paymentMethods: cert.paymentMethods || {
+          usdt: true,
+          usdc: true,
+        },
       });
     } catch (error) {
       console.error("Load error:", error);
@@ -184,6 +203,25 @@ const AdminCreateProfessionalCertificationPage = () => {
     setFormData({
       ...formData,
       tags: formData.tags.filter((tag) => tag !== tagToRemove),
+    });
+  };
+  const addSubcategory = () => {
+    if (!currentSubcategory.trim()) return;
+    if (formData.subcategories.includes(currentSubcategory.trim())) {
+      toast.error("Subcategory already added");
+      return;
+    }
+    setFormData({
+      ...formData,
+      subcategories: [...formData.subcategories, currentSubcategory.trim()],
+    });
+    setCurrentSubcategory("");
+  };
+
+  const removeSubcategory = (sub) => {
+    setFormData({
+      ...formData,
+      subcategories: formData.subcategories.filter((s) => s !== sub),
     });
   };
 
@@ -558,7 +596,7 @@ const AdminCreateProfessionalCertificationPage = () => {
                 </div>
 
                 {/* Category, Subcategory & Level */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
                       Category *
@@ -584,20 +622,44 @@ const AdminCreateProfessionalCertificationPage = () => {
 
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                      Subcategory
+                      Subcategories (Multiple allowed)
                     </label>
-                    <input
-                      type="text"
-                      value={formData.subcategory}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          subcategory: e.target.value,
-                        })
-                      }
-                      placeholder="e.g., Bitcoin, Ethereum"
-                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-500 outline-none transition"
-                    />
+                    <div className="flex items-center space-x-2 mb-3">
+                      <input
+                        type="text"
+                        value={currentSubcategory}
+                        onChange={(e) => setCurrentSubcategory(e.target.value)}
+                        onKeyPress={(e) =>
+                          e.key === "Enter" && addSubcategory()
+                        }
+                        placeholder="e.g., Bitcoin, DeFi, NFTs"
+                        className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-500 outline-none transition"
+                      />
+                      <button
+                        onClick={addSubcategory}
+                        type="button"
+                        className="px-6 py-3 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.subcategories.map((sub) => (
+                        <span
+                          key={sub}
+                          className="inline-flex items-center space-x-2 px-3 py-1 bg-blue-500/10 text-blue-500 rounded-lg text-sm font-medium"
+                        >
+                          <span>{sub}</span>
+                          <button
+                            onClick={() => removeSubcategory(sub)}
+                            type="button"
+                            className="hover:text-blue-600"
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   <div>
@@ -970,7 +1032,7 @@ const AdminCreateProfessionalCertificationPage = () => {
 
           {/* Sidebar - Settings */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24 space-y-6">
+            <div className="sticky top-8 space-y-6">
               {/* Test Settings */}
               <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-2xl p-6">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
@@ -1035,6 +1097,28 @@ const AdminCreateProfessionalCertificationPage = () => {
                       }
                       className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                      <Target className="w-4 h-4 inline mr-2" />
+                      Questions Per Test
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.questionsPerTest}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          questionsPerTest: parseInt(e.target.value) || 10,
+                        })
+                      }
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Random questions shown per attempt
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1109,6 +1193,106 @@ const AdminCreateProfessionalCertificationPage = () => {
                       className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Attempt Reset Settings - ADD THIS ENTIRE BLOCK */}
+              <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                  <Shield className="w-4 h-4 inline mr-2" />
+                  Attempt Reset Settings
+                </h3>
+
+                <div className="space-y-4">
+                  <label className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      Enable Attempt Reset
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={formData.attemptResetEnabled}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          attemptResetEnabled: e.target.checked,
+                        })
+                      }
+                      className="w-5 h-5"
+                    />
+                  </label>
+
+                  {formData.attemptResetEnabled && (
+                    <div>
+                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                        Reset Price (USD)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.attemptResetPrice.usd}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            attemptResetPrice: {
+                              usd: parseFloat(e.target.value) || 0,
+                            },
+                          })
+                        }
+                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Methods - ADD THIS ENTIRE BLOCK */}
+              <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+                  <DollarSign className="w-4 h-4 inline mr-2" />
+                  Payment Methods
+                </h3>
+
+                <div className="space-y-4">
+                  <label className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      USDT
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={formData.paymentMethods.usdt}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          paymentMethods: {
+                            ...formData.paymentMethods,
+                            usdt: e.target.checked,
+                          },
+                        })
+                      }
+                      className="w-5 h-5"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      USDC
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={formData.paymentMethods.usdc}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          paymentMethods: {
+                            ...formData.paymentMethods,
+                            usdc: e.target.checked,
+                          },
+                        })
+                      }
+                      className="w-5 h-5"
+                    />
+                  </label>
                 </div>
               </div>
 
@@ -1210,40 +1394,38 @@ const AdminCreateProfessionalCertificationPage = () => {
                   </label>
                 </div>
               </div>
+            </div>
 
-              {/* Summary */}
-              <div className="bg-gradient-to-br from-primary-500 to-purple-600 rounded-2xl p-6 text-white">
-                <h3 className="text-lg font-bold mb-4">Summary</h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/80">Questions:</span>
-                    <span className="font-bold">
-                      {formData.questions.length}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/80">Total Points:</span>
-                    <span className="font-bold">
-                      {formData.questions.reduce(
-                        (sum, q) => sum + (q.points || 1),
-                        0
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/80">Duration:</span>
-                    <span className="font-bold">{formData.duration} min</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/80">Passing Score:</span>
-                    <span className="font-bold">{formData.passingScore}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/80">Certificate Price:</span>
-                    <span className="font-bold">
-                      ${formData.certificatePrice.usd}
-                    </span>
-                  </div>
+            {/* Summary */}
+            <div className="bg-gradient-to-br from-primary-500 to-purple-600 rounded-2xl p-6 text-white">
+              <h3 className="text-lg font-bold mb-4">Summary</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80">Questions:</span>
+                  <span className="font-bold">{formData.questions.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80">Total Points:</span>
+                  <span className="font-bold">
+                    {formData.questions.reduce(
+                      (sum, q) => sum + (q.points || 1),
+                      0
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80">Duration:</span>
+                  <span className="font-bold">{formData.duration} min</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80">Passing Score:</span>
+                  <span className="font-bold">{formData.passingScore}%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80">Certificate Price:</span>
+                  <span className="font-bold">
+                    ${formData.certificatePrice.usd}
+                  </span>
                 </div>
               </div>
             </div>

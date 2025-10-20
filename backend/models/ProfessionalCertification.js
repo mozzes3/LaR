@@ -51,6 +51,16 @@ const professionalCertificationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    paymentMethods: {
+      usdt: {
+        type: Boolean,
+        default: true,
+      },
+      usdc: {
+        type: Boolean,
+        default: true,
+      },
+    },
     subcategories: [String], // CHANGED: Now array instead of single subcategory
     level: {
       type: String,

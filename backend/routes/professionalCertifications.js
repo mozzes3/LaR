@@ -1,55 +1,45 @@
 const express = require("express");
 const router = express.Router();
-const { authenticate, optionalAuth } = require("../middleware/auth");
+const { authenticate } = require("../middleware/auth");
 const profCertController = require("../controllers/professionalCertificationController");
-const profCertificateController = require("../controllers/professionalCertificateController");
 
-// ===== PROFESSIONAL CERTIFICATIONS (TESTS) =====
+// Public routes
+router.get("/", profCertController.getAllCertifications);
+router.get("/:slug", profCertController.getCertificationDetails);
 
+// Protected routes
 router.post("/start-test", authenticate, profCertController.startTestAttempt);
 router.post("/submit-test", authenticate, profCertController.submitTestAttempt);
-
-// ===== ATTEMPTS (MUST BE BEFORE /:slug) =====
 router.get(
   "/attempts/my-attempts",
   authenticate,
   profCertController.getMyAttempts
 );
-
 router.get(
   "/attempts/:attemptId",
   authenticate,
   profCertController.getAttemptDetails
 );
+router.post("/reset-attempts", authenticate, profCertController.resetAttempts);
 
-// ===== CERTIFICATES (MUST BE BEFORE /:slug) =====
+// Certificate routes
+router.post("/certificates/purchase", authenticate, (req, res, next) => {
+  console.log("✅ Certificate purchase route hit");
+  profCertController.purchaseCertificate(req, res, next);
+});
 router.get(
   "/certificates/eligible",
   authenticate,
-  profCertificateController.getEligibleCertificates
+  profCertController.getEligibleCertificates
 );
-
 router.get(
   "/certificates/my-certificates",
   authenticate,
-  profCertificateController.getMyCertificates
+  profCertController.getMyCertificates
 );
-
-router.post(
-  "/certificates/purchase",
-  authenticate,
-  profCertificateController.purchaseCertificate
-);
-
 router.get(
   "/certificates/verify/:certificateNumber",
-  profCertificateController.verifyCertificate
+  profCertController.verifyCertificate
 );
-router.post("/reset-attempts", authenticate, profCertController.resetAttempts);
-
-// ===== GENERAL ROUTES (/:slug MUST BE LAST) =====
-router.get("/", profCertController.getAllCertifications);
-
-router.get("/:slug", optionalAuth, profCertController.getCertificationDetails);
 
 module.exports = router;

@@ -370,6 +370,8 @@ export const professionalCertificationApi = {
     api.get(
       `/professional-certifications/certificates/verify/${certificateNumber}`
     ),
+  resetAttempts: (data) =>
+    api.post("/professional-certifications/reset-attempts", data),
 };
 
 // Admin Professional Certifications API
@@ -397,5 +399,9 @@ export const adminProfessionalCertificationApi = {
       `/admin/professional-certifications/certificates/${id}/revoke`,
       data
     ),
+  purchaseCertificate: (data) =>
+    api.post("/professional-certifications/certificates/purchase", data),
+  getEligibleCertificates: () =>
+    api.get("/professional-certifications/certificates/eligible"),
 };
 export default api;

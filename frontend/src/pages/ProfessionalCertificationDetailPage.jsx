@@ -182,7 +182,8 @@ const ProfessionalCertificationDetailPage = () => {
                   <div>
                     <p className="text-sm text-gray-500 mb-1">Questions</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {certification.totalQuestions}
+                      {certification.questionsPerTest ||
+                        certification.totalQuestions}
                     </p>
                   </div>
                 </div>
@@ -480,7 +481,11 @@ const ProfessionalCertificationDetailPage = () => {
               </div>
               <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
                 <Target className="w-4 h-4" />
-                <span>{certification.totalQuestions} questions</span>
+                <span>
+                  {certification.questionsPerTest ||
+                    certification.totalQuestions}{" "}
+                  questions
+                </span>
               </div>
               <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
                 <TrendingUp className="w-4 h-4" />

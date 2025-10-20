@@ -294,7 +294,7 @@ const ProfessionalCertificationsPage = () => {
                       <div className="flex items-center space-x-2 text-sm">
                         <Target className="w-4 h-4 text-gray-400" />
                         <span className="text-gray-600 dark:text-gray-400">
-                          {cert.totalQuestions} questions
+                          {cert.questionsPerTest} questions
                         </span>
                       </div>
                     </div>

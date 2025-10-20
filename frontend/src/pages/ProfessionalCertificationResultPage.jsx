@@ -19,36 +19,22 @@ import {
   Zap,
 } from "lucide-react";
 import { professionalCertificationApi } from "@services/api";
+import PremiumCertificatePurchaseModal from "@components/PremiumCertificatePurchaseModal";
 import toast from "react-hot-toast";
 
 const ProfessionalCertificationResultPage = () => {
   const { attemptId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // STATE
   const [attempt, setAttempt] = useState(null);
   const [certification, setCertification] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [hasCertificate, setHasCertificate] = useState(false);
 
-  useEffect(() => {
-    loadAttemptDetails();
-  }, [attemptId]);
-
-  const loadAttemptDetails = async () => {
-    try {
-      const response = await professionalCertificationApi.getAttemptDetails(
-        attemptId
-      );
-      setAttempt(response.data.attempt);
-      setCertification(response.data.certification);
-      console.log("Certification data:", response.data.certification); // Debug log
-    } catch (error) {
-      console.error("Load attempt error:", error);
-      toast.error("Failed to load results");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // HELPER FUNCTIONS (define before using)
   const formatDuration = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -82,6 +68,54 @@ const ProfessionalCertificationResultPage = () => {
     return XCircle;
   };
 
+  // API FUNCTIONS
+  const loadAttemptDetails = async () => {
+    try {
+      const response = await professionalCertificationApi.getAttemptDetails(
+        attemptId
+      );
+      setAttempt(response.data.attempt);
+      setCertification(response.data.certification);
+    } catch (error) {
+      console.error("Load attempt error:", error);
+      toast.error("Failed to load results");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkCertificateStatus = async () => {
+    if (!certification) return;
+
+    try {
+      const response = await professionalCertificationApi.getMyCertificates();
+      const hasCert = response.data.certificates.some(
+        (cert) => cert.certification._id === certification._id
+      );
+      setHasCertificate(hasCert);
+    } catch (error) {
+      console.error("Check certificate error:", error);
+    }
+  };
+
+  const handlePurchaseSuccess = (certificate) => {
+    setHasCertificate(true);
+    setShowPurchaseModal(false);
+    toast.success("Certificate purchased successfully!");
+  };
+
+  // EFFECTS
+  useEffect(() => {
+    loadAttemptDetails();
+  }, [attemptId]);
+
+  useEffect(() => {
+    if (attempt?.passed && certification) {
+      checkCertificateStatus();
+    }
+  }, [attempt?.passed, certification?._id]);
+
+  // LOADING STATE
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
@@ -95,6 +129,7 @@ const ProfessionalCertificationResultPage = () => {
     );
   }
 
+  // ERROR STATE
   if (!attempt || !certification) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
@@ -114,7 +149,8 @@ const ProfessionalCertificationResultPage = () => {
     );
   }
 
-  const passed = attempt.passed;
+  // COMPUTED VALUES (after null checks)
+  const passed = attempt?.passed || false;
   const GradeIcon = getGradeIcon(attempt.grade);
   const accuracyRate = (
     (attempt.correctAnswers / attempt.totalQuestions) *
@@ -174,12 +210,11 @@ const ProfessionalCertificationResultPage = () => {
                   )}
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                  Certificate of Competency Assessment
-                  {certification.subcategory
-                    ? ` • ${certification.subcategory}`
-                    : certification.category
-                    ? ` • ${certification.category}`
-                    : ""}
+                  Certificate of Competency Assessment •{" "}
+                  {certification.category}
+                  {certification.subcategories &&
+                    certification.subcategories.length > 0 &&
+                    ` • ${certification.subcategories.join(" | ")}`}
                 </p>
               </div>
 
@@ -447,17 +482,32 @@ const ProfessionalCertificationResultPage = () => {
 
             {/* Actions */}
             <div className="flex gap-3">
-              {passed ? (
+              {passed && !hasCertificate && (
                 <button
-                  onClick={() => navigate("/certificates")}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl font-semibold hover:bg-gray-800 dark:hover:bg-gray-100 transition-all group"
+                  onClick={() => setShowPurchaseModal(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-primary-500 to-purple-600 text-white rounded-xl font-bold hover:shadow-xl hover:shadow-primary-500/30 transition-all group"
                 >
-                  <Award className="w-4 h-4" />
-                  Claim Certificate
-                  <span className="text-xs opacity-75">($5)</span>
+                  <Award className="w-5 h-5 group-hover:scale-110 transition" />
+                  Purchase Certificate
+                  <span className="text-sm opacity-90">
+                    ${certification.certificatePrice?.usd || 5}
+                  </span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </button>
-              ) : (
+              )}
+
+              {passed && hasCertificate && (
+                <button
+                  onClick={() => navigate("/certificates")}
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-green-500/20 border-2 border-green-500 text-green-500 rounded-xl font-bold hover:bg-green-500/30 transition-all group"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  Certificate Purchased
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+              )}
+
+              {!passed &&
                 certification.maxAttempts - attempt.attemptNumber > 0 && (
                   <button
                     onClick={() =>
@@ -471,8 +521,7 @@ const ProfessionalCertificationResultPage = () => {
                     Retake Assessment
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                   </button>
-                )
-              )}
+                )}
               <button
                 onClick={() => navigate("/professional-certifications")}
                 className="px-6 py-3.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-900 transition"
@@ -520,6 +569,19 @@ const ProfessionalCertificationResultPage = () => {
           </div>
         )}
       </div>
+
+      {/* Premium Purchase Modal */}
+      {showPurchaseModal && attempt && certification && (
+        <>
+          {console.log("🚀 Opening modal with:", { attempt, certification })}
+          <PremiumCertificatePurchaseModal
+            attempt={attempt}
+            certification={certification}
+            onClose={() => setShowPurchaseModal(false)}
+            onSuccess={handlePurchaseSuccess}
+          />
+        </>
+      )}
     </div>
   );
 };

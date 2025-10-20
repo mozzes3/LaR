@@ -3,9 +3,16 @@ const ProfessionalCertification = require("../models/ProfessionalCertification")
 const CertificationAttempt = require("../models/CertificationAttempt");
 const ProfessionalCertificate = require("../models/ProfessionalCertificate");
 const AttemptReset = require("../models/AttemptReset");
+const {
+  createProfessionalCertificateImage,
+} = require("./professionalCertificateController");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const FormData = require("form-data");
+const { createCanvas, loadImage } = require("canvas");
+const path = require("path");
 const crypto = require("crypto");
+const axios = require("axios");
 
 /**
  * ANTI-CHEAT: Server-side session management
@@ -17,6 +24,19 @@ const activeStartRequests = new Set();
  * Get all published professional certifications
  * PUBLIC - No auth required for browsing
  */
+/**
+ * Generate unique certificate number
+ * Format: LA-COC-YYYY-XXXXXX (Certificate of Competency)
+ */
+const generateCertificateNumber = () => {
+  const year = new Date().getFullYear();
+  const random = crypto.randomBytes(3).toString("hex").toUpperCase();
+  return `LA-COC-${year}-${random}`;
+};
+const generateVerificationCode = () => {
+  return crypto.randomBytes(4).toString("hex").toUpperCase();
+};
+
 const getAllCertifications = async (req, res) => {
   try {
     const { category, level, search, page = 1, limit = 12 } = req.query;
@@ -564,8 +584,10 @@ const getAttemptDetails = async (req, res) => {
     res.json({
       success: true,
       attempt: {
+        _id: attempt._id,
         attemptNumber: attempt.attemptNumber,
         score: attempt.score,
+        grade: attempt.grade,
         passed: attempt.passed,
         correctAnswers: attempt.correctAnswers,
         totalQuestions: attempt.totalQuestions,
@@ -688,6 +710,282 @@ const calculateAverageScore = async (certificationId) => {
   return result[0]?.averageScore || 0;
 };
 
+const purchaseCertificate = async (req, res) => {
+  try {
+    const { attemptId, paymentMethod, transactionHash } = req.body;
+    const userId = req.userId;
+
+    console.log("📝 Purchase request:", { attemptId, paymentMethod, userId });
+
+    // Get attempt with all populated data
+    const attempt = await CertificationAttempt.findById(attemptId)
+      .populate("certification")
+      .populate("user", "username displayName email walletAddress");
+
+    console.log("🔍 Found attempt:", attempt ? "YES" : "NO");
+
+    if (!attempt) {
+      console.log("❌ Attempt not found for ID:", attemptId);
+      return res.status(404).json({ error: "Attempt not found" });
+    }
+
+    // Fix user comparison - handle both ObjectId and populated object
+    const attemptUserId = attempt.user._id || attempt.user;
+
+    console.log("👤 Comparing users:", {
+      attemptUserId: attemptUserId.toString(),
+      currentUserId: userId.toString(),
+    });
+
+    if (attemptUserId.toString() !== userId.toString()) {
+      console.log("❌ Unauthorized: User mismatch");
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    if (!attempt.passed) {
+      return res.status(400).json({ error: "Test not passed" });
+    }
+
+    // Check if certificate already exists
+    const existingCert = await ProfessionalCertificate.findOne({
+      userId: userId,
+      certificationId: attempt.certification._id,
+      status: { $ne: "revoked" },
+    })
+      .populate("certificationId", "title thumbnail category subcategories")
+      .populate("userId", "username displayName avatar");
+
+    if (existingCert) {
+      console.log("📜 Certificate already exists, returning existing one");
+      return res.json({
+        success: true,
+        certificate: existingCert,
+        message: "Certificate already purchased",
+        alreadyExists: true,
+      });
+    }
+    // Generate certificate number
+    const certificateNumber = generateCertificateNumber();
+
+    // Generate certificate image
+    const studentName = attempt.user.displayName || attempt.user.username;
+    const certificationData = {
+      certificateNumber,
+      studentName,
+      certificationTitle: attempt.certification.title,
+      category: attempt.certification.category,
+      subcategories: attempt.certification.subcategories,
+      level: attempt.certification.level,
+      score: attempt.score,
+      grade: attempt.grade,
+      correctAnswers: attempt.correctAnswers,
+      totalQuestions: attempt.totalQuestions,
+      completedDate: attempt.completedAt,
+      designedBy: attempt.certification.designedBy,
+      auditedBy: attempt.certification.auditedBy,
+    };
+
+    const certificateBuffer = await createProfessionalCertificateImage(
+      certificationData
+    );
+
+    // Upload to Bunny CDN
+    const filename = `${certificateNumber}.png`;
+    let certificateUrl;
+
+    try {
+      console.log("📤 Uploading certificate to Bunny CDN...");
+
+      const uploadResponse = await axios.put(
+        `https://storage.bunnycdn.com/${process.env.BUNNY_ZONE_CERTIFICATES}/${filename}`,
+        certificateBuffer,
+        {
+          headers: {
+            AccessKey: process.env.BUNNY_STORAGE_PASSWORD_CERTIFICATES,
+            "Content-Type": "image/png",
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        }
+      );
+
+      certificateUrl = `${process.env.BUNNY_CDN_CERTIFICATES}/${filename}`;
+      console.log("✅ Certificate uploaded:", certificateUrl);
+    } catch (uploadError) {
+      console.error(
+        "❌ Certificate upload error:",
+        uploadError.response?.data || uploadError.message
+      );
+      throw new Error("Failed to upload certificate");
+    }
+
+    const verificationUrl = `${
+      process.env.FRONTEND_URL || "http://localhost:3000"
+    }/certificates/verify/${certificateNumber}`;
+
+    const certificate = await ProfessionalCertificate.create({
+      // Required fields from model
+      userId: userId,
+      certificationId: attempt.certification._id,
+      attemptId: attemptId,
+      studentName: studentName,
+      studentWallet: attempt.user.walletAddress || "N/A",
+      certificationTitle: attempt.certification.title,
+      completedDate: attempt.completedAt,
+      issuedDate: new Date(),
+      verificationUrl: verificationUrl,
+      verificationCode: verificationCode,
+
+      // Certificate details
+      certificateNumber,
+      certificateUrl,
+      grade: attempt.grade || "Pass",
+      score: attempt.score,
+
+      // Payment details
+      paymentAmount: attempt.certification.certificatePrice.usd,
+      paymentCurrency: "USD",
+      paymentMethod,
+      transactionHash,
+      paid: true,
+
+      // Status
+      isValid: true,
+      status: "active",
+      blockchainVerified: false,
+
+      // Optional metadata
+      metadata: {
+        correctAnswers: attempt.correctAnswers,
+        totalQuestions: attempt.totalQuestions,
+        attemptNumber: attempt.attemptNumber,
+        category: attempt.certification.category,
+        subcategories: attempt.certification.subcategories,
+        level: attempt.certification.level,
+      },
+    });
+
+    // Mark attempt as certificate issued
+    attempt.certificateIssued = true;
+    await attempt.save();
+
+    // TODO: Record on blockchain (implement later)
+    // const blockchainTx = await recordCertificateOnChain(certificate);
+    // certificate.blockchainVerified = true;
+    // certificate.blockchainTxHash = blockchainTx.hash;
+    // await certificate.save();
+
+    // Populate certificate for response
+    const populatedCert = await ProfessionalCertificate.findById(
+      certificate._id
+    )
+      .populate("certificationId", "title thumbnail category subcategories")
+      .populate("userId", "username displayName avatar");
+
+    res.json({
+      success: true,
+      certificate: populatedCert,
+      message: "Certificate purchased and generated successfully",
+    });
+  } catch (error) {
+    console.error("Purchase certificate error:", error);
+    res.status(500).json({
+      error: "Failed to purchase certificate",
+      details: error.message,
+    });
+  }
+};
+
+const getEligibleCertificates = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const passedAttempts = await CertificationAttempt.find({
+      user: userId,
+      passed: true,
+      status: "completed",
+    }).populate(
+      "certification",
+      "title thumbnail category subcategories certificatePrice"
+    );
+
+    const purchased = await ProfessionalCertificate.find({
+      user: userId,
+      status: { $ne: "revoked" },
+    }).select("certification");
+
+    const purchasedIds = purchased.map((p) => p.certification.toString());
+
+    const eligible = passedAttempts.filter(
+      (attempt) => !purchasedIds.includes(attempt.certification._id.toString())
+    );
+
+    res.json({
+      success: true,
+      eligible: eligible.map((a) => ({
+        attemptId: a._id,
+        certification: a.certification,
+        score: a.score,
+        passedAt: a.completedAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Get eligible error:", error);
+    res.status(500).json({ error: "Failed to fetch eligible certificates" });
+  }
+};
+
+const getMyCertificates = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const certificates = await ProfessionalCertificate.find({
+      user: userId,
+      status: { $ne: "revoked" },
+    })
+      .populate("certification", "title thumbnail category subcategories")
+      .populate("user", "username displayName avatar")
+      .sort({ issueDate: -1 });
+
+    res.json({
+      success: true,
+      certificates,
+    });
+  } catch (error) {
+    console.error("Get my certificates error:", error);
+    res.status(500).json({ error: "Failed to fetch certificates" });
+  }
+};
+
+const verifyCertificate = async (req, res) => {
+  try {
+    const { certificateNumber } = req.params;
+
+    const certificate = await ProfessionalCertificate.findOne({
+      certificateNumber,
+      isValid: true,
+      status: "active",
+    })
+      .populate("certification", "title category subcategories")
+      .populate("user", "username displayName avatar");
+
+    if (!certificate) {
+      return res
+        .status(404)
+        .json({ error: "Certificate not found or invalid" });
+    }
+
+    res.json({
+      success: true,
+      certificate,
+      verified: true,
+    });
+  } catch (error) {
+    console.error("Verify certificate error:", error);
+    res.status(500).json({ error: "Failed to verify certificate" });
+  }
+};
+
 module.exports = {
   getAllCertifications,
   getCertificationDetails,
@@ -696,4 +994,8 @@ module.exports = {
   getMyAttempts,
   getAttemptDetails,
   resetAttempts,
+  purchaseCertificate,
+  getEligibleCertificates,
+  getMyCertificates,
+  verifyCertificate,
 };

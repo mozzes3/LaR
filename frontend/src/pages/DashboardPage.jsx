@@ -163,6 +163,7 @@ const DashboardPage = () => {
 
     loadDashboardData();
   }, [walletUser]);
+
   // Helper functions
   const formatLastWatched = (date) => {
     if (!date) return "Not started yet";
@@ -306,6 +307,21 @@ const DashboardPage = () => {
       course.instructor.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  useEffect(() => {
+    const scrollContainer = document.getElementById("courses-scroll-container");
+    if (!scrollContainer) return;
+
+    const handleWheel = (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        scrollContainer.scrollLeft += e.deltaY;
+      }
+    };
+
+    scrollContainer.addEventListener("wheel", handleWheel, { passive: false });
+    return () => scrollContainer.removeEventListener("wheel", handleWheel);
+  }, [filteredCourses]);
 
   // Loading state
   if (loading) {
@@ -582,126 +598,137 @@ const DashboardPage = () => {
               </div>
             </div>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCourses.map((course) => (
-              <div
-                key={course.id}
-                className="bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden hover:shadow-lg transition group flex flex-col"
-              >
-                <div className="relative">
-                  <img
-                    src={course.thumbnail}
-                    alt={course.title}
-                    className="w-full h-40 object-cover"
-                  />
-                  {course.status === "completed" ? (
-                    <div className="absolute top-3 right-3 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-lg flex items-center space-x-1">
-                      <CheckCircle className="w-3 h-3" />
-                      <span>Completed</span>
-                    </div>
-                  ) : (
-                    <div className="absolute top-3 right-3 px-3 py-1 bg-black/70 backdrop-blur-sm text-white text-xs font-bold rounded-lg">
-                      {course.progress}%
-                    </div>
-                  )}
-                  <button
-                    onClick={() => navigate(`/courses/${course.slug}/learn`)}
-                    className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+          <div className="relative">
+            <div
+              id="courses-scroll-container"
+              className="flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-600 cursor-grab active:cursor-grabbing"
+            >
+              {filteredCourses.map((course) => (
+                <div key={course._id} className="flex-shrink-0 w-80">
+                  <div
+                    key={course.id}
+                    className="bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden hover:shadow-lg transition group flex flex-col"
                   >
-                    <div className="w-16 h-16 bg-primary-400 rounded-full flex items-center justify-center">
-                      <Play className="w-8 h-8 text-black ml-1" />
-                    </div>
-                  </button>
-                </div>
-                <div className="p-4 flex flex-col flex-1">
-                  <h3 className="font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-primary-400 transition">
-                    {course.title}
-                  </h3>
-                  <div className="flex items-center space-x-2 mb-3">
-                    <img
-                      src={course.instructorAvatar}
-                      alt={course.instructor}
-                      className="w-5 h-5 rounded-full"
-                    />
-                    <span className="text-sm text-gray-500">
-                      {course.instructor}
-                    </span>
-                  </div>
-                  {/* Flexible spacer - pushes content to bottom */}
-                  <div className="flex-1" />
-                  {course.status === "in-progress" && (
-                    <>
-                      <div className="mb-3">
-                        <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                          <span>
-                            {course.completedLessons} / {course.totalLessons}{" "}
-                            lessons
-                          </span>
-                          <span>{course.progress}%</span>
+                    <div className="relative">
+                      <img
+                        src={course.thumbnail}
+                        alt={course.title}
+                        className="w-full h-40 object-cover"
+                      />
+                      {course.status === "completed" ? (
+                        <div className="absolute top-3 right-3 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-lg flex items-center space-x-1">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>Completed</span>
                         </div>
-                        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all"
-                            style={{ width: `${course.progress}%` }}
-                          />
+                      ) : (
+                        <div className="absolute top-3 right-3 px-3 py-1 bg-black/70 backdrop-blur-sm text-white text-xs font-bold rounded-lg">
+                          {course.progress}%
                         </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mb-3">
-                        Current: {course.currentLesson}
-                      </p>
+                      )}
                       <button
                         onClick={() =>
                           navigate(`/courses/${course.slug}/learn`)
                         }
-                        className="w-full py-2 bg-primary-400 text-black rounded-lg font-bold hover:bg-primary-500 transition flex items-center justify-center space-x-2"
+                        className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
                       >
-                        <Play className="w-4 h-4" />
-                        <span>Continue Learning</span>
+                        <div className="w-16 h-16 bg-primary-400 rounded-full flex items-center justify-center">
+                          <Play className="w-8 h-8 text-black ml-1" />
+                        </div>
                       </button>
-                    </>
-                  )}
-                  {course.status === "completed" && (
-                    <>
-                      <div className="flex items-center space-x-1 mb-3">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${
-                              i < Math.floor(course.rating)
-                                ? "fill-primary-400 text-primary-400"
-                                : "text-gray-300"
-                            }`}
-                          />
-                        ))}
-                        <span className="text-sm text-gray-500 ml-1">
-                          {course.rating}
+                    </div>
+                    <div className="p-4 flex flex-col flex-1">
+                      <h3 className="font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-primary-400 transition">
+                        {course.title}
+                      </h3>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <img
+                          src={course.instructorAvatar}
+                          alt={course.instructor}
+                          className="w-5 h-5 rounded-full"
+                        />
+                        <span className="text-sm text-gray-500">
+                          {course.instructor}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => handleViewCertificate(course.id)}
-                          disabled={loadingCertificate}
-                          className="py-2 bg-primary-400 text-black rounded-lg font-bold hover:bg-primary-500 transition text-sm flex items-center justify-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Award className="w-4 h-4" />
-                          <span>
-                            {loadingCertificate ? "Loading..." : "Certificate"}
-                          </span>
-                        </button>
-                        <button
-                          onClick={() =>
-                            navigate(`/courses/${course.slug}/learn`)
-                          }
-                          className="py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg font-bold hover:border-primary-400 transition text-sm"
-                        >
-                          Rewatch
-                        </button>
-                      </div>
-                    </>
-                  )}
+                      {/* Flexible spacer - pushes content to bottom */}
+                      <div className="flex-1" />
+                      {course.status === "in-progress" && (
+                        <>
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                              <span>
+                                {course.completedLessons} /{" "}
+                                {course.totalLessons} lessons
+                              </span>
+                              <span>{course.progress}%</span>
+                            </div>
+                            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all"
+                                style={{ width: `${course.progress}%` }}
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-500 mb-3">
+                            Current: {course.currentLesson}
+                          </p>
+                          <button
+                            onClick={() =>
+                              navigate(`/courses/${course.slug}/learn`)
+                            }
+                            className="w-full py-2 bg-primary-400 text-black rounded-lg font-bold hover:bg-primary-500 transition flex items-center justify-center space-x-2"
+                          >
+                            <Play className="w-4 h-4" />
+                            <span>Continue Learning</span>
+                          </button>
+                        </>
+                      )}
+                      {course.status === "completed" && (
+                        <>
+                          <div className="flex items-center space-x-1 mb-3">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-4 h-4 ${
+                                  i < Math.floor(course.rating)
+                                    ? "fill-primary-400 text-primary-400"
+                                    : "text-gray-300"
+                                }`}
+                              />
+                            ))}
+                            <span className="text-sm text-gray-500 ml-1">
+                              {course.rating}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => handleViewCertificate(course.id)}
+                              disabled={loadingCertificate}
+                              className="py-2 bg-primary-400 text-black rounded-lg font-bold hover:bg-primary-500 transition text-sm flex items-center justify-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Award className="w-4 h-4" />
+                              <span>
+                                {loadingCertificate
+                                  ? "Loading..."
+                                  : "Certificate"}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() =>
+                                navigate(`/courses/${course.slug}/learn`)
+                              }
+                              className="py-2 border-2 border-gray-200 dark:border-gray-700 rounded-lg font-bold hover:border-primary-400 transition text-sm"
+                            >
+                              Rewatch
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
           {filteredCourses.length === 0 && (
             <div className="text-center py-12">

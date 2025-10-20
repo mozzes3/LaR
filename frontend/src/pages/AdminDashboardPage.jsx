@@ -12,7 +12,7 @@ import {
   Shield,
   Award,
 } from "lucide-react";
-import { adminApi } from "@services/api";
+import { adminApi, adminProfessionalCertificationApi } from "@services/api";
 import toast from "react-hot-toast";
 
 const AdminDashboardPage = () => {
@@ -26,6 +26,7 @@ const AdminDashboardPage = () => {
     pendingReviews: 0,
     pendingApplications: 0,
     flaggedReviews: 0,
+    totalCertifications: 0,
   });
 
   useEffect(() => {
@@ -35,8 +36,15 @@ const AdminDashboardPage = () => {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const response = await adminApi.getDashboardStats();
-      setStats(response.data.stats);
+      const [dashboardStats, certStats] = await Promise.all([
+        adminApi.getDashboardStats(),
+        adminProfessionalCertificationApi.getDashboardStats(),
+      ]);
+
+      setStats({
+        ...dashboardStats.data.stats,
+        totalCertifications: certStats.data.stats.totalCertifications || 0,
+      });
     } catch (error) {
       console.error("Load stats error:", error);
       toast.error("Failed to load dashboard stats");
@@ -44,7 +52,6 @@ const AdminDashboardPage = () => {
       setLoading(false);
     }
   };
-
   const statCards = [
     {
       title: "Total Users",
