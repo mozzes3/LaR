@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import CertificateViewModal from "@components/CertificateViewModal";
 import {
   Award,
@@ -20,7 +20,6 @@ import {
   Sparkles,
   Eye,
   Lock,
-  Plus,
   Target,
   Clock,
   ArrowRight,
@@ -36,10 +35,10 @@ const CertificatesPage = () => {
   const { user } = useWallet();
 
   // Tab state
-  const [activeTab, setActiveTab] = useState("all"); // all, completion, competency
-  const [competencySubTab, setCompetencySubTab] = useState("certificates"); // certificates, attempts
+  const [activeTab, setActiveTab] = useState("all");
+  const [competencySubTab, setCompetencySubTab] = useState("certificates");
 
-  // Course Certificates (Completion)
+  // Course Certificates
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -48,38 +47,36 @@ const CertificatesPage = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingCertificate, setViewingCertificate] = useState(null);
 
-  // Professional Certificates (Competency)
+  // Professional Certificates
   const [professionalCertificates, setProfessionalCertificates] = useState([]);
   const [loadingProfessional, setLoadingProfessional] = useState(true);
   const [attempts, setAttempts] = useState([]);
   const [filteredAttempts, setFilteredAttempts] = useState([]);
-  const [attemptFilter, setAttemptFilter] = useState("all"); // all, passed, failed
+  const [attemptFilter, setAttemptFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    if (!user) {
-      navigate("/");
-      return;
-    }
-    loadAllCertificates();
-  }, [user, navigate]);
+    loadCertificates();
+  }, []);
 
   useEffect(() => {
     applyAttemptFilters();
   }, [attemptFilter, categoryFilter, attempts]);
 
-  const loadAllCertificates = async () => {
-    // Load Course Certificates
+  const loadCertificates = async () => {
+    await Promise.all([loadCourseCertificates(), loadProfessionalData()]);
+  };
+
+  const loadCourseCertificates = async () => {
     try {
-      setLoadingCourse(true);
       const response = await certificateApi.getMyCertificates();
       const transformed = (response.data.certificates || []).map((cert) => ({
         id: cert._id,
         type: "completion",
         courseTitle: cert.courseTitle,
         instructor: cert.instructor,
-        instructorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cert.instructor}`,
+        instructorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cert.instructor}`, // ADD THIS LINE
         completedDate: cert.completedDate,
         certificateNumber: cert.certificateNumber,
         grade: cert.grade,
@@ -94,14 +91,17 @@ const CertificatesPage = () => {
       }));
       setCourseCertificates(transformed);
     } catch (error) {
-      console.error("Error loading course certificates:", error);
+      console.error("Error loading certificates:", error);
     } finally {
       setLoadingCourse(false);
     }
+  };
+
+  const loadProfessionalData = async () => {
+    setLoadingProfessional(true);
 
     // Load Professional Certificates
     try {
-      setLoadingProfessional(true);
       const response = await professionalCertificationApi.getMyCertificates();
       setProfessionalCertificates(response.data.certificates || []);
     } catch (error) {
@@ -167,29 +167,19 @@ const CertificatesPage = () => {
 
   const handleShareSocial = (platform) => {
     const cert = selectedCertificate;
-    const text = `I earned a certificate from Lizard Academy! 🎓`;
-    const url = cert.verificationUrl;
-
-    let shareUrl = "";
-    switch (platform) {
-      case "twitter":
-        shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
-          text
-        )}&url=${encodeURIComponent(url)}`;
-        break;
-      case "linkedin":
-        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-          url
-        )}`;
-        break;
-      case "facebook":
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-          url
-        )}`;
-        break;
-    }
-    window.open(shareUrl, "_blank", "width=600,height=400");
-    toast.success(`Sharing to ${platform}!`);
+    const text = `I earned a certificate from Lizard Academy! ${cert.verificationUrl}`;
+    const urls = {
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+        text
+      )}`,
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+        cert.verificationUrl
+      )}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+        cert.verificationUrl
+      )}`,
+    };
+    window.open(urls[platform], "_blank");
   };
 
   const getGradeColor = (grade) => {
@@ -198,8 +188,10 @@ const CertificatesPage = () => {
         return "text-purple-500 bg-purple-500/10 border-purple-500/30";
       case "excellent":
         return "text-green-500 bg-green-500/10 border-green-500/30";
-      case "good":
+      case "very good":
         return "text-blue-500 bg-blue-500/10 border-blue-500/30";
+      case "good":
+        return "text-cyan-500 bg-cyan-500/10 border-cyan-500/30";
       default:
         return "text-gray-500 bg-gray-500/10 border-gray-500/30";
     }
@@ -263,7 +255,6 @@ const CertificatesPage = () => {
   };
 
   const passedAttempts = attempts.filter((a) => a.passed);
-  const failedAttempts = attempts.filter((a) => !a.passed);
 
   // Get eligible attempts (passed but no certificate)
   const eligibleAttempts = passedAttempts.filter((attempt) => {
@@ -279,8 +270,8 @@ const CertificatesPage = () => {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">
+          <div className="w-12 h-12 border-3 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Loading certificates...
           </p>
         </div>
@@ -376,13 +367,13 @@ const CertificatesPage = () => {
             onClick={() => setActiveTab("competency")}
             className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap relative overflow-hidden ${
               activeTab === "competency"
-                ? "bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-500 text-black shadow-xl shadow-yellow-500/30"
+                ? "bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/30"
                 : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-2 border-yellow-500/30 hover:border-yellow-500"
             }`}
           >
             <div className="flex items-center gap-2 relative z-10">
               <Shield className="w-5 h-5" />
-              Professional Certificate of Competency
+              Certificate of Competency
               {activeTab === "competency" && (
                 <Sparkles className="w-4 h-4 animate-pulse" />
               )}
@@ -426,47 +417,57 @@ const CertificatesPage = () => {
                 {/* Search */}
                 <div className="mb-6">
                   <div className="relative">
-                    <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search all certificates..."
+                      placeholder="Search certificates..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
+                      className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-400/20 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
 
+                {/* Certificates Grid */}
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Professional Certificates First */}
                   {allCertificates
                     .filter((cert) =>
-                      (cert.courseTitle || cert.certificationTitle || "")
-                        .toLowerCase()
-                        .includes(searchQuery.toLowerCase())
+                      cert.type === "completion"
+                        ? cert.courseTitle
+                            .toLowerCase()
+                            .includes(searchQuery.toLowerCase())
+                        : cert.certificationTitle
+                            .toLowerCase()
+                            .includes(searchQuery.toLowerCase())
                     )
-                    .map((cert) => {
-                      if (cert.type === "completion") {
-                        return (
-                          <CompletionCertificateCard
-                            key={cert.id}
-                            cert={cert}
-                            user={user}
-                            onView={handleView}
-                            onShare={handleShare}
-                            onCopyLink={handleCopyLink}
-                            getGradeColor={getGradeColor}
-                          />
-                        );
-                      } else {
-                        return (
-                          <CompetencyCertificateCard
-                            key={cert._id}
-                            cert={cert}
-                            getCompetencyGrade={getCompetencyGrade}
-                          />
-                        );
-                      }
-                    })}
+                    .sort((a, b) => {
+                      // Sort: Certificate of Competency first, then Completion
+                      if (a.type === "competency" && b.type !== "competency")
+                        return -1;
+                      if (a.type !== "competency" && b.type === "competency")
+                        return 1;
+                      return 0;
+                    })
+                    .map((cert) =>
+                      cert.type === "completion" ? (
+                        <CompletionCertificateCard
+                          key={cert.id}
+                          cert={cert}
+                          user={user}
+                          onView={handleView}
+                          onShare={handleShare}
+                          onCopyLink={handleCopyLink}
+                          getGradeColor={getGradeColor}
+                        />
+                      ) : (
+                        <CompetencyCertificateCard
+                          key={cert._id}
+                          cert={cert}
+                          getCompetencyGrade={getCompetencyGrade}
+                        />
+                      )
+                    )}
                 </div>
               </div>
             )}
@@ -475,25 +476,7 @@ const CertificatesPage = () => {
 
         {activeTab === "completion" && (
           <div>
-            {/* Search & Filter */}
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="relative flex-1">
-                <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search certificates..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
-                />
-              </div>
-              <button className="p-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition">
-                <Filter className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Certificates Grid */}
-            {filteredCourseCertificates.length === 0 ? (
+            {courseCertificates.length === 0 ? (
               <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800">
                 <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
@@ -542,6 +525,17 @@ const CertificatesPage = () => {
                 Certificates
               </button>
               <button
+                onClick={() => setCompetencySubTab("eligible")}
+                className={`px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 ${
+                  competencySubTab === "eligible"
+                    ? "bg-yellow-500 text-black"
+                    : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-2 border-gray-200 dark:border-gray-800"
+                }`}
+              >
+                <Star className="w-4 h-4" />
+                Eligible ({eligibleAttempts.length})
+              </button>
+              <button
                 onClick={() => setCompetencySubTab("attempts")}
                 className={`px-4 py-2 rounded-lg font-bold transition ${
                   competencySubTab === "attempts"
@@ -553,11 +547,39 @@ const CertificatesPage = () => {
               </button>
             </div>
 
-            {competencySubTab === "certificates" ? (
+            {competencySubTab === "certificates" && (
               <div>
-                {/* Purchased Certificates */}
-                {professionalCertificates.length > 0 && (
-                  <div className="mb-8">
+                {professionalCertificates.length === 0 ? (
+                  <div className="text-center py-16 bg-gradient-to-br from-yellow-500/5 to-orange-500/5 border-2 border-yellow-500/30 rounded-2xl">
+                    <Shield className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                      No Certificate of Competency yet
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      Pass a professional certification test to earn your COC
+                      certificate
+                    </p>
+                    <div className="flex items-center justify-center gap-3">
+                      {eligibleAttempts.length > 0 && (
+                        <button
+                          onClick={() => setCompetencySubTab("eligible")}
+                          className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-bold hover:shadow-xl transition inline-flex items-center gap-2"
+                        >
+                          <Star className="w-5 h-5" />
+                          View Eligible ({eligibleAttempts.length})
+                        </button>
+                      )}
+                      <button
+                        onClick={() => navigate("/professional-certifications")}
+                        className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl font-bold hover:shadow-xl transition inline-flex items-center gap-2"
+                      >
+                        <Target className="w-5 h-5" />
+                        Take Professional Tests
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
                       Verified Certificates
                     </h3>
@@ -572,10 +594,31 @@ const CertificatesPage = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
 
-                {/* Eligible for Purchase */}
-                {eligibleAttempts.length > 0 && (
-                  <div className="mb-8">
+            {competencySubTab === "eligible" && (
+              <div>
+                {eligibleAttempts.length === 0 ? (
+                  <div className="text-center py-16 bg-gradient-to-br from-green-500/5 to-emerald-500/5 border-2 border-green-500/30 rounded-2xl">
+                    <Star className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                      No eligible certificates
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      Pass a professional test to become eligible for
+                      certificate purchase
+                    </p>
+                    <button
+                      onClick={() => navigate("/professional-certifications")}
+                      className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-bold hover:shadow-xl transition inline-flex items-center gap-2"
+                    >
+                      <Target className="w-5 h-5" />
+                      Take Professional Tests
+                    </button>
+                  </div>
+                ) : (
+                  <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                       <Star className="w-6 h-6 text-yellow-500" />
                       Eligible for Certificate Purchase
@@ -592,32 +635,12 @@ const CertificatesPage = () => {
                     </div>
                   </div>
                 )}
-
-                {/* No Certificates */}
-                {professionalCertificates.length === 0 &&
-                  eligibleAttempts.length === 0 && (
-                    <div className="text-center py-16 bg-gradient-to-br from-yellow-500/5 to-orange-500/5 border-2 border-yellow-500/30 rounded-2xl">
-                      <Shield className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                        No professional certificates yet
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400 mb-6">
-                        Pass a professional certification test to earn your
-                        certificate
-                      </p>
-                      <button
-                        onClick={() => navigate("/professional-certifications")}
-                        className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl font-bold hover:shadow-xl transition inline-flex items-center gap-2"
-                      >
-                        <Target className="w-5 h-5" />
-                        Take Professional Tests
-                      </button>
-                    </div>
-                  )}
               </div>
-            ) : (
+            )}
+
+            {competencySubTab === "attempts" && (
               <div>
-                {/* Filters for Attempts */}
+                {/* Filters */}
                 <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-6">
                   <div className="flex flex-col md:flex-row gap-6">
                     <div className="flex-1">
@@ -639,8 +662,8 @@ const CertificatesPage = () => {
                             onClick={() => setAttemptFilter(item.value)}
                             className={`flex-1 px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
                               attemptFilter === item.value
-                                ? "bg-gradient-to-r from-yellow-500 to-yellow-400 text-black shadow-lg"
-                                : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                                ? "bg-yellow-500 text-black shadow-lg"
+                                : "bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                             }`}
                           >
                             <item.icon className="w-4 h-4" />
@@ -650,42 +673,38 @@ const CertificatesPage = () => {
                       </div>
                     </div>
 
-                    <div className="flex-1">
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3">
-                        Category
-                      </label>
-                      <select
-                        value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-medium focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
-                      >
-                        <option value="all">All Categories</option>
-                        {categories.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {categories.length > 0 && (
+                      <div className="flex-1">
+                        <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3">
+                          Category Filter
+                        </label>
+                        <select
+                          value={categoryFilter}
+                          onChange={(e) => setCategoryFilter(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-gray-900 dark:text-white font-semibold"
+                        >
+                          <option value="all">All Categories</option>
+                          {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Attempts List */}
                 {filteredAttempts.length === 0 ? (
-                  <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-2xl p-16 text-center">
+                  <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800">
                     <Target className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                       No attempts found
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">
-                      Try adjusting your filters or take a test
+                    <p className="text-gray-500 mb-6">
+                      Start taking professional tests to see your attempts here
                     </p>
-                    <button
-                      onClick={() => navigate("/professional-certifications")}
-                      className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl font-bold hover:shadow-lg transition"
-                    >
-                      Browse Tests
-                    </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -705,8 +724,8 @@ const CertificatesPage = () => {
           </div>
         )}
 
-        {/* Modals */}
-        {showShareModal && selectedCertificate && (
+        {/* Share Modal */}
+        {showShareModal && (
           <ShareModal
             certificate={selectedCertificate}
             onClose={() => setShowShareModal(false)}
@@ -715,7 +734,8 @@ const CertificatesPage = () => {
           />
         )}
 
-        {showViewModal && viewingCertificate && (
+        {/* View Modal */}
+        {showViewModal && (
           <CertificateViewModal
             certificate={viewingCertificate}
             onClose={() => {
@@ -941,32 +961,24 @@ const CompletionCertificateCard = ({
   </div>
 );
 
-// Component: Competency Certificate Card (Purchased/Verified)
+// Component: Competency Certificate Card
 const CompetencyCertificateCard = ({ cert, getCompetencyGrade }) => {
   const grade = getCompetencyGrade(cert.score);
 
   return (
     <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500/10 via-orange-500/10 to-yellow-500/10 p-[2px] hover:scale-105 transition-all duration-300">
       <div className="bg-white dark:bg-black rounded-2xl overflow-hidden">
-        {/* Premium Certificate Preview */}
         <div className="relative aspect-video bg-gradient-to-br from-yellow-900 via-orange-900 to-yellow-900 p-6 flex flex-col overflow-hidden">
-          {/* Glowing effects */}
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 to-orange-500/20"></div>
-          <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-3xl"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/20 to-orange-600/20"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/20 rounded-full blur-3xl"></div>
 
-          {/* Gold corner ornaments */}
-          <div className="absolute top-2 left-2">
-            <div className="w-8 h-8 border-t-2 border-l-2 border-yellow-400/80 relative">
-              <div className="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
-            </div>
-          </div>
-          <div className="absolute top-2 right-2">
-            <div className="w-8 h-8 border-t-2 border-r-2 border-yellow-400/80 relative">
-              <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+          <div className="absolute top-3 right-3 z-10">
+            <div className="px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full text-[8px] font-bold text-black flex items-center gap-1 shadow-lg">
+              <Shield className="w-2.5 h-2.5" />
+              VERIFIED
             </div>
           </div>
 
-          {/* Header */}
           <div className="relative z-10 text-center mb-2">
             <div className="flex justify-center mb-1">
               <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/50">
@@ -978,71 +990,43 @@ const CompetencyCertificateCard = ({ cert, getCompetencyGrade }) => {
             </p>
           </div>
 
-          {/* Title */}
           <div className="relative z-10 flex-grow flex items-center justify-center">
             <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-4 text-center">
               {cert.certificationTitle}
             </h3>
           </div>
 
-          {/* Footer */}
           <div className="relative z-10 text-center">
-            <div className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-xl rounded-lg border border-yellow-400/30">
-              <CheckCircle className="w-3 h-3 text-yellow-400 mr-1" />
-              <span className="text-white text-[9px] font-bold">VERIFIED</span>
+            <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-lg border border-yellow-400/30">
+              <p className="text-white/70 text-[8px] tracking-wider uppercase mb-0.5">
+                Score
+              </p>
+              <p className="text-white font-bold text-[13px]">{cert.score}%</p>
             </div>
           </div>
         </div>
 
-        {/* Info */}
         <div className="p-4">
-          <div className="space-y-3 mb-4">
-            <div className="flex items-center justify-between">
-              <div
-                className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${grade.bgColor} ${grade.borderColor} ${grade.textColor}`}
-              >
-                {grade.text}
-              </div>
-              <div className="text-sm text-gray-500">
-                Score:{" "}
-                <span className="font-bold text-gray-900 dark:text-white">
-                  {cert.score}%
-                </span>
-              </div>
+          <div className="flex items-center justify-between mb-4">
+            <div
+              className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${grade.bgColor} ${grade.borderColor} ${grade.textColor}`}
+            >
+              {grade.text}
             </div>
-            <div className="flex items-center space-x-4 text-xs text-gray-500">
-              <div className="flex items-center space-x-1">
-                <Calendar className="w-3 h-3" />
-                <span>{new Date(cert.issuedDate).toLocaleDateString()}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Target className="w-3 h-3" />
-                <span>{cert.category}</span>
-              </div>
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {new Date(cert.issueDate).toLocaleDateString()}
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <button
-              onClick={() => window.open(cert.verificationUrl, "_blank")}
-              className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
-            >
-              View
-            </button>
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={async () => {
                 try {
-                  const response = await fetch(cert.templateImage);
-                  const blob = await response.blob();
-                  const url = window.URL.createObjectURL(blob);
                   const link = document.createElement("a");
-                  link.href = url;
-                  link.download = `${cert.certificateNumber}.png`;
-                  document.body.appendChild(link);
+                  link.href = cert.templateImage;
+                  link.download = `professional-certificate-${cert.certificateNumber}.png`;
                   link.click();
-                  document.body.removeChild(link);
-                  window.URL.revokeObjectURL(url);
                   toast.success("Certificate downloaded!");
                 } catch (error) {
                   toast.error("Failed to download");
@@ -1063,7 +1047,7 @@ const CompetencyCertificateCard = ({ cert, getCompetencyGrade }) => {
             </button>
           </div>
 
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-800 mt-4">
             <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
               <Lock className="w-3 h-3" />
               <span className="font-mono">{cert.certificateNumber}</span>
@@ -1089,13 +1073,10 @@ const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
   return (
     <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500/10 via-emerald-500/10 to-green-500/10 p-[2px] hover:scale-105 transition-all duration-300">
       <div className="bg-white dark:bg-black rounded-2xl overflow-hidden">
-        {/* Frosty Premium Preview */}
         <div className="relative aspect-video bg-gradient-to-br from-green-900 via-emerald-900 to-green-900 p-6 flex flex-col overflow-hidden backdrop-blur-xl">
-          {/* Frosted glass effect */}
           <div className="absolute inset-0 bg-white/5 backdrop-blur-md"></div>
           <div className="absolute top-0 right-0 w-64 h-64 bg-green-400/10 rounded-full blur-3xl"></div>
 
-          {/* Eligible Badge */}
           <div className="absolute top-3 right-3 z-10">
             <div className="px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full text-[8px] font-bold text-white flex items-center gap-1 shadow-lg">
               <Star className="w-2.5 h-2.5" />
@@ -1103,7 +1084,6 @@ const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
             </div>
           </div>
 
-          {/* Header */}
           <div className="relative z-10 text-center mb-2">
             <div className="flex justify-center mb-1">
               <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/50 animate-pulse">
@@ -1115,14 +1095,12 @@ const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
             </p>
           </div>
 
-          {/* Title */}
           <div className="relative z-10 flex-grow flex items-center justify-center">
             <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-4 text-center">
               {attempt.certification.title}
             </h3>
           </div>
 
-          {/* Score Badge */}
           <div className="relative z-10 text-center">
             <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-lg border border-green-400/30">
               <p className="text-white/70 text-[8px] tracking-wider uppercase mb-0.5">
@@ -1135,7 +1113,6 @@ const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
           </div>
         </div>
 
-        {/* Info */}
         <div className="p-4">
           <div className="space-y-3 mb-4">
             <div className="flex items-center justify-between">
@@ -1162,10 +1139,9 @@ const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
             </div>
           </div>
 
-          {/* Buy Button */}
           <button
             onClick={() =>
-              navigate(`/professional-certifications/attempts/${attempt._id}`)
+              navigate(`/professional-certifications/results/${attempt._id}`)
             }
             className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-bold hover:from-green-600 hover:to-emerald-600 hover:shadow-xl transition flex items-center justify-center gap-2"
           >
@@ -1194,7 +1170,7 @@ const AttemptCard = ({
   return (
     <div
       onClick={() =>
-        navigate(`/professional-certifications/attempts/${attempt._id}`)
+        navigate(`/professional-certifications/results/${attempt._id}`)
       }
       className="group relative overflow-hidden rounded-2xl bg-gradient-to-r p-[2px] cursor-pointer hover:scale-[1.02] transition-all duration-300"
       style={{
@@ -1221,28 +1197,30 @@ const AttemptCard = ({
             )}
           </div>
 
-          <div className="flex-1">
+          <div className="flex-grow">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1 group-hover:text-yellow-500 transition">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
                   {attempt.certification.title}
                 </h3>
-                <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <Target className="w-4 h-4" />
-                    Attempt #{attempt.attemptNumber}
-                  </span>
+                <div className="flex items-center gap-3 text-sm text-gray-500">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
                     {new Date(attempt.completedAt).toLocaleDateString()}
                   </span>
+                  {attempt.duration && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      {formatDuration(attempt.duration)}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    {formatDuration(attempt.duration)}
+                    <Target className="w-4 h-4" />
+                    Attempt #{attempt.attemptNumber}
                   </span>
                 </div>
               </div>
-              <ArrowRight className="w-6 h-6 text-gray-400 group-hover:text-yellow-500 group-hover:translate-x-1 transition" />
+              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 group-hover:translate-x-1 transition" />
             </div>
 
             <div className="grid grid-cols-3 gap-4">
@@ -1289,66 +1267,48 @@ const ShareModal = ({ certificate, onClose, onShareSocial, onCopyLink }) => (
       className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
       onClick={onClose}
     />
-    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6 z-50">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-          Share Certificate
-        </h3>
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      <div className="mb-6 p-4 bg-gradient-to-br from-primary-400 to-purple-600 rounded-xl text-center">
-        <Award className="w-12 h-12 text-white mx-auto mb-2" />
-        <p className="text-white font-bold text-sm line-clamp-2">
-          {certificate.courseTitle || certificate.certificationTitle}
-        </p>
-      </div>
-      <div className="space-y-3 mb-6">
-        <button
-          onClick={() => onShareSocial("twitter")}
-          className="w-full flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-        >
-          <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-            <Twitter className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="font-bold text-gray-900 dark:text-white">Twitter</p>
-            <p className="text-xs text-gray-500">Share on Twitter</p>
-          </div>
-        </button>
-        <button
-          onClick={() => onShareSocial("linkedin")}
-          className="w-full flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-        >
-          <div className="w-10 h-10 bg-blue-700 rounded-lg flex items-center justify-center">
-            <Linkedin className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="font-bold text-gray-900 dark:text-white">LinkedIn</p>
-            <p className="text-xs text-gray-500">Share on LinkedIn</p>
-          </div>
-        </button>
-      </div>
-      <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Verification Link
-        </p>
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            value={certificate.verificationUrl}
-            readOnly
-            className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-          />
+    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md mx-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            Share Certificate
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            onClick={() => onShareSocial("twitter")}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white rounded-xl font-semibold transition"
+          >
+            <Twitter className="w-5 h-5" />
+            Share on Twitter
+          </button>
+          <button
+            onClick={() => onShareSocial("linkedin")}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-[#0A66C2] hover:bg-[#084d94] text-white rounded-xl font-semibold transition"
+          >
+            <Linkedin className="w-5 h-5" />
+            Share on LinkedIn
+          </button>
+          <button
+            onClick={() => onShareSocial("facebook")}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-[#1877F2] hover:bg-[#145dbf] text-white rounded-xl font-semibold transition"
+          >
+            <Facebook className="w-5 h-5" />
+            Share on Facebook
+          </button>
           <button
             onClick={() => onCopyLink(certificate.verificationUrl)}
-            className="p-2 bg-primary-400 text-black rounded-lg hover:bg-primary-500 transition"
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white rounded-xl font-semibold transition"
           >
-            <Copy className="w-4 h-4" />
+            <Copy className="w-5 h-5" />
+            Copy Link
           </button>
         </div>
       </div>
