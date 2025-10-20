@@ -41,6 +41,7 @@ import ProfessionalCertificationsPage from "@pages/ProfessionalCertificationsPag
 import ProfessionalCertificationDetailPage from "@pages/ProfessionalCertificationDetailPage";
 import ProfessionalCertificationTestPage from "@pages/ProfessionalCertificationTestPage";
 import ProfessionalCertificationResultsPage from "@pages/ProfessionalCertificationResultPage";
+import MyProfessionalAttemptsPage from "@pages/MyProfessionalAttemptsPage";
 
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
@@ -216,6 +217,10 @@ function App() {
                   <ProfessionalCertificationResultsPage />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/my-professional-attempts"
+              element={<MyProfessionalAttemptsPage />}
             />
             {/* Progress */}
             <Route

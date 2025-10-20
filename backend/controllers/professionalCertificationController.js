@@ -2,6 +2,7 @@
 const ProfessionalCertification = require("../models/ProfessionalCertification");
 const CertificationAttempt = require("../models/CertificationAttempt");
 const ProfessionalCertificate = require("../models/ProfessionalCertificate");
+const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const crypto = require("crypto");
 
@@ -91,10 +92,28 @@ const getCertificationDetails = async (req, res) => {
 
     console.log("🔍 User authenticated:", !!req.userId); // ADD THIS
 
-    if (req.userId) {
-      console.log("✅ Fetching attempts for user:", req.userId); // ADD THIS
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+    let userId = null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+        if (user && user.isActive && !user.isBanned) {
+          userId = user._id;
+        }
+      } catch (error) {
+        // Invalid token, treat as unauthenticated
+      }
+    }
+
+    console.log("🔍 User authenticated:", !!userId);
+
+    if (userId) {
+      console.log("✅ Fetching attempts for user:", userId);
 
       const attempts = await CertificationAttempt.find({
+        user: userId,
         user: req.userId,
         certification: certification._id,
       })
@@ -306,12 +325,17 @@ const startTestAttempt = async (req, res) => {
 /**
  * ANTI-CHEAT: Track security violations
  */
-const trackSecurityEvent = async (req, res) => {
+
+/**
+ * Submit test answers - SERVER-SIDE VALIDATION ONLY
+ * SECURITY: Never trust client-side scoring
+ */
+const submitTestAttempt = async (req, res) => {
   try {
-    const { attemptId, eventType, sessionToken } = req.body;
+    const { attemptId, answers, sessionToken, securityLog } = req.body;
     const userId = req.userId;
 
-    // Validate session
+    // Validate attempt
     const attempt = await CertificationAttempt.findOne({
       _id: attemptId,
       user: userId,
@@ -329,147 +353,85 @@ const trackSecurityEvent = async (req, res) => {
       return res.status(403).json({ error: "Invalid session" });
     }
 
-    // Track event
-    const updates = {};
+    // Process security log
+    if (securityLog && Array.isArray(securityLog)) {
+      const tabSwitches = securityLog.filter(
+        (e) => e.type === "tab-switch"
+      ).length;
+      const copyAttempts = securityLog.filter(
+        (e) => e.type === "copy-attempt"
+      ).length;
+      const pasteAttempts = securityLog.filter(
+        (e) => e.type === "paste-attempt"
+      ).length;
+      const rightClicks = securityLog.filter(
+        (e) => e.type === "right-click"
+      ).length;
 
-    switch (eventType) {
-      case "tab-switch":
-        attempt.tabSwitches += 1;
-        attempt.tabSwitchTimestamps.push(new Date());
+      attempt.tabSwitches = tabSwitches;
+      attempt.copyAttempts = copyAttempts;
+      attempt.pasteAttempts = pasteAttempts;
+      attempt.rightClickAttempts = rightClicks;
 
-        if (attempt.tabSwitches > attempt.certification.tabSwitchWarnings) {
-          // Auto-cancel
-          attempt.status = "cancelled";
-          attempt.cancelReason = "Too many tab switches";
-          attempt.completedAt = new Date();
-          activeSessions.delete(sessionKey);
-        }
-        break;
-
-      case "copy-attempt":
-        attempt.copyAttempts += 1;
-        break;
-
-      case "paste-attempt":
-        attempt.pasteAttempts += 1;
-        break;
-
-      case "right-click":
-        attempt.rightClickAttempts += 1;
-        break;
-
-      case "devtools":
-        attempt.devToolsDetected = true;
-        attempt.suspiciousActivity.push(
-          "DevTools detected at " + new Date().toISOString()
-        );
-        break;
+      if (tabSwitches > 0) {
+        attempt.tabSwitchTimestamps = securityLog
+          .filter((e) => e.type === "tab-switch")
+          .map((e) => new Date(e.timestamp));
+      }
     }
 
-    await attempt.save();
+    // Validate time limits
+    const timeElapsed = Math.floor((Date.now() - session.startTime) / 1000);
+    const maxTime = attempt.certification.duration * 60 + 60; // +1 min buffer
 
-    res.json({
-      success: true,
-      cancelled: attempt.status === "cancelled",
-      warningsRemaining:
-        attempt.certification.tabSwitchWarnings - attempt.tabSwitches,
-    });
-  } catch (error) {
-    console.error("Track security event error:", error);
-    res.status(500).json({ error: "Failed to track event" });
-  }
-};
-
-/**
- * Submit test answers - SERVER-SIDE VALIDATION ONLY
- * SECURITY: Never trust client-side scoring
- */
-const submitTestAttempt = async (req, res) => {
-  try {
-    const { attemptId, answers, sessionToken } = req.body;
-    const userId = req.userId;
-
-    // Validate attempt
-    const attempt = await CertificationAttempt.findOne({
-      _id: attemptId,
-      user: userId,
-      status: "in-progress",
-    }).populate("certification");
-
-    if (!attempt) {
-      return res.status(404).json({ error: "Invalid attempt" });
-    }
-
-    // Validate session
-    const sessionKey = `${userId}_${attempt.certification._id}`;
-    const session = activeSessions.get(sessionKey);
-
-    if (!session || session.token !== sessionToken) {
-      return res.status(403).json({ error: "Invalid session token" });
-    }
-
-    // Check time limit
-    const timeElapsed = Math.floor(
-      (Date.now() - attempt.startedAt.getTime()) / 1000
-    );
-    const timeLimit = attempt.certification.duration * 60;
-
-    if (timeElapsed > timeLimit + 30) {
-      // 30 sec buffer for network
+    if (timeElapsed > maxTime) {
       attempt.status = "cancelled";
       attempt.cancelReason = "Time limit exceeded";
       attempt.completedAt = new Date();
       await attempt.save();
       activeSessions.delete(sessionKey);
-      return res
-        .status(400)
-        .json({ error: "Time limit exceeded", cancelled: true });
+      return res.status(400).json({ error: "Time limit exceeded" });
     }
 
-    // SERVER-SIDE GRADING
-    const originalQuestions = session.questions; // Has correct answers
+    // SERVER-SIDE SCORING
+    const originalQuestions = session.questions;
     let correctCount = 0;
-    let earnedPoints = 0;
     const gradedAnswers = [];
 
-    for (let i = 0; i < originalQuestions.length; i++) {
-      const question = originalQuestions[i];
-      const userAnswer = answers.find(
-        (a) => a.questionId === question._id.toString()
+    for (let userAnswer of answers) {
+      const question = originalQuestions.find(
+        (q) => q._id.toString() === userAnswer.questionId
       );
+
+      if (!question) continue;
 
       let isCorrect = false;
 
-      if (userAnswer) {
-        if (question.type === "multiple-choice") {
-          const correctOption = question.options.find((opt) => opt.isCorrect);
-          isCorrect = userAnswer.answer === correctOption?.text;
-        } else if (question.type === "true-false") {
-          isCorrect = userAnswer.answer === question.correctAnswer;
-        }
+      if (question.type === "multiple-choice") {
+        // Find the correct option
+        const correctOption = question.options.find((opt) => opt.isCorrect);
+        isCorrect = correctOption && userAnswer.answer === correctOption.text;
+      } else if (question.type === "true-false") {
+        isCorrect = userAnswer.answer === question.correctAnswer;
       }
 
-      if (isCorrect) {
-        correctCount++;
-        earnedPoints += question.points || 1;
-      }
+      if (isCorrect) correctCount++;
 
       gradedAnswers.push({
         questionId: question._id,
-        answer: userAnswer?.answer || null,
+        answer: userAnswer.answer,
         isCorrect,
-        points: isCorrect ? question.points || 1 : 0,
-        timeSpent: userAnswer?.timeSpent || 0,
+        timeSpent: userAnswer.timeSpent || 0,
       });
     }
 
-    // Calculate score
-    const totalPoints = originalQuestions.reduce(
-      (sum, q) => sum + (q.points || 1),
-      0
-    );
-    const score = Math.round((earnedPoints / totalPoints) * 100);
+    const score = Math.round((correctCount / originalQuestions.length) * 100);
     const passed = score >= attempt.certification.passingScore;
+
+    // Calculate actual test duration
+    const actualDuration = Math.floor(
+      (Date.now() - attempt.startedAt.getTime()) / 1000
+    );
 
     // Update attempt
     attempt.answers = gradedAnswers;
@@ -480,50 +442,31 @@ const submitTestAttempt = async (req, res) => {
       (originalQuestions.length - answers.length);
     attempt.unansweredQuestions = originalQuestions.length - answers.length;
     attempt.score = score;
-    attempt.totalPoints = totalPoints;
-    attempt.earnedPoints = earnedPoints;
     attempt.passed = passed;
     attempt.completedAt = new Date();
-    attempt.duration = timeElapsed;
-    attempt.timeRemaining = Math.max(0, timeLimit - timeElapsed);
+    attempt.duration = actualDuration; // FIX: Use calculated duration
     attempt.status = "completed";
 
     await attempt.save();
-
-    // Update certification stats
-    await ProfessionalCertification.findByIdAndUpdate(
-      attempt.certification._id,
-      {
-        $inc: {
-          totalAttempts: 1,
-          totalPassed: passed ? 1 : 0,
-        },
-        $set: {
-          averageScore: await calculateAverageScore(attempt.certification._id),
-        },
-      }
-    );
-
-    // Cleanup session
     activeSessions.delete(sessionKey);
 
     res.json({
       success: true,
       results: {
+        attemptId: attempt._id,
         score,
         passed,
         correctAnswers: correctCount,
         incorrectAnswers: attempt.incorrectAnswers,
         unansweredQuestions: attempt.unansweredQuestions,
         totalQuestions: originalQuestions.length,
-        earnedPoints,
-        totalPoints,
+        duration: actualDuration, // FIX: Return actual duration
         grade: calculateGrade(score),
         attemptNumber: attempt.attemptNumber,
       },
     });
   } catch (error) {
-    console.error("Submit test error:", error);
+    console.error("Submit test attempt error:", error);
     res.status(500).json({ error: "Failed to submit test" });
   }
 };
@@ -656,7 +599,6 @@ module.exports = {
   getAllCertifications,
   getCertificationDetails,
   startTestAttempt,
-  trackSecurityEvent,
   submitTestAttempt,
   getMyAttempts,
   getAttemptDetails,

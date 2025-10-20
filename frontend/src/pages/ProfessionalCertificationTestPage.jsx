@@ -16,17 +16,6 @@ import {
 import toast from "react-hot-toast";
 import { professionalCertificationApi } from "@services/api";
 
-/**
- * ULTRA-SECURE TEST TAKING COMPONENT
- * Features:
- * - Tab switch detection & auto-cancel
- * - Copy/paste blocking
- * - Right-click disabled
- * - DevTools detection
- * - Timer with auto-submit
- * - Server-side validation only
- * - Encrypted session tokens
- */
 const ProfessionalCertificationTestPage = () => {
   const { certificationId } = useParams();
   const navigate = useNavigate();
@@ -46,39 +35,48 @@ const ProfessionalCertificationTestPage = () => {
   const [showWarning, setShowWarning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testCancelled, setTestCancelled] = useState(false);
+  const [securityLog, setSecurityLog] = useState([]); // ADD THIS
 
   // Refs for security
   const timerRef = useRef(null);
   const visibilityChangeRef = useRef(null);
   const startTimeRef = useRef({});
+  const securityLogRef = useRef([]); // ADD THIS
+
+  // Log security events - DEFINE BEFORE USE
+  const logSecurityEvent = useCallback((eventType) => {
+    const event = {
+      type: eventType,
+      timestamp: Date.now(),
+    };
+    securityLogRef.current.push(event);
+    setSecurityLog((prev) => [...prev, event]);
+  }, []);
 
   // Anti-cheat: Disable right-click
   useEffect(() => {
     const handleContextMenu = (e) => {
       e.preventDefault();
-      trackSecurityEvent("right-click");
-      toast.error("Right-click is disabled during the test");
-      return false;
+      logSecurityEvent("right-click");
+      toast.error("Right-click is disabled");
     };
 
     document.addEventListener("contextmenu", handleContextMenu);
     return () => document.removeEventListener("contextmenu", handleContextMenu);
-  }, []);
+  }, [logSecurityEvent]);
 
   // Anti-cheat: Disable copy/paste
   useEffect(() => {
     const handleCopy = (e) => {
       e.preventDefault();
-      trackSecurityEvent("copy-attempt");
-      toast.error("Copying is disabled during the test");
-      return false;
+      logSecurityEvent("copy-attempt");
+      toast.error("Copying is disabled");
     };
 
     const handlePaste = (e) => {
       e.preventDefault();
-      trackSecurityEvent("paste-attempt");
-      toast.error("Pasting is disabled during the test");
-      return false;
+      logSecurityEvent("paste-attempt");
+      toast.error("Pasting is disabled");
     };
 
     document.addEventListener("copy", handleCopy);
@@ -88,48 +86,23 @@ const ProfessionalCertificationTestPage = () => {
       document.removeEventListener("copy", handleCopy);
       document.removeEventListener("paste", handlePaste);
     };
-  }, []);
-
-  // Anti-cheat: DevTools detection
-  // DevTools detection (around line 90)
-  useEffect(() => {
-    // ONLY track if test has started
-    if (!attemptId || !sessionToken) {
-      console.log("⏸️ Test not started yet, skipping security checks");
-      return;
-    }
-
-    const detectDevTools = () => {
-      const threshold = 160;
-      const widthThreshold = window.outerWidth - window.innerWidth > threshold;
-      const heightThreshold =
-        window.outerHeight - window.innerHeight > threshold;
-
-      if (widthThreshold || heightThreshold) {
-        trackSecurityEvent("devtools");
-      }
-    };
-
-    const interval = setInterval(detectDevTools, 1000);
-
-    return () => clearInterval(interval);
-  }, [attemptId, sessionToken]); // Add dependencies
+  }, [logSecurityEvent]);
 
   // Anti-cheat: Tab switch detection
   useEffect(() => {
-    // ONLY track if test has started
     if (!attemptId || !sessionToken || !certificationId) {
       return;
     }
 
-    const handleVisibilityChange = async () => {
+    const handleVisibilityChange = () => {
       if (document.hidden) {
         const newCount = tabSwitches + 1;
         setTabSwitches(newCount);
+        logSecurityEvent("tab-switch");
 
-        const response = await trackSecurityEvent("tab-switch");
+        const warningsLeft = maxWarnings - newCount;
 
-        if (response && response.cancelled) {
+        if (newCount > maxWarnings) {
           setTestCancelled(true);
           toast.error("Test cancelled due to tab switching");
           setTimeout(
@@ -137,13 +110,11 @@ const ProfessionalCertificationTestPage = () => {
             2000
           );
         } else {
-          const warningsLeft = maxWarnings - newCount;
           setShowWarning(true);
           toast.error(
             `Warning! ${warningsLeft} warning(s) remaining. Test will be cancelled if you switch tabs again.`,
             { duration: 5000 }
           );
-
           setTimeout(() => setShowWarning(false), 5000);
         }
       }
@@ -162,20 +133,8 @@ const ProfessionalCertificationTestPage = () => {
     tabSwitches,
     maxWarnings,
     navigate,
+    logSecurityEvent,
   ]);
-  // Track security events
-  const trackSecurityEvent = async (eventType) => {
-    try {
-      const response = await professionalCertificationApi.trackSecurityEvent({
-        attemptId,
-        eventType,
-        sessionToken,
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Track security error:", error);
-    }
-  };
 
   // Load/start test
   useEffect(() => {
@@ -216,7 +175,7 @@ const ProfessionalCertificationTestPage = () => {
       } catch (error) {
         console.error("Start test error:", error);
         toast.error(error.response?.data?.error || "Failed to start test");
-        navigate(`/professional-certifications/${certification.slug}/test`);
+        navigate(`/professional-certifications/${certificationId}`);
       } finally {
         setLoading(false);
       }
@@ -273,11 +232,9 @@ const ProfessionalCertificationTestPage = () => {
   // Submit test
   const handleSubmitTest = async () => {
     if (isSubmitting || testCancelled) return;
-
     setIsSubmitting(true);
 
     try {
-      // Prepare answers array
       const answersArray = Object.entries(answers).map(
         ([questionId, data]) => ({
           questionId,
@@ -292,12 +249,11 @@ const ProfessionalCertificationTestPage = () => {
         attemptId,
         sessionToken,
         answers: answersArray,
+        securityLog: securityLogRef.current,
       });
 
       toast.dismiss();
       toast.success("Test submitted successfully!");
-
-      // Navigate to results
       navigate(`/professional-certifications/results/${attemptId}`, {
         state: { results: response.data.results },
       });

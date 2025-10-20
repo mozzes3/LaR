@@ -347,8 +347,6 @@ export const professionalCertificationApi = {
     api.get(`/professional-certifications/${slug}`),
   startTest: (data) =>
     api.post("/professional-certifications/start-test", data),
-  trackSecurityEvent: (data) =>
-    api.post("/professional-certifications/track-security", data),
   submitTest: (data) =>
     api.post("/professional-certifications/submit-test", data),
   getMyAttempts: (params) =>

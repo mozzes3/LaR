@@ -21,78 +21,136 @@ import {
   Eye,
   Lock,
   Plus,
+  Target,
+  Clock,
+  ArrowRight,
+  Shield,
+  Zap,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { certificateApi } from "@services/api";
+import { certificateApi, professionalCertificationApi } from "@services/api";
 import { useWallet } from "@contexts/WalletContext";
 
 const CertificatesPage = () => {
   const navigate = useNavigate();
   const { user } = useWallet();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState("all"); // all, completion, competency
+  const [competencySubTab, setCompetencySubTab] = useState("certificates"); // certificates, attempts
+
+  // Course Certificates (Completion)
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [certificates, setCertificates] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [courseCertificates, setCourseCertificates] = useState([]);
+  const [loadingCourse, setLoadingCourse] = useState(true);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingCertificate, setViewingCertificate] = useState(null);
 
-  // Load real certificates
+  // Professional Certificates (Competency)
+  const [professionalCertificates, setProfessionalCertificates] = useState([]);
+  const [loadingProfessional, setLoadingProfessional] = useState(true);
+  const [attempts, setAttempts] = useState([]);
+  const [filteredAttempts, setFilteredAttempts] = useState([]);
+  const [attemptFilter, setAttemptFilter] = useState("all"); // all, passed, failed
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categories, setCategories] = useState([]);
+
   useEffect(() => {
-    const loadCertificates = async () => {
-      if (!user) {
-        navigate("/");
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const response = await certificateApi.getMyCertificates();
-
-        // Transform to match the UI structure
-        const transformedCerts = (response.data.certificates || []).map(
-          (cert) => ({
-            id: cert._id,
-            courseTitle: cert.courseTitle,
-            instructor: cert.instructor,
-            instructorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cert.instructor}`,
-            completedDate: cert.completedDate,
-            certificateNumber: cert.certificateNumber,
-            grade: cert.grade,
-            finalScore: cert.finalScore,
-            thumbnail: cert.courseId?.thumbnail || cert.templateImage,
-            skills: [],
-            totalHours: cert.totalHours,
-            totalLessons: cert.totalLessons,
-            verificationUrl: cert.verificationUrl,
-            blockchainHash: cert.blockchainHash,
-            blockchainExplorerUrl: cert.blockchainExplorerUrl,
-            templateImage: cert.templateImage,
-          })
-        );
-
-        setCertificates(transformedCerts);
-      } catch (error) {
-        console.error("Error loading certificates:", error);
-        toast.error("Failed to load certificates");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCertificates();
+    if (!user) {
+      navigate("/");
+      return;
+    }
+    loadAllCertificates();
   }, [user, navigate]);
 
-  const filteredCertificates = certificates.filter((cert) =>
+  useEffect(() => {
+    applyAttemptFilters();
+  }, [attemptFilter, categoryFilter, attempts]);
+
+  const loadAllCertificates = async () => {
+    // Load Course Certificates
+    try {
+      setLoadingCourse(true);
+      const response = await certificateApi.getMyCertificates();
+      const transformed = (response.data.certificates || []).map((cert) => ({
+        id: cert._id,
+        type: "completion",
+        courseTitle: cert.courseTitle,
+        instructor: cert.instructor,
+        instructorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cert.instructor}`,
+        completedDate: cert.completedDate,
+        certificateNumber: cert.certificateNumber,
+        grade: cert.grade,
+        finalScore: cert.finalScore,
+        thumbnail: cert.courseId?.thumbnail || cert.templateImage,
+        totalHours: cert.totalHours,
+        totalLessons: cert.totalLessons,
+        verificationUrl: cert.verificationUrl,
+        blockchainHash: cert.blockchainHash,
+        blockchainExplorerUrl: cert.blockchainExplorerUrl,
+        templateImage: cert.templateImage,
+      }));
+      setCourseCertificates(transformed);
+    } catch (error) {
+      console.error("Error loading course certificates:", error);
+    } finally {
+      setLoadingCourse(false);
+    }
+
+    // Load Professional Certificates
+    try {
+      setLoadingProfessional(true);
+      const response = await professionalCertificationApi.getMyCertificates();
+      setProfessionalCertificates(response.data.certificates || []);
+    } catch (error) {
+      console.error("Error loading professional certificates:", error);
+    } finally {
+      setLoadingProfessional(false);
+    }
+
+    // Load Professional Attempts
+    try {
+      const response = await professionalCertificationApi.getMyAttempts();
+      setAttempts(response.data.attempts || []);
+      const uniqueCategories = [
+        ...new Set(response.data.attempts.map((a) => a.certification.category)),
+      ];
+      setCategories(uniqueCategories);
+    } catch (error) {
+      console.error("Error loading attempts:", error);
+    }
+  };
+
+  const applyAttemptFilters = () => {
+    let filtered = [...attempts];
+
+    if (attemptFilter === "passed") {
+      filtered = filtered.filter((a) => a.passed);
+    } else if (attemptFilter === "failed") {
+      filtered = filtered.filter((a) => !a.passed);
+    }
+
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(
+        (a) => a.certification.category === categoryFilter
+      );
+    }
+
+    setFilteredAttempts(filtered);
+  };
+
+  const filteredCourseCertificates = courseCertificates.filter((cert) =>
     cert.courseTitle.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleView = (cert) => {
-    setViewingCertificate(cert);
-    setShowViewModal(true);
-  };
+  const allCertificates = [
+    ...courseCertificates.map((c) => ({ ...c, type: "completion" })),
+    ...professionalCertificates.map((c) => ({ ...c, type: "competency" })),
+  ];
 
-  const handleDownload = (cert) => {
+  const handleView = (cert) => {
     setViewingCertificate(cert);
     setShowViewModal(true);
   };
@@ -109,7 +167,7 @@ const CertificatesPage = () => {
 
   const handleShareSocial = (platform) => {
     const cert = selectedCertificate;
-    const text = `I just completed "${cert.courseTitle}" on Lizard Academy! 🎓`;
+    const text = `I earned a certificate from Lizard Academy! 🎓`;
     const url = cert.verificationUrl;
 
     let shareUrl = "";
@@ -147,6 +205,76 @@ const CertificatesPage = () => {
     }
   };
 
+  const getCompetencyGrade = (score) => {
+    if (score >= 95)
+      return {
+        text: "Outstanding",
+        color: "from-purple-500 to-pink-500",
+        textColor: "text-purple-500",
+        bgColor: "bg-purple-500/10",
+        borderColor: "border-purple-500/30",
+      };
+    if (score >= 85)
+      return {
+        text: "Excellent",
+        color: "from-green-500 to-emerald-500",
+        textColor: "text-green-500",
+        bgColor: "bg-green-500/10",
+        borderColor: "border-green-500/30",
+      };
+    if (score >= 75)
+      return {
+        text: "Very Good",
+        color: "from-blue-500 to-cyan-500",
+        textColor: "text-blue-500",
+        bgColor: "bg-blue-500/10",
+        borderColor: "border-blue-500/30",
+      };
+    if (score >= 70)
+      return {
+        text: "Good",
+        color: "from-cyan-500 to-teal-500",
+        textColor: "text-cyan-500",
+        bgColor: "bg-cyan-500/10",
+        borderColor: "border-cyan-500/30",
+      };
+    if (score >= 60)
+      return {
+        text: "Pass",
+        color: "from-yellow-500 to-orange-500",
+        textColor: "text-yellow-500",
+        bgColor: "bg-yellow-500/10",
+        borderColor: "border-yellow-500/30",
+      };
+    return {
+      text: "Fail",
+      color: "from-red-500 to-rose-500",
+      textColor: "text-red-500",
+      bgColor: "bg-red-500/10",
+      borderColor: "border-red-500/30",
+    };
+  };
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return "N/A";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  const passedAttempts = attempts.filter((a) => a.passed);
+  const failedAttempts = attempts.filter((a) => !a.passed);
+
+  // Get eligible attempts (passed but no certificate)
+  const eligibleAttempts = passedAttempts.filter((attempt) => {
+    return !professionalCertificates.some(
+      (cert) =>
+        cert.attemptId && cert.attemptId.toString() === attempt._id.toString()
+    );
+  });
+
+  const loading = loadingCourse || loadingProfessional;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
@@ -181,421 +309,412 @@ const CertificatesPage = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-4 gap-6 mb-8">
           <div className="bg-gradient-to-br from-primary-400/10 to-primary-600/10 border-2 border-primary-400/30 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <Trophy className="w-8 h-8 text-primary-400" />
-            </div>
+            <Trophy className="w-8 h-8 text-primary-400 mb-2" />
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-              {certificates.length}
+              {allCertificates.length}
             </div>
             <div className="text-sm text-gray-500">Total Certificates</div>
           </div>
           <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-2 border-blue-500/30 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <Star className="w-8 h-8 text-blue-500" />
-            </div>
+            <Award className="w-8 h-8 text-blue-500 mb-2" />
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-              {certificates.length > 0
-                ? (
-                    certificates.reduce(
-                      (sum, cert) => sum + cert.finalScore,
-                      0
-                    ) / certificates.length
-                  ).toFixed(1)
-                : 0}
-              %
+              {courseCertificates.length}
             </div>
-            <div className="text-sm text-gray-500">Average Score</div>
+            <div className="text-sm text-gray-500">Course Certificates</div>
+          </div>
+          <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border-2 border-yellow-500/30 rounded-2xl p-6">
+            <Shield className="w-8 h-8 text-yellow-500 mb-2" />
+            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              {professionalCertificates.length}
+            </div>
+            <div className="text-sm text-gray-500">
+              Professional Certificates
+            </div>
           </div>
           <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-2 border-green-500/30 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
+            <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-              {certificates
-                .reduce((sum, cert) => sum + cert.totalHours, 0)
-                .toFixed(1)}
-              h
+              {passedAttempts.length}
             </div>
-            <div className="text-sm text-gray-500">Total Learning Hours</div>
+            <div className="text-sm text-gray-500">Tests Passed</div>
           </div>
         </div>
 
-        {/* Search & Filter */}
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search certificates..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
-            />
-          </div>
-          <button className="p-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition">
-            <Filter className="w-5 h-5" />
+        {/* Tabs */}
+        <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2">
+          <button
+            onClick={() => setActiveTab("all")}
+            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${
+              activeTab === "all"
+                ? "bg-gradient-to-r from-primary-400 to-primary-600 text-black shadow-lg"
+                : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-2 border-gray-200 dark:border-gray-800 hover:border-primary-400"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5" />
+              All Certificates
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("completion")}
+            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap ${
+              activeTab === "completion"
+                ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg"
+                : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-2 border-gray-200 dark:border-gray-800 hover:border-blue-500"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              Certificate of Completion
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("competency")}
+            className={`px-6 py-3 rounded-xl font-bold transition-all whitespace-nowrap relative overflow-hidden ${
+              activeTab === "competency"
+                ? "bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-500 text-black shadow-xl shadow-yellow-500/30"
+                : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-2 border-yellow-500/30 hover:border-yellow-500"
+            }`}
+          >
+            <div className="flex items-center gap-2 relative z-10">
+              <Shield className="w-5 h-5" />
+              Professional Certificate of Competency
+              {activeTab === "competency" && (
+                <Sparkles className="w-4 h-4 animate-pulse" />
+              )}
+            </div>
+            {activeTab === "competency" && (
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+            )}
           </button>
         </div>
 
-        {/* Certificates Grid */}
-        {filteredCertificates.length === 0 ? (
-          <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800">
-            <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              No certificates yet
-            </h3>
-            <p className="text-gray-500 mb-6">
-              Complete courses to earn certificates
-            </p>
-            <button
-              onClick={() => navigate("/courses")}
-              className="px-6 py-3 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold hover:shadow-xl transition"
-            >
-              Browse Courses
-            </button>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCertificates.map((cert) => (
-              <div
-                key={cert.id}
-                className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-2xl hover:border-primary-400/50 transition-all duration-300 group"
-              >
-                {/* Certificate Preview - Elite Design */}
-                <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-gray-900 to-black p-6 flex flex-col overflow-hidden">
-                  {/* Elegant background pattern */}
-                  <div className="absolute inset-0 opacity-5">
-                    <svg
-                      className="w-full h-full"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <defs>
-                        <pattern
-                          id="grid"
-                          width="40"
-                          height="40"
-                          patternUnits="userSpaceOnUse"
-                        >
-                          <path
-                            d="M 40 0 L 0 0 0 40"
-                            fill="none"
-                            stroke="white"
-                            strokeWidth="0.5"
-                          />
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" fill="url(#grid)" />
-                    </svg>
-                  </div>
-
-                  {/* Luxury corner ornaments */}
-                  <div className="absolute top-2 left-2">
-                    <div className="w-8 h-8 border-t-2 border-l-2 border-primary-400/60 relative">
-                      <div className="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-                    </div>
-                  </div>
-                  <div className="absolute top-2 right-2">
-                    <div className="w-8 h-8 border-t-2 border-r-2 border-primary-400/60 relative">
-                      <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-                    </div>
-                  </div>
-                  <div className="absolute bottom-2 left-2">
-                    <div className="w-8 h-8 border-b-2 border-l-2 border-primary-400/60 relative">
-                      <div className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-                    </div>
-                  </div>
-                  <div className="absolute bottom-2 right-2">
-                    <div className="w-8 h-8 border-b-2 border-r-2 border-primary-400/60 relative">
-                      <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-                    </div>
-                  </div>
-
-                  {/* Glowing orbs */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-400/5 rounded-full blur-3xl"></div>
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-2xl"></div>
-
-                  {/* Header Section */}
-                  <div className="relative z-10 flex-shrink-0">
-                    <div className="text-center space-y-2">
-                      {/* Award Icon - Smaller */}
-                      <div className="flex justify-center mb-1">
-                        <div className="relative">
-                          <div className="w-10 h-10 bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-500/50">
-                            <Award
-                              className="w-5 h-5 text-black"
-                              strokeWidth={2.5}
-                            />
-                          </div>
-                          <div className="absolute inset-0 bg-primary-400 rounded-full blur-md opacity-40 animate-pulse"></div>
-                        </div>
-                      </div>
-
-                      {/* Certificate Title */}
-                      <div>
-                        <div className="flex items-center justify-center space-x-2 mb-1.5">
-                          <div className="h-px w-6 bg-gradient-to-r from-transparent to-primary-400/50"></div>
-                          <Star className="w-2.5 h-2.5 text-primary-400" />
-                          <div className="h-px w-6 bg-gradient-to-l from-transparent to-primary-400/50"></div>
-                        </div>
-                        <p className="text-primary-400 text-[9px] font-bold tracking-[0.2em] uppercase mb-1.5">
-                          Certificate of Completion
-                        </p>
-                        <div className="h-px w-16 bg-gradient-to-r from-transparent via-primary-400/30 to-transparent mx-auto"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Course Title - Centered with flex-grow */}
-                  <div className="relative z-10 flex-grow flex items-center justify-center py-2">
-                    <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-6 text-center">
-                      {cert.courseTitle}
-                    </h3>
-                  </div>
-
-                  {/* Footer Section */}
-                  <div className="relative z-10 flex-shrink-0">
-                    <div className="text-center space-y-1.5">
-                      {/* Student Name Badge */}
-                      <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-lg border border-primary-400/20 shadow-xl">
-                        <p className="text-white/50 text-[8px] tracking-wider uppercase mb-0.5">
-                          Awarded to
-                        </p>
-                        <p className="text-white font-bold text-[11px] tracking-wide">
-                          {user?.username || "Student"}
-                        </p>
-                      </div>
-
-                      {/* Bottom Info */}
-                      <div className="flex items-center justify-center space-x-1.5 text-[8px] text-white/30 tracking-wider">
-                        <span className="font-semibold">LIZARD ACADEMY</span>
-                        <span>•</span>
-                        <span>
-                          {new Date(cert.completedDate).getFullYear()}
-                        </span>
-                        <span>•</span>
-                        <Lock className="w-2 h-2" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Subtle vignette */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 pointer-events-none"></div>
-                </div>
-
-                {/* Certificate Info */}
-                <div className="p-4">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <img
-                      src={cert.instructorAvatar}
-                      alt={cert.instructor}
-                      className="w-6 h-6 rounded-full ring-2 ring-gray-200 dark:ring-gray-800"
-                    />
-                    <span className="text-sm text-gray-500 font-medium">
-                      {cert.instructor}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div
-                      className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getGradeColor(
-                        cert.grade
-                      )}`}
-                    >
-                      {cert.grade}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      Score:{" "}
-                      <span className="font-bold text-gray-900 dark:text-white">
-                        {cert.finalScore}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4 text-xs text-gray-500 mb-3">
-                    <div className="flex items-center space-x-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>
-                        {new Date(cert.completedDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <CheckCircle className="w-3 h-3" />
-                      <span>{cert.totalLessons} lessons</span>
-                    </div>
-                  </div>
-                  {cert.skills?.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {cert.skills.slice(0, 3).map((skill, index) => (
-                        <span
-                          key={index}
-                          className="px-2 py-1 bg-primary-400/10 text-primary-400 text-xs rounded-lg font-medium"
-                        >
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Action Buttons with Enhanced Hover */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => handleView(cert)}
-                      className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-primary-400 hover:bg-primary-400/5 hover:scale-105 hover:shadow-lg transition-all duration-200 active:scale-95"
-                    >
-                      View
-                    </button>
-                    <button
-                      onClick={async () => {
-                        try {
-                          // Fetch and auto-download
-                          const response = await fetch(cert.templateImage);
-                          const blob = await response.blob();
-                          const url = window.URL.createObjectURL(blob);
-                          const link = document.createElement("a");
-                          link.href = url;
-                          link.download = `${cert.certificateNumber}.png`;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                          window.URL.revokeObjectURL(url);
-                          toast.success("Certificate downloaded!");
-                        } catch (error) {
-                          console.error("Download error:", error);
-                          toast.error("Failed to download certificate");
-                        }
-                      }}
-                      className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-primary-400 hover:bg-primary-400/5 hover:scale-105 hover:shadow-lg transition-all duration-200 active:scale-95"
-                    >
-                      Download
-                    </button>
-                    <button
-                      onClick={() => handleShare(cert)}
-                      className="py-2.5 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl text-sm font-bold hover:from-primary-500 hover:to-primary-700 hover:scale-105 hover:shadow-xl hover:shadow-primary-400/30 transition-all duration-200 active:scale-95"
-                    >
-                      Share
-                    </button>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-                    <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
-                      <Lock className="w-3 h-3" />
-                      <span className="font-mono">
-                        {cert.certificateNumber}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleCopyLink(cert.verificationUrl)}
-                      className="text-xs text-primary-400 hover:text-primary-500 font-semibold flex items-center space-x-1 hover:underline transition-all"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>Verify on blockchain</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Share Modal */}
-        {showShareModal && selectedCertificate && (
-          <>
-            <div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-              onClick={() => setShowShareModal(false)}
-            />
-            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6 z-50">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Share Certificate
+        {/* Tab Content */}
+        {activeTab === "all" && (
+          <div>
+            {allCertificates.length === 0 ? (
+              <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800">
+                <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                  No certificates yet
                 </h3>
-                <button
-                  onClick={() => setShowShareModal(false)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="mb-6 p-4 bg-gradient-to-br from-primary-400 to-purple-600 rounded-xl text-center">
-                <Award className="w-12 h-12 text-white mx-auto mb-2" />
-                <p className="text-white font-bold text-sm line-clamp-2">
-                  {selectedCertificate.courseTitle}
+                <p className="text-gray-500 mb-6">
+                  Complete courses or pass professional tests to earn
+                  certificates
                 </p>
-                <p className="text-white/80 text-xs mt-2">
-                  Grade: {selectedCertificate.grade} (
-                  {selectedCertificate.finalScore}%)
-                </p>
-              </div>
-              <div className="space-y-3 mb-6">
-                <button
-                  onClick={() => handleShareSocial("twitter")}
-                  className="w-full flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                >
-                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                    <Twitter className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-bold text-gray-900 dark:text-white">
-                      Twitter
-                    </p>
-                    <p className="text-xs text-gray-500">Share on Twitter</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => handleShareSocial("linkedin")}
-                  className="w-full flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                >
-                  <div className="w-10 h-10 bg-blue-700 rounded-lg flex items-center justify-center">
-                    <Linkedin className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-bold text-gray-900 dark:text-white">
-                      LinkedIn
-                    </p>
-                    <p className="text-xs text-gray-500">Share on LinkedIn</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => handleShareSocial("facebook")}
-                  className="w-full flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                >
-                  <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                    <Facebook className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-bold text-gray-900 dark:text-white">
-                      Facebook
-                    </p>
-                    <p className="text-xs text-gray-500">Share on Facebook</p>
-                  </div>
-                </button>
-              </div>
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Verification Link
-                </p>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={selectedCertificate.verificationUrl}
-                    readOnly
-                    className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                  />
+                <div className="flex items-center justify-center gap-3">
                   <button
-                    onClick={() =>
-                      handleCopyLink(selectedCertificate.verificationUrl)
-                    }
-                    className="p-2 bg-primary-400 text-black rounded-lg hover:bg-primary-500 transition"
+                    onClick={() => navigate("/courses")}
+                    className="px-6 py-3 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold hover:shadow-xl transition"
                   >
-                    <Copy className="w-4 h-4" />
+                    Browse Courses
+                  </button>
+                  <button
+                    onClick={() => navigate("/professional-certifications")}
+                    className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl font-bold hover:shadow-xl transition"
+                  >
+                    Take Professional Tests
                   </button>
                 </div>
               </div>
-            </div>
-          </>
+            ) : (
+              <div>
+                {/* Search */}
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search all certificates..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {allCertificates
+                    .filter((cert) =>
+                      (cert.courseTitle || cert.certificationTitle || "")
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase())
+                    )
+                    .map((cert) => {
+                      if (cert.type === "completion") {
+                        return (
+                          <CompletionCertificateCard
+                            key={cert.id}
+                            cert={cert}
+                            user={user}
+                            onView={handleView}
+                            onShare={handleShare}
+                            onCopyLink={handleCopyLink}
+                            getGradeColor={getGradeColor}
+                          />
+                        );
+                      } else {
+                        return (
+                          <CompetencyCertificateCard
+                            key={cert._id}
+                            cert={cert}
+                            getCompetencyGrade={getCompetencyGrade}
+                          />
+                        );
+                      }
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* View Certificate Modal */}
+        {activeTab === "completion" && (
+          <div>
+            {/* Search & Filter */}
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="relative flex-1">
+                <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search certificates..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black focus:border-primary-400 transition"
+                />
+              </div>
+              <button className="p-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition">
+                <Filter className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Certificates Grid */}
+            {filteredCourseCertificates.length === 0 ? (
+              <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800">
+                <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                  No certificates yet
+                </h3>
+                <p className="text-gray-500 mb-6">
+                  Complete courses to earn certificates
+                </p>
+                <button
+                  onClick={() => navigate("/courses")}
+                  className="px-6 py-3 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold hover:shadow-xl transition"
+                >
+                  Browse Courses
+                </button>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredCourseCertificates.map((cert) => (
+                  <CompletionCertificateCard
+                    key={cert.id}
+                    cert={cert}
+                    user={user}
+                    onView={handleView}
+                    onShare={handleShare}
+                    onCopyLink={handleCopyLink}
+                    getGradeColor={getGradeColor}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "competency" && (
+          <div>
+            {/* Sub Tabs */}
+            <div className="flex items-center gap-3 mb-6">
+              <button
+                onClick={() => setCompetencySubTab("certificates")}
+                className={`px-4 py-2 rounded-lg font-bold transition ${
+                  competencySubTab === "certificates"
+                    ? "bg-yellow-500 text-black"
+                    : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-2 border-gray-200 dark:border-gray-800"
+                }`}
+              >
+                Certificates
+              </button>
+              <button
+                onClick={() => setCompetencySubTab("attempts")}
+                className={`px-4 py-2 rounded-lg font-bold transition ${
+                  competencySubTab === "attempts"
+                    ? "bg-yellow-500 text-black"
+                    : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-2 border-gray-200 dark:border-gray-800"
+                }`}
+              >
+                All Attempts ({attempts.length})
+              </button>
+            </div>
+
+            {competencySubTab === "certificates" ? (
+              <div>
+                {/* Purchased Certificates */}
+                {professionalCertificates.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                      Verified Certificates
+                    </h3>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {professionalCertificates.map((cert) => (
+                        <CompetencyCertificateCard
+                          key={cert._id}
+                          cert={cert}
+                          getCompetencyGrade={getCompetencyGrade}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Eligible for Purchase */}
+                {eligibleAttempts.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <Star className="w-6 h-6 text-yellow-500" />
+                      Eligible for Certificate Purchase
+                    </h3>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {eligibleAttempts.map((attempt) => (
+                        <EligibleCertificateCard
+                          key={attempt._id}
+                          attempt={attempt}
+                          getCompetencyGrade={getCompetencyGrade}
+                          navigate={navigate}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No Certificates */}
+                {professionalCertificates.length === 0 &&
+                  eligibleAttempts.length === 0 && (
+                    <div className="text-center py-16 bg-gradient-to-br from-yellow-500/5 to-orange-500/5 border-2 border-yellow-500/30 rounded-2xl">
+                      <Shield className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        No professional certificates yet
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400 mb-6">
+                        Pass a professional certification test to earn your
+                        certificate
+                      </p>
+                      <button
+                        onClick={() => navigate("/professional-certifications")}
+                        className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl font-bold hover:shadow-xl transition inline-flex items-center gap-2"
+                      >
+                        <Target className="w-5 h-5" />
+                        Take Professional Tests
+                      </button>
+                    </div>
+                  )}
+              </div>
+            ) : (
+              <div>
+                {/* Filters for Attempts */}
+                <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-2xl p-6 mb-6">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="flex-1">
+                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3">
+                        Status Filter
+                      </label>
+                      <div className="flex gap-2">
+                        {[
+                          { value: "all", label: "All", icon: Target },
+                          {
+                            value: "passed",
+                            label: "Passed",
+                            icon: CheckCircle,
+                          },
+                          { value: "failed", label: "Failed", icon: X },
+                        ].map((item) => (
+                          <button
+                            key={item.value}
+                            onClick={() => setAttemptFilter(item.value)}
+                            className={`flex-1 px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                              attemptFilter === item.value
+                                ? "bg-gradient-to-r from-yellow-500 to-yellow-400 text-black shadow-lg"
+                                : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
+                            }`}
+                          >
+                            <item.icon className="w-4 h-4" />
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex-1">
+                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3">
+                        Category
+                      </label>
+                      <select
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-medium focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition"
+                      >
+                        <option value="all">All Categories</option>
+                        {categories.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Attempts List */}
+                {filteredAttempts.length === 0 ? (
+                  <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-2xl p-16 text-center">
+                    <Target className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                      No attempts found
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      Try adjusting your filters or take a test
+                    </p>
+                    <button
+                      onClick={() => navigate("/professional-certifications")}
+                      className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl font-bold hover:shadow-lg transition"
+                    >
+                      Browse Tests
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredAttempts.map((attempt) => (
+                      <AttemptCard
+                        key={attempt._id}
+                        attempt={attempt}
+                        getCompetencyGrade={getCompetencyGrade}
+                        formatDuration={formatDuration}
+                        navigate={navigate}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Modals */}
+        {showShareModal && selectedCertificate && (
+          <ShareModal
+            certificate={selectedCertificate}
+            onClose={() => setShowShareModal(false)}
+            onShareSocial={handleShareSocial}
+            onCopyLink={handleCopyLink}
+          />
+        )}
+
         {showViewModal && viewingCertificate && (
           <CertificateViewModal
             certificate={viewingCertificate}
@@ -610,5 +729,631 @@ const CertificatesPage = () => {
     </div>
   );
 };
+
+// Component: Completion Certificate Card (Your existing design)
+const CompletionCertificateCard = ({
+  cert,
+  user,
+  onView,
+  onShare,
+  onCopyLink,
+  getGradeColor,
+}) => (
+  <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-2xl hover:border-primary-400/50 transition-all duration-300 group">
+    {/* Your existing certificate preview design */}
+    <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-gray-900 to-black p-6 flex flex-col overflow-hidden">
+      {/* Elegant background pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern
+              id="grid"
+              width="40"
+              height="40"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M 40 0 L 0 0 0 40"
+                fill="none"
+                stroke="white"
+                strokeWidth="0.5"
+              />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+        </svg>
+      </div>
+
+      {/* Luxury corner ornaments */}
+      <div className="absolute top-2 left-2">
+        <div className="w-8 h-8 border-t-2 border-l-2 border-primary-400/60 relative">
+          <div className="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+        </div>
+      </div>
+      <div className="absolute top-2 right-2">
+        <div className="w-8 h-8 border-t-2 border-r-2 border-primary-400/60 relative">
+          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+        </div>
+      </div>
+      <div className="absolute bottom-2 left-2">
+        <div className="w-8 h-8 border-b-2 border-l-2 border-primary-400/60 relative">
+          <div className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+        </div>
+      </div>
+      <div className="absolute bottom-2 right-2">
+        <div className="w-8 h-8 border-b-2 border-r-2 border-primary-400/60 relative">
+          <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+        </div>
+      </div>
+
+      {/* Glowing orbs */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-400/5 rounded-full blur-3xl"></div>
+      <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-2xl"></div>
+
+      {/* Header Section */}
+      <div className="relative z-10 flex-shrink-0">
+        <div className="text-center space-y-2">
+          <div className="flex justify-center mb-1">
+            <div className="relative">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-500/50">
+                <Award className="w-5 h-5 text-black" strokeWidth={2.5} />
+              </div>
+              <div className="absolute inset-0 bg-primary-400 rounded-full blur-md opacity-40 animate-pulse"></div>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-center space-x-2 mb-1.5">
+              <div className="h-px w-6 bg-gradient-to-r from-transparent to-primary-400/50"></div>
+              <Star className="w-2.5 h-2.5 text-primary-400" />
+              <div className="h-px w-6 bg-gradient-to-l from-transparent to-primary-400/50"></div>
+            </div>
+            <p className="text-primary-400 text-[9px] font-bold tracking-[0.2em] uppercase mb-1.5">
+              Certificate of Completion
+            </p>
+            <div className="h-px w-16 bg-gradient-to-r from-transparent via-primary-400/30 to-transparent mx-auto"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Course Title */}
+      <div className="relative z-10 flex-grow flex items-center justify-center py-2">
+        <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-6 text-center">
+          {cert.courseTitle}
+        </h3>
+      </div>
+
+      {/* Footer Section */}
+      <div className="relative z-10 flex-shrink-0">
+        <div className="text-center space-y-1.5">
+          <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-lg border border-primary-400/20 shadow-xl">
+            <p className="text-white/50 text-[8px] tracking-wider uppercase mb-0.5">
+              Awarded to
+            </p>
+            <p className="text-white font-bold text-[11px] tracking-wide">
+              {user?.username || "Student"}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center space-x-1.5 text-[8px] text-white/30 tracking-wider">
+            <span className="font-semibold">LIZARD ACADEMY</span>
+            <span>•</span>
+            <span>{new Date(cert.completedDate).getFullYear()}</span>
+            <span>•</span>
+            <Lock className="w-2 h-2" />
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 pointer-events-none"></div>
+    </div>
+
+    {/* Certificate Info */}
+    <div className="p-4">
+      <div className="flex items-center space-x-2 mb-3">
+        <img
+          src={cert.instructorAvatar}
+          alt={cert.instructor}
+          className="w-6 h-6 rounded-full ring-2 ring-gray-200 dark:ring-gray-800"
+        />
+        <span className="text-sm text-gray-500 font-medium">
+          {cert.instructor}
+        </span>
+      </div>
+      <div className="flex items-center justify-between mb-3">
+        <div
+          className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getGradeColor(
+            cert.grade
+          )}`}
+        >
+          {cert.grade}
+        </div>
+        <div className="text-sm text-gray-500">
+          Score:{" "}
+          <span className="font-bold text-gray-900 dark:text-white">
+            {cert.finalScore}%
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center space-x-4 text-xs text-gray-500 mb-4">
+        <div className="flex items-center space-x-1">
+          <Calendar className="w-3 h-3" />
+          <span>{new Date(cert.completedDate).toLocaleDateString()}</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <CheckCircle className="w-3 h-3" />
+          <span>{cert.totalLessons} lessons</span>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <button
+          onClick={() => onView(cert)}
+          className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-primary-400 hover:bg-primary-400/5 hover:scale-105 hover:shadow-lg transition-all duration-200 active:scale-95"
+        >
+          View
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              const response = await fetch(cert.templateImage);
+              const blob = await response.blob();
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `${cert.certificateNumber}.png`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+              toast.success("Certificate downloaded!");
+            } catch (error) {
+              toast.error("Failed to download certificate");
+            }
+          }}
+          className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-primary-400 hover:bg-primary-400/5 hover:scale-105 hover:shadow-lg transition-all duration-200 active:scale-95"
+        >
+          Download
+        </button>
+        <button
+          onClick={() => onShare(cert)}
+          className="py-2.5 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl text-sm font-bold hover:from-primary-500 hover:to-primary-700 hover:scale-105 hover:shadow-xl hover:shadow-primary-400/30 transition-all duration-200 active:scale-95"
+        >
+          Share
+        </button>
+      </div>
+
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+        <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
+          <Lock className="w-3 h-3" />
+          <span className="font-mono">{cert.certificateNumber}</span>
+        </div>
+        <button
+          onClick={() => onCopyLink(cert.verificationUrl)}
+          className="text-xs text-primary-400 hover:text-primary-500 font-semibold flex items-center space-x-1 hover:underline transition-all"
+        >
+          <ExternalLink className="w-3 h-3" />
+          <span>Verify on blockchain</span>
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+// Component: Competency Certificate Card (Purchased/Verified)
+const CompetencyCertificateCard = ({ cert, getCompetencyGrade }) => {
+  const grade = getCompetencyGrade(cert.score);
+
+  return (
+    <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500/10 via-orange-500/10 to-yellow-500/10 p-[2px] hover:scale-105 transition-all duration-300">
+      <div className="bg-white dark:bg-black rounded-2xl overflow-hidden">
+        {/* Premium Certificate Preview */}
+        <div className="relative aspect-video bg-gradient-to-br from-yellow-900 via-orange-900 to-yellow-900 p-6 flex flex-col overflow-hidden">
+          {/* Glowing effects */}
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 to-orange-500/20"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-3xl"></div>
+
+          {/* Gold corner ornaments */}
+          <div className="absolute top-2 left-2">
+            <div className="w-8 h-8 border-t-2 border-l-2 border-yellow-400/80 relative">
+              <div className="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+            </div>
+          </div>
+          <div className="absolute top-2 right-2">
+            <div className="w-8 h-8 border-t-2 border-r-2 border-yellow-400/80 relative">
+              <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+            </div>
+          </div>
+
+          {/* Header */}
+          <div className="relative z-10 text-center mb-2">
+            <div className="flex justify-center mb-1">
+              <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/50">
+                <Shield className="w-5 h-5 text-black" strokeWidth={2.5} />
+              </div>
+            </div>
+            <p className="text-yellow-400 text-[9px] font-bold tracking-[0.2em] uppercase">
+              Professional Certificate
+            </p>
+          </div>
+
+          {/* Title */}
+          <div className="relative z-10 flex-grow flex items-center justify-center">
+            <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-4 text-center">
+              {cert.certificationTitle}
+            </h3>
+          </div>
+
+          {/* Footer */}
+          <div className="relative z-10 text-center">
+            <div className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-xl rounded-lg border border-yellow-400/30">
+              <CheckCircle className="w-3 h-3 text-yellow-400 mr-1" />
+              <span className="text-white text-[9px] font-bold">VERIFIED</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="p-4">
+          <div className="space-y-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div
+                className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${grade.bgColor} ${grade.borderColor} ${grade.textColor}`}
+              >
+                {grade.text}
+              </div>
+              <div className="text-sm text-gray-500">
+                Score:{" "}
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {cert.score}%
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4 text-xs text-gray-500">
+              <div className="flex items-center space-x-1">
+                <Calendar className="w-3 h-3" />
+                <span>{new Date(cert.issuedDate).toLocaleDateString()}</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <Target className="w-3 h-3" />
+                <span>{cert.category}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <button
+              onClick={() => window.open(cert.verificationUrl, "_blank")}
+              className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
+            >
+              View
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch(cert.templateImage);
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `${cert.certificateNumber}.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
+                  toast.success("Certificate downloaded!");
+                } catch (error) {
+                  toast.error("Failed to download");
+                }
+              }}
+              className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
+            >
+              Download
+            </button>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(cert.verificationUrl);
+                toast.success("Link copied!");
+              }}
+              className="py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl text-sm font-bold hover:shadow-lg transition"
+            >
+              Share
+            </button>
+          </div>
+
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+            <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
+              <Lock className="w-3 h-3" />
+              <span className="font-mono">{cert.certificateNumber}</span>
+            </div>
+            <button
+              onClick={() => window.open(cert.blockchainExplorerUrl, "_blank")}
+              className="text-xs text-yellow-500 hover:text-yellow-600 font-semibold flex items-center space-x-1 hover:underline transition"
+            >
+              <Shield className="w-3 h-3" />
+              <span>Verify on blockchain</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Component: Eligible Certificate Card
+const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
+  const grade = getCompetencyGrade(attempt.score);
+
+  return (
+    <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500/10 via-emerald-500/10 to-green-500/10 p-[2px] hover:scale-105 transition-all duration-300">
+      <div className="bg-white dark:bg-black rounded-2xl overflow-hidden">
+        {/* Frosty Premium Preview */}
+        <div className="relative aspect-video bg-gradient-to-br from-green-900 via-emerald-900 to-green-900 p-6 flex flex-col overflow-hidden backdrop-blur-xl">
+          {/* Frosted glass effect */}
+          <div className="absolute inset-0 bg-white/5 backdrop-blur-md"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-green-400/10 rounded-full blur-3xl"></div>
+
+          {/* Eligible Badge */}
+          <div className="absolute top-3 right-3 z-10">
+            <div className="px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full text-[8px] font-bold text-white flex items-center gap-1 shadow-lg">
+              <Star className="w-2.5 h-2.5" />
+              ELIGIBLE
+            </div>
+          </div>
+
+          {/* Header */}
+          <div className="relative z-10 text-center mb-2">
+            <div className="flex justify-center mb-1">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/50 animate-pulse">
+                <Shield className="w-5 h-5 text-black" strokeWidth={2.5} />
+              </div>
+            </div>
+            <p className="text-green-400 text-[9px] font-bold tracking-[0.2em] uppercase">
+              Professional Certificate
+            </p>
+          </div>
+
+          {/* Title */}
+          <div className="relative z-10 flex-grow flex items-center justify-center">
+            <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-4 text-center">
+              {attempt.certification.title}
+            </h3>
+          </div>
+
+          {/* Score Badge */}
+          <div className="relative z-10 text-center">
+            <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-lg border border-green-400/30">
+              <p className="text-white/70 text-[8px] tracking-wider uppercase mb-0.5">
+                Score
+              </p>
+              <p className="text-white font-bold text-[13px]">
+                {attempt.score}%
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="p-4">
+          <div className="space-y-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div
+                className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${grade.bgColor} ${grade.borderColor} ${grade.textColor}`}
+              >
+                {grade.text}
+              </div>
+              <div className="text-sm text-gray-500">
+                {attempt.correctAnswers}/{attempt.totalQuestions}
+              </div>
+            </div>
+            <div className="flex items-center space-x-4 text-xs text-gray-500">
+              <div className="flex items-center space-x-1">
+                <Calendar className="w-3 h-3" />
+                <span>
+                  {new Date(attempt.completedAt).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <Target className="w-3 h-3" />
+                <span>Attempt #{attempt.attemptNumber}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Buy Button */}
+          <button
+            onClick={() =>
+              navigate(`/professional-certifications/attempts/${attempt._id}`)
+            }
+            className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-bold hover:from-green-600 hover:to-emerald-600 hover:shadow-xl transition flex items-center justify-center gap-2"
+          >
+            <Shield className="w-5 h-5" />
+            BUY CERTIFICATE ($5)
+          </button>
+
+          <p className="text-center text-xs text-gray-500 mt-2">
+            Get your blockchain-verified certificate
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Component: Attempt Card
+const AttemptCard = ({
+  attempt,
+  getCompetencyGrade,
+  formatDuration,
+  navigate,
+}) => {
+  const grade = getCompetencyGrade(attempt.score);
+
+  return (
+    <div
+      onClick={() =>
+        navigate(`/professional-certifications/attempts/${attempt._id}`)
+      }
+      className="group relative overflow-hidden rounded-2xl bg-gradient-to-r p-[2px] cursor-pointer hover:scale-[1.02] transition-all duration-300"
+      style={{
+        backgroundImage: `linear-gradient(135deg, ${
+          attempt.passed
+            ? "rgba(34, 197, 94, 0.3), rgba(16, 185, 129, 0.3)"
+            : "rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.3)"
+        })`,
+      }}
+    >
+      <div className="bg-white dark:bg-black rounded-2xl p-6">
+        <div className="flex items-start gap-6">
+          <div
+            className={`p-4 rounded-2xl ${
+              attempt.passed
+                ? "bg-gradient-to-br from-green-500/20 to-emerald-500/20"
+                : "bg-gradient-to-br from-red-500/20 to-rose-500/20"
+            }`}
+          >
+            {attempt.passed ? (
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            ) : (
+              <X className="w-8 h-8 text-red-500" />
+            )}
+          </div>
+
+          <div className="flex-1">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1 group-hover:text-yellow-500 transition">
+                  {attempt.certification.title}
+                </h3>
+                <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                  <span className="flex items-center gap-1">
+                    <Target className="w-4 h-4" />
+                    Attempt #{attempt.attemptNumber}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                    {new Date(attempt.completedAt).toLocaleDateString()}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    {formatDuration(attempt.duration)}
+                  </span>
+                </div>
+              </div>
+              <ArrowRight className="w-6 h-6 text-gray-400 group-hover:text-yellow-500 group-hover:translate-x-1 transition" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div
+                className={`p-4 rounded-xl ${grade.bgColor} border-2 ${grade.borderColor}`}
+              >
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  Score
+                </p>
+                <p className={`text-3xl font-bold ${grade.textColor}`}>
+                  {attempt.score}%
+                </p>
+              </div>
+              <div
+                className={`p-4 rounded-xl ${grade.bgColor} border-2 ${grade.borderColor}`}
+              >
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  Grade
+                </p>
+                <p className={`text-2xl font-bold ${grade.textColor}`}>
+                  {grade.text}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  Correct
+                </p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {attempt.correctAnswers}/{attempt.totalQuestions}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Component: Share Modal
+const ShareModal = ({ certificate, onClose, onShareSocial, onCopyLink }) => (
+  <>
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+      onClick={onClose}
+    />
+    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 p-6 z-50">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          Share Certificate
+        </h3>
+        <button
+          onClick={onClose}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="mb-6 p-4 bg-gradient-to-br from-primary-400 to-purple-600 rounded-xl text-center">
+        <Award className="w-12 h-12 text-white mx-auto mb-2" />
+        <p className="text-white font-bold text-sm line-clamp-2">
+          {certificate.courseTitle || certificate.certificationTitle}
+        </p>
+      </div>
+      <div className="space-y-3 mb-6">
+        <button
+          onClick={() => onShareSocial("twitter")}
+          className="w-full flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+        >
+          <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+            <Twitter className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="font-bold text-gray-900 dark:text-white">Twitter</p>
+            <p className="text-xs text-gray-500">Share on Twitter</p>
+          </div>
+        </button>
+        <button
+          onClick={() => onShareSocial("linkedin")}
+          className="w-full flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+        >
+          <div className="w-10 h-10 bg-blue-700 rounded-lg flex items-center justify-center">
+            <Linkedin className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="font-bold text-gray-900 dark:text-white">LinkedIn</p>
+            <p className="text-xs text-gray-500">Share on LinkedIn</p>
+          </div>
+        </button>
+      </div>
+      <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Verification Link
+        </p>
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            value={certificate.verificationUrl}
+            readOnly
+            className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+          />
+          <button
+            onClick={() => onCopyLink(certificate.verificationUrl)}
+            className="p-2 bg-primary-400 text-black rounded-lg hover:bg-primary-500 transition"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  </>
+);
 
 export default CertificatesPage;

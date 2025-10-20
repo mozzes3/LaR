@@ -15,17 +15,6 @@ const profCertificateController = require("../controllers/professionalCertificat
 router.post("/start-test", authenticate, profCertController.startTestAttempt);
 
 /**
- * @route   POST /api/professional-certifications/track-security
- * @desc    Track security events (tab switch, copy, etc)
- * @access  Private
- */
-router.post(
-  "/track-security",
-  authenticate,
-  profCertController.trackSecurityEvent
-);
-
-/**
  * @route   POST /api/professional-certifications/submit-test
  * @desc    Submit test answers and get results
  * @access  Private
@@ -44,7 +33,7 @@ router.get("/", profCertController.getAllCertifications);
  * @desc    Get certification details (without questions)
  * @access  Public (but shows user-specific data if authenticated)
  */
-router.get("/:slug", profCertController.getCertificationDetails);
+router.get("/:slug", authenticate, profCertController.getCertificationDetails);
 
 // ===== TEST TAKING =====
 
@@ -53,11 +42,6 @@ router.get("/:slug", profCertController.getCertificationDetails);
  * @desc    Track security events (tab switch, copy, etc)
  * @access  Private
  */
-router.post(
-  "/track-security",
-  authenticate,
-  profCertController.trackSecurityEvent
-);
 
 // ===== ATTEMPTS =====
 

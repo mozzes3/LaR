@@ -550,3 +550,16 @@
   filter: drop-shadow(0 20px 40px rgba(192, 38, 211, 0.5))
     drop-shadow(0 0 15px rgba(192, 38, 211, 0.3)) brightness(1.1);
 }
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
