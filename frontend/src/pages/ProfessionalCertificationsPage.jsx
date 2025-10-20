@@ -84,7 +84,7 @@ const ProfessionalCertificationsPage = () => {
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-gradient-to-br from-primary-500 via-primary-600 to-purple-600 text-white">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
-        <div className="relative max-w-7xl mx-auto px-4 py-24">
+        <div className="relative max-w-7xl mx-auto px-4 py-24 z-20">
           <div className="text-center">
             <div className="inline-flex items-center space-x-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full mb-6 border border-white/20">
               <Shield className="w-4 h-4" />
@@ -247,9 +247,10 @@ const ProfessionalCertificationsPage = () => {
                   {/* Thumbnail */}
                   <div className="relative h-48 overflow-hidden bg-gradient-to-br from-primary-500/20 to-purple-500/20">
                     <img
-                      src={cert.thumbnail}
+                      src={`${cert.thumbnail}?v=${Date.now()}`}
                       alt={cert.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      loading="lazy"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
 

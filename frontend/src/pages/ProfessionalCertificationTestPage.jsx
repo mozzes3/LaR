@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Star,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { professionalCertificationApi } from "@services/api";
@@ -90,7 +91,14 @@ const ProfessionalCertificationTestPage = () => {
   }, []);
 
   // Anti-cheat: DevTools detection
+  // DevTools detection (around line 90)
   useEffect(() => {
+    // ONLY track if test has started
+    if (!attemptId || !sessionToken) {
+      console.log("⏸️ Test not started yet, skipping security checks");
+      return;
+    }
+
     const detectDevTools = () => {
       const threshold = 160;
       const widthThreshold = window.outerWidth - window.innerWidth > threshold;
@@ -99,16 +107,21 @@ const ProfessionalCertificationTestPage = () => {
 
       if (widthThreshold || heightThreshold) {
         trackSecurityEvent("devtools");
-        toast.error("Developer tools detected - suspicious activity logged");
       }
     };
 
     const interval = setInterval(detectDevTools, 1000);
+
     return () => clearInterval(interval);
-  }, []);
+  }, [attemptId, sessionToken]); // Add dependencies
 
   // Anti-cheat: Tab switch detection
   useEffect(() => {
+    // ONLY track if test has started
+    if (!attemptId || !sessionToken || !certificationId) {
+      return;
+    }
+
     const handleVisibilityChange = async () => {
       if (document.hidden) {
         const newCount = tabSwitches + 1;
@@ -142,8 +155,14 @@ const ProfessionalCertificationTestPage = () => {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [tabSwitches, maxWarnings, certificationId, navigate]);
-
+  }, [
+    attemptId,
+    sessionToken,
+    certificationId,
+    tabSwitches,
+    maxWarnings,
+    navigate,
+  ]);
   // Track security events
   const trackSecurityEvent = async (eventType) => {
     try {
@@ -184,7 +203,7 @@ const ProfessionalCertificationTestPage = () => {
           attemptNumber,
         });
         setTimeRemaining(timeRemaining);
-        setMaxWarnings(settings.tabSwitchWarnings);
+        setMaxWarnings(settings?.tabSwitchWarnings || 2);
 
         // Initialize answer tracking times
         const times = {};
@@ -197,7 +216,7 @@ const ProfessionalCertificationTestPage = () => {
       } catch (error) {
         console.error("Start test error:", error);
         toast.error(error.response?.data?.error || "Failed to start test");
-        navigate(`/professional-certifications/${certificationId}`);
+        navigate(`/professional-certifications/${certification.slug}/test`);
       } finally {
         setLoading(false);
       }

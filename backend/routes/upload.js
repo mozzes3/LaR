@@ -121,16 +121,66 @@ router.post(
       }
 
       const { oldThumbnailUrl } = req.body;
+      const axios = require("axios");
 
+      console.log("📸 Starting certification thumbnail upload");
+      console.log("📸 Old thumbnail URL:", oldThumbnailUrl);
+
+      // STEP 1: Delete old thumbnail FIRST (before uploading new one)
+      if (oldThumbnailUrl && oldThumbnailUrl.trim() !== "") {
+        try {
+          // Extract file path from old URL
+          let oldFilePath = null;
+
+          if (oldThumbnailUrl.includes(process.env.BUNNY_CDN_CONTENTS)) {
+            oldFilePath = oldThumbnailUrl.split(
+              process.env.BUNNY_CDN_CONTENTS + "/"
+            )[1];
+          } else if (oldThumbnailUrl.includes("lizard-academy-contents")) {
+            const urlParts = oldThumbnailUrl.split(".net/");
+            if (urlParts[1]) {
+              oldFilePath = urlParts[1];
+            }
+          }
+
+          if (oldFilePath) {
+            console.log("🗑️  Deleting old file:", oldFilePath);
+
+            const deleteUrl = `https://storage.bunnycdn.com/${process.env.BUNNY_ZONE_CONTENTS}/${oldFilePath}`;
+
+            await axios.delete(deleteUrl, {
+              headers: {
+                AccessKey: process.env.BUNNY_STORAGE_PASSWORD_CONTENTS,
+              },
+            });
+
+            console.log("✅ Old thumbnail deleted successfully:", oldFilePath);
+          } else {
+            console.log("⚠️  Could not extract old file path from URL");
+          }
+        } catch (deleteError) {
+          // Don't fail the upload if deletion fails
+          console.error(
+            "⚠️ Failed to delete old thumbnail:",
+            deleteError.message
+          );
+          if (deleteError.response?.status === 404) {
+            console.log(
+              "⚠️  Old file not found on CDN (already deleted or doesn't exist)"
+            );
+          }
+        }
+      }
+
+      // STEP 2: Upload new thumbnail
       const fileExtension = req.file.originalname.split(".").pop();
       const fileName = `cert-thumb-${Date.now()}.${fileExtension}`;
-      // CORRECT PATH: certification-thumbnails (NOT certifications)
       const filePath = `certification-thumbnails/${fileName}`;
 
-      // Upload to CONTENTS zone (general public content)
       const uploadUrl = `https://storage.bunnycdn.com/${process.env.BUNNY_ZONE_CONTENTS}/${filePath}`;
 
-      const axios = require("axios");
+      console.log("📤 Uploading new thumbnail:", fileName);
+
       await axios.put(uploadUrl, req.file.buffer, {
         headers: {
           AccessKey: process.env.BUNNY_STORAGE_PASSWORD_CONTENTS,
@@ -140,34 +190,7 @@ router.post(
 
       const cdnUrl = `${process.env.BUNNY_CDN_CONTENTS}/${filePath}`;
 
-      // Delete old thumbnail if exists
-      if (
-        oldThumbnailUrl &&
-        oldThumbnailUrl.includes(process.env.BUNNY_CDN_CONTENTS)
-      ) {
-        try {
-          const oldFilePath = oldThumbnailUrl.split(
-            process.env.BUNNY_CDN_CONTENTS + "/"
-          )[1];
-
-          if (oldFilePath) {
-            const deleteUrl = `https://storage.bunnycdn.com/${process.env.BUNNY_ZONE_CONTENTS}/${oldFilePath}`;
-
-            await axios.delete(deleteUrl, {
-              headers: {
-                AccessKey: process.env.BUNNY_STORAGE_PASSWORD_CONTENTS,
-              },
-            });
-
-            console.log("✅ Old certification thumbnail deleted:", oldFilePath);
-          }
-        } catch (deleteError) {
-          console.error(
-            "⚠️ Failed to delete old thumbnail:",
-            deleteError.message
-          );
-        }
-      }
+      console.log("✅ New thumbnail uploaded successfully:", cdnUrl);
 
       res.json({
         success: true,
@@ -175,7 +198,8 @@ router.post(
         message: "Certification thumbnail uploaded successfully",
       });
     } catch (error) {
-      console.error("Certification thumbnail upload error:", error);
+      console.error("❌ Certification thumbnail upload error:", error.message);
+      console.error("❌ Error response:", error.response?.data);
       res.status(500).json({
         error: error.response?.data?.Message || "Failed to upload thumbnail",
       });

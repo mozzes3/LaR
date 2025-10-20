@@ -76,19 +76,24 @@ const getCertificationDetails = async (req, res) => {
   try {
     const { slug } = req.params;
 
+    console.log("🔍 Request userId:", req.userId); // ADD THIS
+
     const certification = await ProfessionalCertification.findOne({
       slug,
       status: "published",
     })
-      .select("-questions") // SECURITY: Hide questions
+      .select("-questions")
       .lean();
 
     if (!certification) {
       return res.status(404).json({ error: "Certification not found" });
     }
 
-    // Get user's attempt history if authenticated
+    console.log("🔍 User authenticated:", !!req.userId); // ADD THIS
+
     if (req.userId) {
+      console.log("✅ Fetching attempts for user:", req.userId); // ADD THIS
+
       const attempts = await CertificationAttempt.find({
         user: req.userId,
         certification: certification._id,
@@ -97,14 +102,18 @@ const getCertificationDetails = async (req, res) => {
         .sort({ attemptNumber: -1 })
         .lean();
 
+      console.log("📊 Found attempts:", attempts); // ADD THIS
+
       certification.userAttempts = attempts;
       certification.attemptsUsed = attempts.filter(
         (a) => a.status === "completed" || a.status === "cancelled"
       ).length;
+
+      console.log("📊 Attempts used:", certification.attemptsUsed); // ADD THIS
+
       certification.canTakeTest =
         certification.attemptsUsed < certification.maxAttempts;
 
-      // Check if user has pending payment certificate
       const pendingCert = await ProfessionalCertificate.findOne({
         userId: req.userId,
         certificationId: certification._id,
@@ -112,7 +121,13 @@ const getCertificationDetails = async (req, res) => {
         status: "pending-payment",
       });
       certification.hasPendingCertificate = !!pendingCert;
+    } else {
+      console.log("❌ User not authenticated"); // ADD THIS
     }
+
+    console.log("📤 Sending response:", {
+      attemptsUsed: certification.attemptsUsed,
+    }); // ADD THIS
 
     res.json({ success: true, certification });
   } catch (error) {
@@ -345,11 +360,9 @@ const trackSecurityEvent = async (req, res) => {
 
       case "devtools":
         attempt.devToolsDetected = true;
-        attempt.suspiciousActivity.push({
-          type: "devtools-detected",
-          timestamp: new Date(),
-          action: "DevTools opened during test",
-        });
+        attempt.suspiciousActivity.push(
+          "DevTools detected at " + new Date().toISOString()
+        );
         break;
     }
 
@@ -585,6 +598,13 @@ const getAttemptDetails = async (req, res) => {
         totalQuestions: attempt.totalQuestions,
         duration: attempt.duration,
         completedAt: attempt.completedAt,
+        grade: calculateGrade(attempt.score),
+      },
+      certification: {
+        slug: attempt.certification.slug,
+        title: attempt.certification.title,
+        passingScore: attempt.certification.passingScore,
+        maxAttempts: attempt.certification.maxAttempts,
       },
       questions,
     });
@@ -609,7 +629,8 @@ const calculateGrade = (score) => {
   if (score >= 85) return "Excellent";
   if (score >= 75) return "Very Good";
   if (score >= 70) return "Good";
-  return "Pass";
+  if (score >= 60) return "Pass";
+  return "Fail";
 };
 
 const calculateAverageScore = async (certificationId) => {

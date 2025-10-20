@@ -8,22 +8,6 @@ const profCertificateController = require("../controllers/professionalCertificat
 // ===== PROFESSIONAL CERTIFICATIONS (TESTS) =====
 
 /**
- * @route   GET /api/professional-certifications
- * @desc    Get all published professional certifications
- * @access  Public
- */
-router.get("/", profCertController.getAllCertifications);
-
-/**
- * @route   GET /api/professional-certifications/:slug
- * @desc    Get certification details (without questions)
- * @access  Public (but shows user-specific data if authenticated)
- */
-router.get("/:slug", profCertController.getCertificationDetails);
-
-// ===== TEST TAKING =====
-
-/**
  * @route   POST /api/professional-certifications/start-test
  * @desc    Start a new test attempt
  * @access  Private
@@ -47,6 +31,33 @@ router.post(
  * @access  Private
  */
 router.post("/submit-test", authenticate, profCertController.submitTestAttempt);
+
+/**
+ * @route   GET /api/professional-certifications
+ * @desc    Get all published professional certifications
+ * @access  Public
+ */
+router.get("/", profCertController.getAllCertifications);
+
+/**
+ * @route   GET /api/professional-certifications/:slug
+ * @desc    Get certification details (without questions)
+ * @access  Public (but shows user-specific data if authenticated)
+ */
+router.get("/:slug", profCertController.getCertificationDetails);
+
+// ===== TEST TAKING =====
+
+/**
+ * @route   POST /api/professional-certifications/track-security
+ * @desc    Track security events (tab switch, copy, etc)
+ * @access  Private
+ */
+router.post(
+  "/track-security",
+  authenticate,
+  profCertController.trackSecurityEvent
+);
 
 // ===== ATTEMPTS =====
 

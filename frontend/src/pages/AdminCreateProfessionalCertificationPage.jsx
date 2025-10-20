@@ -35,6 +35,7 @@ const AdminCreateProfessionalCertificationPage = () => {
     slug: "",
     description: "",
     thumbnail: "",
+    originalThumbnailUrl: "", // ADD THIS
     category: "Blockchain Fundamentals",
     subcategory: "",
     level: "intermediate",
@@ -94,7 +95,12 @@ const AdminCreateProfessionalCertificationPage = () => {
       setLoading(true);
       const response =
         await adminProfessionalCertificationApi.getCertificationDetails(id);
-      setFormData(response.data.certification);
+      const cert = response.data.certification;
+
+      setFormData({
+        ...cert,
+        originalThumbnailUrl: cert.thumbnail, // CAPTURE ORIGINAL
+      });
     } catch (error) {
       console.error("Load error:", error);
       toast.error("Failed to load certification");
@@ -103,7 +109,6 @@ const AdminCreateProfessionalCertificationPage = () => {
       setLoading(false);
     }
   };
-
   const generateSlug = (title) => {
     return title
       .toLowerCase()
@@ -331,9 +336,19 @@ const AdminCreateProfessionalCertificationPage = () => {
         const formDataUpload = new FormData();
         formDataUpload.append("thumbnail", thumbnailFile);
 
-        // If editing and has old thumbnail, pass it for deletion
-        if (isEditMode && formData.thumbnail) {
-          formDataUpload.append("oldThumbnailUrl", formData.thumbnail);
+        // Pass ORIGINAL thumbnail URL for deletion
+        if (
+          formData.originalThumbnailUrl &&
+          formData.originalThumbnailUrl.trim() !== ""
+        ) {
+          console.log(
+            "🗑️ Sending old thumbnail for deletion:",
+            formData.originalThumbnailUrl
+          );
+          formDataUpload.append(
+            "oldThumbnailUrl",
+            formData.originalThumbnailUrl
+          );
         }
 
         try {
@@ -341,6 +356,14 @@ const AdminCreateProfessionalCertificationPage = () => {
             formDataUpload
           );
           thumbnailUrl = response.data.url;
+
+          // UPDATE: Set new URL as both current and original for next update
+          setFormData({
+            ...formData,
+            thumbnail: thumbnailUrl,
+            originalThumbnailUrl: thumbnailUrl,
+          });
+
           toast.dismiss();
           toast.success("Thumbnail uploaded");
         } catch (uploadError) {

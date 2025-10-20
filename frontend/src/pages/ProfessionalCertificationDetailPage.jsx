@@ -38,6 +38,17 @@ const ProfessionalCertificationDetailPage = () => {
       setLoading(true);
       const response =
         await professionalCertificationApi.getCertificationDetails(slug);
+
+      console.log("📊 Full response:", response.data);
+      console.log(
+        "📊 Attempts used:",
+        response.data.certification.attemptsUsed
+      );
+      console.log(
+        "📊 User attempts array:",
+        response.data.certification.userAttempts
+      );
+
       setCertification(response.data.certification);
     } catch (error) {
       console.error("Load certification error:", error);
