@@ -33,8 +33,14 @@ import AdminCoursesPage from "@pages/AdminCoursesPage";
 import AdminReviewsPage from "@pages/AdminReviewsPage";
 import AdminPurchasesPage from "@pages/AdminPurchasesPage";
 import AdminApplicationsPage from "@pages/AdminApplicationsPage";
+import AdminProfessionalCertificationsPage from "@pages/AdminProfessionalCertificationsPage";
+import AdminCreateProfessionalCertificationPage from "@pages/AdminCreateProfessionalCertificationPage";
 import CertificateVerificationPage from "@pages/CertificateVerificationPage";
 import InstructorEarningsPage from "@pages/InstructorEarningsPage";
+import ProfessionalCertificationsPage from "@pages/ProfessionalCertificationsPage";
+import ProfessionalCertificationDetailPage from "@pages/ProfessionalCertificationDetailPage";
+import ProfessionalCertificationTestPage from "@pages/ProfessionalCertificationTestPage";
+
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 // Protected Route
@@ -186,6 +192,22 @@ function App() {
               }
             />
 
+            <Route
+              path="/professional-certifications"
+              element={<ProfessionalCertificationsPage />}
+            />
+            <Route
+              path="/professional-certifications/:slug"
+              element={<ProfessionalCertificationDetailPage />}
+            />
+            <Route
+              path="/professional-certifications/:certificationId/test"
+              element={
+                <ProtectedRoute>
+                  <ProfessionalCertificationTestPage />
+                </ProtectedRoute>
+              }
+            />
             {/* Progress */}
             <Route
               path="progress"
@@ -235,6 +257,30 @@ function App() {
             element={
               <ProtectedRoute requireAdmin>
                 <AdminCoursesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/professional-certifications"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminProfessionalCertificationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/professional-certifications/create"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminCreateProfessionalCertificationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/professional-certifications/:id/edit"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminCreateProfessionalCertificationPage />
               </ProtectedRoute>
             }
           />

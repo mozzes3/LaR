@@ -70,6 +70,14 @@ app.use("/api/levels", levelRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/admin", require("./routes/admin"));
+app.use(
+  "/api/professional-certifications",
+  require("./routes/professionalCertifications")
+);
+app.use(
+  "/api/admin/professional-certifications",
+  require("./routes/adminProfessionalCertifications")
+);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

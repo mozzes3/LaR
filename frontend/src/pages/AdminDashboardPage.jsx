@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Clock,
   Shield,
+  Award,
 } from "lucide-react";
 import { adminApi } from "@services/api";
 import toast from "react-hot-toast";
@@ -52,6 +53,7 @@ const AdminDashboardPage = () => {
       color: "blue",
       link: "/admin/users",
     },
+
     {
       title: "Total Courses",
       value: stats.totalCourses,
@@ -100,6 +102,13 @@ const AdminDashboardPage = () => {
       color: "red",
       link: "/admin/reviews?status=flagged",
     },
+    {
+      title: "Total Certifications",
+      value: stats.totalCertifications || 0,
+      icon: Award,
+      color: "purple",
+      link: "/admin/professional-certifications",
+    },
   ];
 
   const quickActions = [
@@ -110,6 +119,7 @@ const AdminDashboardPage = () => {
       link: "/admin/users",
       color: "blue",
     },
+
     {
       title: "Manage Roles",
       description: "Configure roles and permissions",
@@ -137,6 +147,13 @@ const AdminDashboardPage = () => {
       icon: Star,
       link: "/admin/reviews",
       color: "yellow",
+    },
+    {
+      title: "Professional Certifications",
+      description: "Manage certification tests",
+      icon: Award, // import Award from lucide-react
+      link: "/admin/professional-certifications",
+      color: "purple",
     },
   ];
 

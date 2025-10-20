@@ -13,6 +13,7 @@ import {
   Settings,
   BookOpen,
   LayoutDashboard,
+  Sparkles,
 } from "lucide-react";
 import { useTheme } from "@contexts/ThemeContext";
 import { useWallet } from "@contexts/WalletContext";
@@ -55,20 +56,30 @@ const Navbar = () => {
         <div className="container-custom">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link to="/" className="flex items-center space-x-3 group">
-              <Link
-                to="/"
-                className="flex items-center space-x-3 group perspective-1000"
-              >
-                <img
-                  src="/logo2.png"
-                  alt="Lizard Academy"
-                  className="h-10 w-auto logo-pop"
-                />
-              </Link>
+            <Link
+              to="/"
+              className="flex items-center space-x-3 group perspective-1000"
+            >
+              <img
+                src="/logo2.png"
+                alt="Lizard Academy"
+                className="h-10 w-auto logo-pop"
+              />
             </Link>
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
+              <Link
+                to="/professional-certifications"
+                className="group relative px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-primary-500 transition font-medium"
+              >
+                <div className="flex items-center space-x-2">
+                  <Shield className="w-4 h-4" />
+                  <span>Certifications</span>
+                  <Sparkles className="w-3 h-3 text-primary-500" />
+                </div>
+                {/* Underline animation */}
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-500 group-hover:w-full transition-all duration-300"></span>
+              </Link>
               <Link
                 to="/courses"
                 className="text-sm font-medium hover:text-primary-400 transition"
@@ -252,6 +263,15 @@ const Navbar = () => {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
             <div className="container-custom py-4 space-y-3">
+              <Link
+                to="/professional-certifications"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center space-x-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+              >
+                <Shield className="w-5 h-5" />
+                <span>Professional Certifications</span>
+                <Sparkles className="w-4 h-4 text-primary-500 ml-auto" />
+              </Link>
               <Link
                 to="/courses"
                 className="block py-2 text-sm font-medium hover:text-primary-400"

@@ -236,7 +236,10 @@ export const uploadApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
-
+  uploadCertificationThumbnail: (formData) =>
+    api.post("/upload/certification-thumbnail", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   // Video upload
   // Video upload
   uploadVideo: (file, data, onUploadProgress) => {
@@ -334,4 +337,60 @@ export const categoryApi = {
     api.get(`/categories/${encodeURIComponent(category)}/subcategories`),
 };
 
+// frontend/src/services/api.js - ADD THESE TO YOUR EXISTING API FILE
+
+// Professional Certifications API
+export const professionalCertificationApi = {
+  getAllCertifications: (params) =>
+    api.get("/professional-certifications", { params }),
+  getCertificationDetails: (slug) =>
+    api.get(`/professional-certifications/${slug}`),
+  startTest: (data) =>
+    api.post("/professional-certifications/start-test", data),
+  trackSecurityEvent: (data) =>
+    api.post("/professional-certifications/track-security", data),
+  submitTest: (data) =>
+    api.post("/professional-certifications/submit-test", data),
+  getMyAttempts: (params) =>
+    api.get("/professional-certifications/attempts/my-attempts", { params }),
+  getAttemptDetails: (attemptId) =>
+    api.get(`/professional-certifications/attempts/${attemptId}`),
+  getEligibleCertificates: () =>
+    api.get("/professional-certifications/certificates/eligible"),
+  getMyCertificates: () =>
+    api.get("/professional-certifications/certificates/my-certificates"),
+  purchaseCertificate: (data) =>
+    api.post("/professional-certifications/certificates/purchase", data),
+  verifyCertificate: (certificateNumber) =>
+    api.get(
+      `/professional-certifications/certificates/verify/${certificateNumber}`
+    ),
+};
+
+// Admin Professional Certifications API
+export const adminProfessionalCertificationApi = {
+  getDashboardStats: () =>
+    api.get("/admin/professional-certifications/dashboard/stats"),
+  getAllCertifications: (params) =>
+    api.get("/admin/professional-certifications", { params }),
+  getCertificationDetails: (id) =>
+    api.get(`/admin/professional-certifications/${id}`),
+  createCertification: (data) =>
+    api.post("/admin/professional-certifications", data),
+  updateCertification: (id, data) =>
+    api.put(`/admin/professional-certifications/${id}`, data),
+  deleteCertification: (id) =>
+    api.delete(`/admin/professional-certifications/${id}`),
+  updateStatus: (id, data) =>
+    api.put(`/admin/professional-certifications/${id}/status`, data),
+  getCertificationAttempts: (id, params) =>
+    api.get(`/admin/professional-certifications/${id}/attempts`, { params }),
+  getAllCertificates: (params) =>
+    api.get("/admin/professional-certifications/certificates/all", { params }),
+  revokeCertificate: (id, data) =>
+    api.post(
+      `/admin/professional-certifications/certificates/${id}/revoke`,
+      data
+    ),
+};
 export default api;

@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const bunnyService = require("../services/bunnyService");
-const { authenticate, isInstructor } = require("../middleware/auth");
+const { authenticate, isInstructor, isAdmin } = require("../middleware/auth");
 
 // Separate upload configs for different file types
 const imageUpload = multer({
@@ -109,6 +109,79 @@ router.post(
   }
 );
 
+router.post(
+  "/certification-thumbnail",
+  authenticate,
+  isAdmin,
+  imageUpload.single("thumbnail"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const { oldThumbnailUrl } = req.body;
+
+      const fileExtension = req.file.originalname.split(".").pop();
+      const fileName = `cert-thumb-${Date.now()}.${fileExtension}`;
+      // CORRECT PATH: certification-thumbnails (NOT certifications)
+      const filePath = `certification-thumbnails/${fileName}`;
+
+      // Upload to CONTENTS zone (general public content)
+      const uploadUrl = `https://storage.bunnycdn.com/${process.env.BUNNY_ZONE_CONTENTS}/${filePath}`;
+
+      const axios = require("axios");
+      await axios.put(uploadUrl, req.file.buffer, {
+        headers: {
+          AccessKey: process.env.BUNNY_STORAGE_PASSWORD_CONTENTS,
+          "Content-Type": req.file.mimetype,
+        },
+      });
+
+      const cdnUrl = `${process.env.BUNNY_CDN_CONTENTS}/${filePath}`;
+
+      // Delete old thumbnail if exists
+      if (
+        oldThumbnailUrl &&
+        oldThumbnailUrl.includes(process.env.BUNNY_CDN_CONTENTS)
+      ) {
+        try {
+          const oldFilePath = oldThumbnailUrl.split(
+            process.env.BUNNY_CDN_CONTENTS + "/"
+          )[1];
+
+          if (oldFilePath) {
+            const deleteUrl = `https://storage.bunnycdn.com/${process.env.BUNNY_ZONE_CONTENTS}/${oldFilePath}`;
+
+            await axios.delete(deleteUrl, {
+              headers: {
+                AccessKey: process.env.BUNNY_STORAGE_PASSWORD_CONTENTS,
+              },
+            });
+
+            console.log("✅ Old certification thumbnail deleted:", oldFilePath);
+          }
+        } catch (deleteError) {
+          console.error(
+            "⚠️ Failed to delete old thumbnail:",
+            deleteError.message
+          );
+        }
+      }
+
+      res.json({
+        success: true,
+        url: cdnUrl,
+        message: "Certification thumbnail uploaded successfully",
+      });
+    } catch (error) {
+      console.error("Certification thumbnail upload error:", error);
+      res.status(500).json({
+        error: error.response?.data?.Message || "Failed to upload thumbnail",
+      });
+    }
+  }
+);
 /**
  * @route   POST /api/upload/thumbnail
  * @desc    Upload course thumbnail
@@ -282,7 +355,7 @@ router.get(
  * @desc    Delete thumbnail from CDN
  * @access  Private (Instructor only)
  */
-router.delete("/thumbnail", authenticate, isInstructor, async (req, res) => {
+router.delete("/thumbnail", authenticate, async (req, res) => {
   try {
     const { url } = req.body;
 
