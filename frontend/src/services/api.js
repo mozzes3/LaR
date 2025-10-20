@@ -20,39 +20,46 @@ api.interceptors.request.use(
 );
 
 // Response interceptor - handle token expiration
+// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If 401 and haven't retried yet, try to refresh token
+    // If error is 401 and we haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (!refreshToken) {
-          throw new Error("No refresh token");
-        }
+      // Check if we have a refresh token
+      const refreshToken = localStorage.getItem("refreshToken");
 
-        const { data } = await axios.post(
-          `${
-            import.meta.env.VITE_API_URL || "http://localhost:5000/api"
-          }/auth/refresh`,
-          { refreshToken }
+      if (!refreshToken) {
+        // No refresh token means user isn't logged in - this is OK for public routes
+        // Just return the error without trying to refresh
+        return Promise.reject(error);
+      }
+
+      try {
+        const response = await axios.post(
+          `${API_URL}/auth/refresh`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${refreshToken}`,
+            },
+          }
         );
 
-        localStorage.setItem("token", data.token);
-        api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
-        originalRequest.headers.Authorization = `Bearer ${data.token}`;
+        const { token } = response.data;
+        localStorage.setItem("token", token);
 
+        // Update the failed request with new token
+        originalRequest.headers.Authorization = `Bearer ${token}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, logout
+        // Refresh failed - clear tokens and reject
         localStorage.removeItem("token");
         localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-        window.location.href = "/";
         return Promise.reject(refreshError);
       }
     }

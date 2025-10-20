@@ -70,15 +70,24 @@ const Navbar = () => {
             <div className="hidden md:flex items-center space-x-8">
               <Link
                 to="/professional-certifications"
-                className="group relative px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-primary-500 transition font-medium"
+                className="group relative px-4 py-2 rounded-lg overflow-hidden transition-all"
               >
-                <div className="flex items-center space-x-2">
-                  <Shield className="w-4 h-4" />
-                  <span>Certifications</span>
-                  <Sparkles className="w-3 h-3 text-primary-500" />
+                {/* Animated shine effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+
+                {/* Glow background */}
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-yellow-500/20 to-amber-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-xl"></div>
+
+                {/* Ambient pulse animation */}
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 rounded-lg animate-pulse"></div>
+
+                <div className="relative flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-amber-500 dark:text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span className="font-bold bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 dark:from-amber-400 dark:via-yellow-400 dark:to-amber-400 bg-clip-text text-transparent group-hover:from-amber-500 group-hover:via-yellow-400 group-hover:to-amber-500 transition-all">
+                    Certifications
+                  </span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 animate-pulse group-hover:animate-spin group-hover:text-yellow-400 transition-all" />
                 </div>
-                {/* Underline animation */}
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-500 group-hover:w-full transition-all duration-300"></span>
               </Link>
               <Link
                 to="/courses"

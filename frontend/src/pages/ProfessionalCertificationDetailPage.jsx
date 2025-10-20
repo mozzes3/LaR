@@ -158,7 +158,7 @@ const ProfessionalCertificationDetailPage = () => {
                   <div className="text-center text-white">
                     <Award className="w-20 h-20 mx-auto mb-4" />
                     <p className="text-2xl font-bold mb-2">
-                      Professional Certificate Preview
+                      Certificate of Competency Preview
                     </p>
                     <p className="text-white/80">
                       Earn this blockchain-verified certificate
@@ -359,11 +359,11 @@ const ProfessionalCertificationDetailPage = () => {
                 <div className="relative">
                   <Shield className="w-12 h-12 mb-4" />
                   <h3 className="text-2xl font-bold mb-2">
-                    Professional Certificate
+                    Certificate of Competency
                   </h3>
                   <p className="text-white/80 mb-6">
-                    Blockchain-verified credential recognized by top Web3
-                    companies
+                    Blockchain-verified credential demonstrating
+                    professional-level expertise
                   </p>
 
                   <div className="mb-6">
@@ -384,7 +384,7 @@ const ProfessionalCertificationDetailPage = () => {
                     </div>
                     <div className="flex items-center space-x-2">
                       <CheckCircle className="w-5 h-5" />
-                      <span className="text-sm">Shareable on LinkedIn</span>
+                      <span className="text-sm">Verifiable credential</span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <CheckCircle className="w-5 h-5" />

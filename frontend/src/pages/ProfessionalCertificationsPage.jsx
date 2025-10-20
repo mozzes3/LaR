@@ -96,10 +96,10 @@ const ProfessionalCertificationsPage = () => {
               Professional Certifications
             </h1>
             <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-3xl mx-auto">
-              Prove your Web3 expertise with blockchain-verified credentials.
+              Earn industry-recognized Certificates of Competency.
               <br />
               <span className="text-primary-200 font-bold">
-                Recognized by top Web3 companies worldwide.
+                Pass rigorous tests and get blockchain-verified credentials.
               </span>
             </p>
 

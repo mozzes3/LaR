@@ -138,13 +138,20 @@ const ProfessionalCertificationTestPage = () => {
 
   // Load/start test
   useEffect(() => {
-    const startTest = async () => {
+    let isMounted = true;
+    let retryTimeout;
+
+    const startTest = async (retryCount = 0) => {
+      if (!isMounted) return;
+
       try {
         setLoading(true);
 
         const response = await professionalCertificationApi.startTest({
           certificationId,
         });
+
+        if (!isMounted) return;
 
         const {
           attemptId,
@@ -164,26 +171,44 @@ const ProfessionalCertificationTestPage = () => {
         setTimeRemaining(timeRemaining);
         setMaxWarnings(settings?.tabSwitchWarnings || 2);
 
-        // Initialize answer tracking times
         const times = {};
         questions.forEach((q) => {
           times[q._id] = Date.now();
         });
         startTimeRef.current = times;
 
+        setLoading(false);
         toast.success(`Test started! Attempt ${attemptNumber}`);
       } catch (error) {
+        if (!isMounted) return;
+
+        // Retry on 429 (duplicate request) - wait longer
+        if (error.response?.status === 429 && retryCount < 3) {
+          console.log(`Retrying... attempt ${retryCount + 1}`);
+          retryTimeout = setTimeout(() => {
+            if (isMounted) {
+              startTest(retryCount + 1);
+            }
+          }, 300 * (retryCount + 1)); // Exponential backoff: 300ms, 600ms, 900ms
+          return;
+        }
+
         console.error("Start test error:", error);
         toast.error(error.response?.data?.error || "Failed to start test");
-        navigate(`/professional-certifications/${certificationId}`);
-      } finally {
         setLoading(false);
+        navigate(`/professional-certifications/${certificationId}`);
       }
     };
 
     startTest();
-  }, [certificationId, navigate]);
 
+    return () => {
+      isMounted = false;
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [certificationId, navigate]);
   // Timer countdown
   useEffect(() => {
     if (timeRemaining <= 0 || testCancelled) {
@@ -254,15 +279,20 @@ const ProfessionalCertificationTestPage = () => {
 
       toast.dismiss();
       toast.success("Test submitted successfully!");
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+
       navigate(`/professional-certifications/results/${attemptId}`, {
         state: { results: response.data.results },
+        replace: true,
       });
     } catch (error) {
+      setIsSubmitting(false);
       toast.dismiss();
       console.error("Submit test error:", error);
       toast.error(error.response?.data?.error || "Failed to submit test");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -286,6 +316,19 @@ const ProfessionalCertificationTestPage = () => {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Starting test...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!testData || !testData.questions || testData.questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Loading questions...
+          </p>
         </div>
       </div>
     );

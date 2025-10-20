@@ -51,7 +51,7 @@ const professionalCertificationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    subcategory: String,
+    subcategories: [String], // CHANGED: Now array instead of single subcategory
     level: {
       type: String,
       enum: ["beginner", "intermediate", "advanced"],
@@ -64,6 +64,12 @@ const professionalCertificationSchema = new mongoose.Schema(
     totalQuestions: {
       type: Number,
       default: 0,
+    },
+    questionsPerTest: {
+      // NEW: How many questions to show per test
+      type: Number,
+      required: true,
+      default: 10,
     },
     totalPoints: {
       type: Number,

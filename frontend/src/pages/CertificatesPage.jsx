@@ -1194,7 +1194,7 @@ const AttemptCard = ({
   return (
     <div
       onClick={() =>
-        navigate(`/professional-certifications/attempts/${attempt._id}`)
+        navigate(`/professional-certifications/results/${attempt._id}`)
       }
       className="group relative overflow-hidden rounded-2xl bg-gradient-to-r p-[2px] cursor-pointer hover:scale-[1.02] transition-all duration-300"
       style={{

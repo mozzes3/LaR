@@ -48,6 +48,35 @@ const authenticate = async (req, res, next) => {
 };
 
 /**
+ * Optional authentication - attach user if token exists, but don't fail
+ */
+const optionalAuth = async (req, res, next) => {
+  try {
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+
+    if (!token) {
+      req.userId = null;
+      return next();
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
+
+    if (user && user.isActive && !user.isBanned) {
+      req.userId = user._id;
+      req.user = user;
+    } else {
+      req.userId = null;
+    }
+
+    next();
+  } catch (error) {
+    req.userId = null;
+    next();
+  }
+};
+
+/**
  * Check if user is an instructor
  */
 const isInstructor = (req, res, next) => {
@@ -71,34 +100,9 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-/**
- * Optional authentication - attach user if token exists, but don't fail
- */
-const optionalAuth = async (req, res, next) => {
-  try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.userId)
-        .populate("roleRef")
-        .populate("customPermissions");
-
-      if (user && user.isActive && !user.isBanned) {
-        req.user = user;
-        req.userId = user._id;
-      }
-    }
-  } catch (error) {
-    // Silently fail for optional auth
-  }
-
-  next();
-};
-
 module.exports = {
   authenticate,
+  optionalAuth,
   isInstructor,
   isAdmin,
-  optionalAuth,
 };
