@@ -977,166 +977,144 @@ const CompetencyCertificateCard = ({
           <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/20 rounded-full blur-3xl"></div>
 
           {/* Official Badge */}
-          <div className="absolute top-3 right-3 z-10">
+          <div className="absolute top-3 right-3 z-10 space-y-1">
             <div className="px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full text-[8px] font-bold text-black flex items-center gap-1 shadow-lg">
               <CheckCircle className="w-2.5 h-2.5" />
               OFFICIAL
             </div>
-          </div>
-
-          {/* Header Section */}
-          <div className="relative z-10 flex-shrink-0">
-            <div className="text-center space-y-2">
-              <div className="flex justify-center mb-1">
-                <div className="relative">
-                  <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/50">
-                    <Shield className="w-5 h-5 text-black" strokeWidth={2.5} />
-                  </div>
-                  <div className="absolute inset-0 bg-yellow-400 rounded-full blur-md opacity-40 animate-pulse"></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-center space-x-2 mb-1.5">
-                  <div className="h-px w-6 bg-gradient-to-r from-transparent to-yellow-400/50"></div>
-                  <Star className="w-2.5 h-2.5 text-yellow-400" />
-                  <div className="h-px w-6 bg-gradient-to-l from-transparent to-yellow-400/50"></div>
-                </div>
-                <p className="text-yellow-400 text-[9px] font-bold tracking-[0.2em] uppercase mb-1.5">
-                  Certificate of Competency
-                </p>
-                <div className="h-px w-16 bg-gradient-to-r from-transparent via-yellow-400/30 to-transparent mx-auto"></div>
-              </div>
+            <div className="px-3 py-1 bg-purple-500/20 backdrop-blur-sm border border-purple-500/30 rounded-full text-[10px] font-bold text-purple-400 tracking-wider flex items-center gap-1">
+              <Shield className="w-3 h-3" />
+              NFT
             </div>
           </div>
 
-          {/* Course Title */}
-          <div className="relative z-10 flex-grow flex items-center justify-center py-2">
-            <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-6 text-center">
-              {cert.certificationTitle || cert.certificationId?.title}
-            </h3>
-          </div>
-
-          {/* Footer Section */}
-          <div className="relative z-10 flex-shrink-0">
-            <div className="text-center space-y-1.5">
-              <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-lg border border-yellow-400/20 shadow-xl">
-                <p className="text-white/50 text-[8px] tracking-wider uppercase mb-0.5">
-                  Awarded to
-                </p>
-                <p className="text-white font-bold text-[11px] tracking-wide">
-                  {cert.studentName || user?.username || "Student"}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-center space-x-1.5 text-[8px] text-white/30 tracking-wider">
-                <span className="font-semibold">LIZARD ACADEMY</span>
-                <span>•</span>
-                <span>
-                  {new Date(
-                    cert.issuedDate || cert.completedDate
-                  ).getFullYear()}
-                </span>
-                <span>•</span>
-                <Lock className="w-2 h-2" />
-              </div>
-            </div>
-          </div>
-
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 pointer-events-none"></div>
+          {cert.nftImageURI && (
+            <img
+              src={cert.nftImageURI}
+              alt="Certificate"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          )}
         </div>
 
         {/* Certificate Info */}
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
-              <img
-                src={
-                  cert.studentAvatar ||
-                  user?.avatar ||
-                  `https://api.dicebear.com/7.x/avataaars/svg?seed=${
-                    cert.studentName || user?.username
-                  }`
-                }
-                alt={cert.studentName || user?.username}
-                className="w-6 h-6 rounded-full ring-2 ring-gray-200 dark:ring-gray-800"
-              />
-              <span className="text-sm font-bold text-gray-900 dark:text-white">
-                {cert.studentName || user?.displayName || user?.username}
-              </span>
-            </div>
-            <div className="text-right">
-              <div className="flex items-center justify-end text-xs text-gray-500">
-                <Calendar className="w-3 h-3 mr-1" />
-                <span>
-                  {new Date(
-                    cert.issuedDate || cert.completedDate
-                  ).toLocaleDateString()}
+        <div className="relative p-4 bg-gradient-to-br from-slate-900/95 via-gray-900/95 to-black/95 backdrop-blur-sm overflow-hidden border-t border-orange-500/10">
+          {/* Subtle grid pattern */}
+          <div
+            className="absolute inset-0 opacity-[0.02]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(249,115,22,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(249,115,22,0.5) 1px, transparent 1px)",
+              backgroundSize: "20px 20px",
+            }}
+          ></div>
+
+          {/* Orange gradient accent */}
+          <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-orange-500/5 to-transparent"></div>
+
+          {/* Bottom glow */}
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-24 bg-orange-500/3 blur-2xl"></div>
+
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2">
+                <img
+                  src={
+                    cert.studentAvatar ||
+                    user?.avatar ||
+                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${
+                      cert.studentName || user?.username
+                    }`
+                  }
+                  alt={cert.studentName || user?.username}
+                  className="w-6 h-6 rounded-full ring-2 ring-gray-200 dark:ring-gray-800"
+                />
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {cert.studentName || user?.displayName || user?.username}
                 </span>
               </div>
+              <div className="text-right">
+                <div className="flex items-center justify-end text-xs text-gray-500">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  <span>
+                    {new Date(
+                      cert.issuedDate || cert.completedDate
+                    ).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center justify-between mb-4">
-            <div
-              className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${grade.bgColor} ${grade.borderColor} ${grade.textColor}`}
-            >
-              {grade.text}
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${grade.bgColor} ${grade.borderColor} ${grade.textColor}`}
+              >
+                {grade.text}
+              </div>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <button
-              onClick={() => onView(cert)}
-              className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
-            >
-              View
-            </button>
-            <button
-              onClick={async () => {
-                try {
-                  const response = await fetch(
-                    cert.certificateUrl || cert.templateImage
-                  );
-                  const blob = await response.blob();
-                  const url = window.URL.createObjectURL(blob);
-                  const link = document.createElement("a");
-                  link.href = url;
-                  link.download = `${cert.certificateNumber}.png`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  window.URL.revokeObjectURL(url);
-                  toast.success("Certificate downloaded!");
-                } catch (error) {
-                  toast.error("Failed to download certificate");
-                }
-              }}
-              className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
-            >
-              Download
-            </button>
-            <button
-              onClick={() => onShare(cert)}
-              className="py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl text-sm font-bold hover:shadow-lg transition"
-            >
-              Share
-            </button>
-          </div>
-
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-            <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
-              <Lock className="w-3 h-3" />
-              <span className="font-mono">{cert.certificateNumber}</span>
+            {/* Action Buttons */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <button
+                onClick={() => onView(cert)}
+                className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
+              >
+                View
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(
+                      cert.certificateUrl || cert.templateImage
+                    );
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = `${cert.certificateNumber}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    toast.success("Certificate downloaded!");
+                  } catch (error) {
+                    toast.error("Failed to download certificate");
+                  }
+                }}
+                className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
+              >
+                Download
+              </button>
+              <button
+                onClick={() => onShare(cert)}
+                className="py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl text-sm font-bold hover:shadow-lg transition"
+              >
+                Share
+              </button>
             </div>
-            <button
-              onClick={() => onCopyLink(cert.verificationUrl)}
-              className="text-xs text-yellow-500 hover:text-yellow-600 font-semibold flex items-center space-x-1 hover:underline transition"
-            >
-              <Shield className="w-3 h-3" />
-              <span>Verify on blockchain</span>
-            </button>
+
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
+                <Lock className="w-3 h-3" />
+                <span className="font-mono">{cert.certificateNumber}</span>
+              </div>
+              <button
+                onClick={() => {
+                  if (cert.nftTokenId && cert.nftContractAddress) {
+                    window.open(
+                      `https://shannon-explorer.somnia.network/token/${cert.nftContractAddress}/instance/${cert.nftTokenId}`,
+                      "_blank"
+                    );
+                  } else {
+                    onCopyLink(cert.verificationUrl);
+                  }
+                }}
+                className="text-xs text-primary-400 hover:text-primary-500 font-semibold flex items-center space-x-1 hover:underline transition-all"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>View NFT on Chain</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

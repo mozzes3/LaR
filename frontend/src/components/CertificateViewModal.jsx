@@ -15,19 +15,30 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [signedImageUrl, setSignedImageUrl] = useState(null);
   const [loadingToken, setLoadingToken] = useState(true);
-
   // Detect certificate type
   const isCompetency =
     certificate.certificationTitle || certificate.certificationId;
 
   useEffect(() => {
-    // For professional certificates, use certificateUrl or templateImage directly
-    const imageUrl = certificate.certificateUrl || certificate.templateImage;
+    console.log("🔍 Full certificate object:", certificate);
+    console.log("🔍 Available fields:", Object.keys(certificate));
+    console.log("🔍 blockchainVerified:", certificate.blockchainVerified);
+    console.log("🔍 blockchainHash:", certificate.nftTransactionHash);
+    console.log("🔍 nftMinted:", certificate.nftMinted);
+    console.log("🔍 nftTransactionHash:", certificate.nftTransactionHash);
+
+    const imageUrl =
+      certificate.nftImageURI ||
+      certificate.templateImage ||
+      certificate.certificateUrl;
     console.log("🖼️ Loading certificate image:", imageUrl);
     setSignedImageUrl(imageUrl);
     setLoadingToken(false);
   }, [certificate]);
-
+  const txHash = certificate.blockchainHash || certificate.nftTransactionHash;
+  const explorerUrl =
+    certificate.blockchainExplorerUrl ||
+    (txHash ? `https://shannon-explorer.somnia.network/tx/${txHash}` : null);
   // Format duration helper
   const formatDuration = (seconds) => {
     if (!seconds) return "N/A";
@@ -74,7 +85,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${certificate.certificateNumber}.png`;
+      link.download = `${certificate.certificateNumber}.webp`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -93,17 +104,17 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   };
 
   const handleCopyHash = () => {
-    if (certificate.blockchainHash) {
-      navigator.clipboard.writeText(certificate.blockchainHash);
+    if (txHash) {
+      navigator.clipboard.writeText(txHash);
       toast.success("Transaction hash copied!");
     }
   };
 
   const handleViewOnBlockchain = () => {
-    if (certificate.blockchainExplorerUrl) {
-      window.open(certificate.blockchainExplorerUrl, "_blank");
-    } else if (certificate.blockchainHash) {
-      const explorerUrl = `https://shannon-explorer.somnia.network/tx/${certificate.blockchainHash}`;
+    if (certificate.nftTokenId && certificate.nftContractAddress) {
+      const nftUrl = `https://shannon-explorer.somnia.network/token/${certificate.nftContractAddress}/instance/${certificate.nftTokenId}`;
+      window.open(nftUrl, "_blank");
+    } else if (explorerUrl) {
       window.open(explorerUrl, "_blank");
     }
   };
@@ -258,12 +269,10 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                     This certificate is permanently recorded on the blockchain
                   </p>
                 </div>
-                {certificate.blockchainHash && (
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                )}
+                {txHash && <CheckCircle className="w-5 h-5 text-green-500" />}
               </div>
 
-              {certificate.blockchainHash && (
+              {txHash && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg">
                     <div className="flex-1 min-w-0">
@@ -271,7 +280,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                         Transaction Hash
                       </p>
                       <p className="text-xs font-mono text-gray-900 dark:text-white truncate">
-                        {certificate.blockchainHash}
+                        {txHash}
                       </p>
                     </div>
                     <button
@@ -285,16 +294,16 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
 
                   <button
                     onClick={handleViewOnBlockchain}
-                    disabled={!certificate.blockchainHash}
+                    disabled={!txHash}
                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-primary-400 text-primary-400 rounded-lg font-medium hover:bg-primary-400 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    <span>View on Explorer</span>
+                    <span>View NFT on Explorer</span>
                   </button>
                 </div>
               )}
 
-              {!certificate.blockchainHash && (
+              {!txHash && (
                 <p className="text-sm text-gray-500 text-center">
                   Blockchain verification pending...
                 </p>

@@ -12,9 +12,6 @@ const path = require("path");
  * Generate verification code
  * Format: 8 character alphanumeric
  */
-const generateVerificationCode = () => {
-  return crypto.randomBytes(4).toString("hex").toUpperCase();
-};
 /**
  * Generate unique certificate number
  * Format: LA-PRO-YYYY-XXXXXX
@@ -428,154 +425,9 @@ const getMyCertificates = async (req, res) => {
 /**
  * Purchase certificate (create pending, then process payment)
  */
-const purchaseCertificate = async (req, res) => {
-  try {
-    const { attemptId, paymentMethod } = req.body;
-    const userId = req.userId;
-
-    // Validate attempt
-    const attempt = await CertificationAttempt.findOne({
-      _id: attemptId,
-      user: userId,
-      passed: true,
-      certificateIssued: false,
-      status: "completed",
-    }).populate("certification");
-
-    if (!attempt) {
-      return res.status(404).json({ error: "Eligible attempt not found" });
-    }
-
-    // Check if certificate already exists
-    const existingCert = await ProfessionalCertificate.findOne({
-      userId,
-      attemptId,
-    });
-
-    if (existingCert && existingCert.paid) {
-      return res.status(400).json({ error: "Certificate already purchased" });
-    }
-
-    const user = await User.findById(userId);
-    const certification = attempt.certification;
-
-    // Calculate price
-    let price = certification.certificatePrice.usd;
-    if (
-      certification.discountPrice &&
-      certification.discountEndDate &&
-      new Date() < new Date(certification.discountEndDate)
-    ) {
-      price = certification.discountPrice.usd;
-    }
-
-    // For now, simulate payment (integrate Stripe/crypto later)
-    const paymentId = `pay_${crypto.randomBytes(16).toString("hex")}`;
-
-    // Generate certificate
-    const certificateNumber = generateCertificateNumber();
-    const verificationCode = generateVerificationCode();
-    const grade = calculateGrade(attempt.score);
-
-    // Create certificate image
-    const certificateBuffer = await createProfessionalCertificateImage({
-      certificateNumber,
-      studentName: user.displayName || user.username,
-      certificationTitle: certification.title,
-      category: certification.category,
-      level: certification.level,
-      score: attempt.score,
-      grade,
-      correctAnswers: attempt.correctAnswers,
-      totalQuestions: attempt.totalQuestions,
-      completedDate: attempt.completedAt,
-      attemptNumber: attempt.attemptNumber,
-    });
-
-    // Upload to Bunny CDN
-    const filename = `${certificateNumber}.png`;
-    const storageZone = process.env.BUNNY_ZONE_CERTIFICATES;
-    const storagePassword = process.env.BUNNY_STORAGE_PASSWORD_CERTIFICATES;
-    const uploadUrl = `https://storage.bunnycdn.com/${storageZone}/${filename}`;
-
-    await axios.put(uploadUrl, certificateBuffer, {
-      headers: {
-        AccessKey: storagePassword,
-        "Content-Type": "image/png",
-      },
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
-    });
-
-    const certificateImageUrl = `${process.env.BUNNY_CDN_CERTIFICATES}/${filename}`;
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-professional/${certificateNumber}`;
-
-    // Create certificate record
-    const certificate = await ProfessionalCertificate.create({
-      userId,
-      certificationId: certification._id,
-      attemptId: attempt._id,
-      certificateNumber,
-      certificateType: "Professional Certificate of Competency",
-      studentName: user.displayName || user.username,
-      studentWallet: user.walletAddress || "Not Connected",
-      certificationTitle: certification.title,
-      category: certification.category,
-      level: certification.level,
-      score: attempt.score,
-      grade,
-      totalQuestions: attempt.totalQuestions,
-      correctAnswers: attempt.correctAnswers,
-      testDuration: certification.duration,
-      completedDate: attempt.completedAt,
-      attemptNumber: attempt.attemptNumber,
-      templateImage: certificateImageUrl,
-      verificationUrl,
-      verificationCode,
-      paid: true, // Mark as paid (after payment processing)
-      paymentAmount: price,
-      paymentCurrency: "USD",
-      paymentMethod,
-      paymentId,
-      paidAt: new Date(),
-      status: "active",
-      issuedDate: new Date(),
-      isValid: true,
-    });
-
-    // Update attempt
-    attempt.certificateIssued = true;
-    attempt.certificateId = certificate._id;
-    attempt.certificatePaid = true;
-    attempt.certificatePaymentId = paymentId;
-    attempt.certificatePaidAt = new Date();
-    await attempt.save();
-
-    // Blockchain recording (async, don't wait)
-    recordCertificateOnBlockchain(certificate).catch((err) =>
-      console.error("Blockchain recording error:", err)
-    );
-
-    res.json({
-      success: true,
-      message: "Certificate purchased successfully!",
-      certificate: {
-        certificateNumber,
-        verificationUrl,
-        imageUrl: certificateImageUrl,
-      },
-    });
-  } catch (error) {
-    console.error("Purchase certificate error:", error);
-    res.status(500).json({ error: "Failed to purchase certificate" });
-  }
-};
 
 /**
- * Record certificate on blockchain (async)
- */
-/**
- * Record certificate on blockchain (async)
+ * Record certificate on blockchain (async, existing system)
  */
 const recordCertificateOnBlockchain = async (certificate) => {
   try {
@@ -603,26 +455,18 @@ const recordCertificateOnBlockchain = async (certificate) => {
       issuedDate: certificate.issuedDate,
     });
 
-    console.log("✅ Blockchain SUCCESS!");
-    console.log("📝 TX:", result.transactionHash);
-    console.log("🔗 Explorer:", result.explorerUrl);
+    console.log("✅ Blockchain SUCCESS!", result.transactionHash);
 
-    certificate.blockchainHash = result.transactionHash;
-    certificate.blockchainExplorerUrl = result.explorerUrl;
-    certificate.blockchainBlock = result.blockNumber;
+    // Update certificate
     certificate.blockchainVerified = true;
-    certificate.blockchainVerifiedAt = new Date();
+    certificate.blockchainTransactionHash = result.transactionHash;
+    certificate.blockchainRecordedAt = new Date();
     await certificate.save();
-
-    console.log("✅ Certificate updated with blockchain info");
   } catch (error) {
-    console.error("❌ Blockchain recording FAILED:", error.message);
-    console.error("❌ Stack:", error.stack);
+    console.error("❌ Blockchain recording failed:", error.message);
   }
 };
-/**
- * Verify certificate by number (public)
- */
+
 const verifyCertificate = async (req, res) => {
   try {
     const { certificateNumber } = req.params;
@@ -682,7 +526,6 @@ const calculateGrade = (score) => {
 module.exports = {
   getEligibleCertificates,
   getMyCertificates,
-  purchaseCertificate,
   verifyCertificate,
   createProfessionalCertificateImage,
 };

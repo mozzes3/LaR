@@ -3,29 +3,11 @@ const mongoose = require("mongoose");
 
 const professionalCertificateSchema = new mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    certificationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "ProfessionalCertification",
-      required: true,
-      index: true,
-    },
-    attemptId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "CertificationAttempt",
-      required: true,
-    },
-
-    // Certificate details
+    // Certificate identification
     certificateNumber: {
       type: String,
-      unique: true,
       required: true,
+      unique: true,
       index: true,
     },
     certificateType: {
@@ -33,63 +15,80 @@ const professionalCertificateSchema = new mongoose.Schema(
       default: "Professional Certificate of Competency",
     },
 
-    // Student info
+    // Student information
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
     studentName: {
       type: String,
       required: true,
     },
     studentWallet: {
       type: String,
-      required: true,
+      default: "N/A",
     },
 
-    // Certification info
+    // Certification information
+    certificationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ProfessionalCertification",
+      required: true,
+    },
     certificationTitle: {
       type: String,
       required: true,
     },
-    category: String,
-    level: String,
+    category: {
+      type: String,
+      required: true,
+    },
+    subcategories: [String],
+    level: {
+      type: String,
+      enum: ["beginner", "intermediate", "advanced"],
+      required: true,
+    },
 
     // Test results
     score: {
       type: Number,
       required: true,
+      min: 0,
+      max: 100,
     },
     grade: {
       type: String,
       required: true,
     },
-    totalQuestions: Number,
-    correctAnswers: Number,
-    testDuration: Number, // minutes
+    correctAnswers: {
+      type: Number,
+      required: true,
+    },
+    totalQuestions: {
+      type: Number,
+      required: true,
+    },
+    attemptNumber: {
+      type: Number,
+      default: 1,
+    },
+
+    // Dates
     completedDate: {
       type: Date,
       required: true,
     },
-    attemptNumber: Number,
-
-    // Certificate image
-    templateImage: String, // Bunny CDN URL
-    certificateUrl: String,
-    transactionHash: String,
-
-    // Blockchain verification
-    blockchainHash: {
-      type: String,
-      index: true,
+    issuedDate: {
+      type: Date,
+      default: Date.now,
     },
-    blockchainExplorerUrl: String,
-    blockchainBlock: Number,
-    blockchainNetwork: {
-      type: String,
-      default: "Somnia",
+    expiryDate: {
+      type: Date,
+      default: null,
     },
-    blockchainVerified: {
-      type: Boolean,
-      default: false,
-    },
-    blockchainVerifiedAt: Date,
 
     // Verification
     verificationUrl: {
@@ -99,54 +98,51 @@ const professionalCertificateSchema = new mongoose.Schema(
     verificationCode: {
       type: String,
       unique: true,
+      sparse: true,
     },
-
-    // Payment
-    paid: {
-      type: Boolean,
-      default: false,
-      required: true,
-    },
-    paymentAmount: Number,
-    paymentCurrency: {
-      type: String,
-      default: "USD",
-    },
-    paymentMethod: String,
-    paymentId: String,
-    paidAt: Date,
-
-    // Status
     status: {
       type: String,
-      enum: ["pending-payment", "active", "revoked"],
-      default: "pending-payment",
+      enum: ["active", "revoked", "expired"],
+      default: "active",
     },
-    revokedAt: Date,
-    revokedReason: String,
 
-    // Validity
-    issuedDate: {
-      type: Date,
-      required: true,
-    },
-    expiryDate: Date, // Optional: some certs don't expire
-    isValid: {
+    // Blockchain (existing system)
+    blockchainVerified: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+    blockchainTransactionHash: String,
+    blockchainRecordedAt: Date,
+
+    // NFT fields
+    nftMinted: {
+      type: Boolean,
+      default: false,
+    },
+    nftTokenId: String,
+    nftContractAddress: String,
+    nftMetadataURI: String,
+    nftImageURI: String,
+    nftTransactionHash: String,
+    nftMintedAt: Date,
+    nftMintError: String,
+
+    // Metadata
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 // Indexes for performance
-professionalCertificateSchema.index({ userId: 1, createdAt: -1 });
-professionalCertificateSchema.index({ certificationId: 1, createdAt: -1 });
-professionalCertificateSchema.index({ certificateNumber: 1 }, { unique: true });
-professionalCertificateSchema.index({ verificationCode: 1 }, { unique: true });
-professionalCertificateSchema.index({ blockchainHash: 1 });
-professionalCertificateSchema.index({ status: 1, paid: 1 });
-professionalCertificateSchema.index({ createdAt: -1 });
+professionalCertificateSchema.index({ userId: 1, issuedDate: -1 });
+professionalCertificateSchema.index({ certificationId: 1 });
+professionalCertificateSchema.index({ status: 1 });
+professionalCertificateSchema.index({ nftMinted: 1 });
+professionalCertificateSchema.index({ nftTokenId: 1 });
 
 module.exports = mongoose.model(
   "ProfessionalCertificate",

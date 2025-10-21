@@ -42,7 +42,7 @@ import ProfessionalCertificationDetailPage from "@pages/ProfessionalCertificatio
 import ProfessionalCertificationTestPage from "@pages/ProfessionalCertificationTestPage";
 import ProfessionalCertificationResultsPage from "@pages/ProfessionalCertificationResultPage";
 import MyProfessionalAttemptsPage from "@pages/MyProfessionalAttemptsPage";
-
+import NFTCertificateViewer from "./pages/NFTViewerPage";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 // Protected Route
@@ -232,6 +232,7 @@ function App() {
               }
             />
           </Route>
+          <Route path="/nft-viewer" element={<NFTCertificateViewer />} />
 
           {/* Admin Routes */}
           <Route

@@ -16,6 +16,7 @@ const { createCanvas, loadImage } = require("canvas");
 const path = require("path");
 const crypto = require("crypto");
 const axios = require("axios");
+const sharp = require("sharp");
 
 /**
  * ANTI-CHEAT: Server-side session management
@@ -737,6 +738,10 @@ const purchaseCertificate = async (req, res) => {
     // Generate certificate number
     const certificateNumber = generateCertificateNumber();
     const verificationCode = generateVerificationCode();
+    // ADD THESE DEBUG LOGS:
+    console.log("🔍 Generated certificateNumber:", certificateNumber);
+    console.log("🔍 Generated verificationCode:", verificationCode);
+    console.log("🔍 Type of verificationCode:", typeof verificationCode);
     // Generate certificate image
     const studentName = attempt.user.displayName || attempt.user.username;
     const certificationData = {
@@ -759,8 +764,12 @@ const purchaseCertificate = async (req, res) => {
       certificationData
     );
 
+    const webpBuffer = await sharp(certificateBuffer)
+      .webp({ quality: 85, effort: 6 })
+      .toBuffer();
+
     // Upload to Bunny CDN
-    const filename = `${certificateNumber}.png`;
+    const filename = `${certificateNumber}.webp`;
     let certificateUrl;
 
     try {
@@ -768,11 +777,11 @@ const purchaseCertificate = async (req, res) => {
 
       const uploadResponse = await axios.put(
         `https://storage.bunnycdn.com/${process.env.BUNNY_ZONE_CERTIFICATES}/${filename}`,
-        certificateBuffer,
+        webpBuffer,
         {
           headers: {
             AccessKey: process.env.BUNNY_STORAGE_PASSWORD_CERTIFICATES,
-            "Content-Type": "image/png",
+            "Content-Type": "image/webp",
           },
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
@@ -892,6 +901,102 @@ const purchaseCertificate = async (req, res) => {
     } catch (blockchainError) {
       console.error("❌ Blockchain recording failed:", blockchainError.message);
       console.error("❌ Full error:", blockchainError);
+    }
+
+    // ===========================================
+    // NFT MINTING (NEW)
+    // ===========================================
+    try {
+      if (certificate.studentWallet && certificate.studentWallet !== "N/A") {
+        console.log("🎨 Starting NFT minting process...");
+
+        const { getIPFSService } = require("../services/ipfsService");
+        const {
+          getNFTBlockchainService,
+        } = require("../services/nftBlockchainService");
+
+        console.log("📤 Uploading certificate image to IPFS...");
+        const ipfsService = getIPFSService();
+        const ipfsImage = await ipfsService.uploadImage(
+          webpBuffer,
+          `${certificateNumber}.webp`
+        );
+        console.log(`✅ Image uploaded: ${ipfsImage.url}`);
+
+        const metadata = {
+          name: `${attempt.certification.title} - Certificate of Competency`,
+          description: `Soul-bound Professional Certificate of Competency issued to ${studentName} by Lizard Academy for completing ${attempt.certification.title}. This certificate represents verified achievement in ${attempt.certification.category}.`,
+          image: ipfsImage.url,
+          external_url: verificationUrl,
+          attributes: [
+            { trait_type: "Certificate Number", value: certificateNumber },
+            { trait_type: "Student", value: studentName },
+            { trait_type: "Certification", value: attempt.certification.title },
+            { trait_type: "Category", value: attempt.certification.category },
+            { trait_type: "Level", value: attempt.certification.level },
+            {
+              trait_type: "Score",
+              value: attempt.score,
+              display_type: "number",
+            },
+            { trait_type: "Grade", value: certificate.grade },
+            {
+              trait_type: "Correct Answers",
+              value: `${attempt.correctAnswers}/${attempt.totalQuestions}`,
+            },
+            {
+              trait_type: "Completed Date",
+              value: Math.floor(attempt.completedAt.getTime() / 1000),
+              display_type: "date",
+            },
+            {
+              trait_type: "Issued Date",
+              value: Math.floor(new Date().getTime() / 1000),
+              display_type: "date",
+            },
+            { trait_type: "Type", value: "Soul-bound Certificate" },
+            { trait_type: "Blockchain", value: "Somnia" },
+          ],
+          properties: {
+            category: "certificates",
+            type: "competency",
+            creators: [{ address: "Lizard Academy", share: 100 }],
+          },
+        };
+
+        console.log("📤 Uploading metadata to IPFS...");
+        const ipfsMetadata = await ipfsService.uploadMetadata(metadata);
+        console.log(`✅ Metadata uploaded: ${ipfsMetadata.url}`);
+
+        console.log("🎨 Minting NFT on blockchain...");
+        const nftService = await getNFTBlockchainService();
+        const nftResult = await nftService.mintCertificateNFT(
+          {
+            studentWallet: certificate.studentWallet,
+            certificateNumber: certificate.certificateNumber,
+          },
+          ipfsMetadata.url
+        );
+
+        certificate.nftTokenId = nftResult.tokenId;
+        certificate.nftMetadataURI = ipfsMetadata.url;
+        certificate.nftImageURI = ipfsImage.url;
+        certificate.nftMinted = true;
+        certificate.nftContractAddress =
+          process.env.COMPETENCY_NFT_CONTRACT_ADDRESS;
+        certificate.nftTransactionHash = nftResult.transactionHash;
+        certificate.nftMintedAt = new Date();
+        await certificate.save();
+
+        console.log(`✅ NFT minted! Token ID: ${nftResult.tokenId}`);
+        console.log(`🔗 Explorer: ${nftResult.explorerUrl}`);
+      } else {
+        console.log("⚠️ No wallet connected - skipping NFT mint");
+      }
+    } catch (nftError) {
+      console.error("❌ NFT minting failed:", nftError.message);
+      certificate.nftMintError = nftError.message;
+      await certificate.save();
     }
 
     // Populate certificate for response

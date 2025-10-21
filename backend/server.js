@@ -10,6 +10,7 @@ const certificateRoutes = require("./routes/certificateRoutes");
 const levelRoutes = require("./routes/levels");
 const categoryRoutes = require("./routes/categories");
 const { sanitizeInput } = require("./middleware/sanitize");
+const nftRoutes = require("./routes/nft");
 const app = express();
 app.use(helmet());
 // Connect to MongoDB
@@ -70,6 +71,7 @@ app.use("/api/levels", levelRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/admin", require("./routes/admin"));
+app.use("/api/nft", nftRoutes);
 app.use(
   "/api/professional-certifications",
   require("./routes/professionalCertifications")
