@@ -199,28 +199,25 @@ const CoursesPage = () => {
       );
 
       setCourses(transformedCourses);
-      setLoading(false);
     } catch (error) {
       console.error("Fetch courses error:", error);
       toast.error("Failed to load courses");
-      setCourses([]); // Empty array instead of mock data
+    } finally {
       setLoading(false);
     }
   };
 
-  // Add helper functions at the bottom
   const formatDuration = (seconds) => {
+    if (!seconds) return "0h 0m";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
   };
 
   const formatDate = (date) => {
     const days = Math.floor(
       (new Date() - new Date(date)) / (1000 * 60 * 60 * 24)
     );
-    if (days === 0) return "Today";
-    if (days === 1) return "Yesterday";
     if (days < 7) return `${days} days ago`;
     if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
     return `${Math.floor(days / 30)} months ago`;
@@ -228,9 +225,7 @@ const CoursesPage = () => {
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
-    if (key === "category" && value) {
-      setViewMode("all");
-    }
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const clearFilters = () => {
@@ -243,19 +238,19 @@ const CoursesPage = () => {
       rating: "",
       sort: "newest",
     });
-    setViewMode("browse");
   };
 
   const getBadgeIcon = (badge) => {
-    switch (badge) {
-      case "KOL":
-        return <Sparkles className="w-3 h-3" />;
-      case "Professional":
-        return <Shield className="w-3 h-3" />;
-      case "Expert":
+    switch (badge?.toLowerCase()) {
+      case "kol":
         return <Trophy className="w-3 h-3" />;
-      case "Creator":
+      case "professional":
+        return <Shield className="w-3 h-3" />;
+      case "expert":
+        return <Sparkles className="w-3 h-3" />;
+      case "creator":
         return <Zap className="w-3 h-3" />;
+      case "instructor":
       default:
         return <Award className="w-3 h-3" />;
     }
@@ -294,8 +289,112 @@ const CoursesPage = () => {
 
   const featuredCourses = courses.filter((c) => c.featured);
   const trendingCourses = courses.filter((c) => c.trending);
+
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 relative overflow-hidden">
+      {/* BREATHTAKING Multi-layer Glassmorphism Background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        {/* Layer 1: Large animated gradient orbs with MORE opacity and size */}
+        <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-gradient-to-br from-primary-400/25 via-purple-400/20 to-blue-400/15 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute top-1/3 right-1/4 w-[700px] h-[700px] bg-gradient-to-br from-blue-400/25 via-cyan-400/20 to-green-400/15 rounded-full blur-3xl animate-float-delay-1"></div>
+        <div className="absolute bottom-1/4 left-1/3 w-[750px] h-[750px] bg-gradient-to-br from-purple-400/25 via-pink-400/20 to-rose-400/15 rounded-full blur-3xl animate-float-delay-2"></div>
+        <div className="absolute bottom-0 right-1/3 w-[700px] h-[700px] bg-gradient-to-br from-green-400/20 via-emerald-400/15 to-teal-400/10 rounded-full blur-3xl animate-float-delay-3"></div>
+
+        {/* Layer 2: Medium orbs for mid-depth */}
+        <div className="absolute top-1/4 right-1/3 w-[400px] h-[400px] bg-gradient-to-br from-yellow-400/20 to-orange-400/15 rounded-full blur-2xl animate-pulse-slow"></div>
+        <div
+          className="absolute bottom-1/3 left-1/4 w-[450px] h-[450px] bg-gradient-to-br from-indigo-400/20 to-violet-400/15 rounded-full blur-2xl animate-pulse-slow"
+          style={{ animationDelay: "1s" }}
+        ></div>
+
+        {/* Layer 3: Animated mesh gradient overlay */}
+        <div className="absolute inset-0 opacity-30 dark:opacity-20">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-400/10 via-transparent to-purple-400/10 animate-gradient"></div>
+          <div className="absolute inset-0 bg-gradient-to-tl from-blue-400/10 via-transparent to-pink-400/10 animate-gradient-reverse"></div>
+        </div>
+
+        {/* Layer 4: Noise texture for depth */}
+        <div className="absolute inset-0 opacity-[0.015] dark:opacity-[0.025] mix-blend-overlay bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxwYXRoIGQ9Ik0wIDBoMzAwdjMwMEgweiIgZmlsdGVyPSJ1cmwoI2EpIiBvcGFjaXR5PSIuMDUiLz48L3N2Zz4=')]"></div>
+
+        {/* Layer 5: Enhanced grid pattern with glow */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080801a_1px,transparent_1px),linear-gradient(to_bottom,#8080801a_1px,transparent_1px)] bg-[size:48px_48px] dark:bg-[linear-gradient(to_right,#ffffff0f_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0f_1px,transparent_1px)]"></div>
+
+        {/* Layer 6: Radial gradient vignette for focus */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.05)_100%)] dark:bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.3)_100%)]"></div>
+
+        {/* Layer 7: Top light beam effect */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-white/10 dark:from-white/5 to-transparent blur-3xl"></div>
+
+        {/* Layer 8: Floating particles/sparkles */}
+        <div className="absolute inset-0">
+          <div className="absolute top-[10%] left-[15%] w-2 h-2 bg-primary-400/40 rounded-full blur-sm animate-float"></div>
+          <div className="absolute top-[25%] right-[20%] w-3 h-3 bg-purple-400/30 rounded-full blur-sm animate-float-delay-1"></div>
+          <div className="absolute top-[60%] left-[25%] w-2 h-2 bg-blue-400/40 rounded-full blur-sm animate-float-delay-2"></div>
+          <div className="absolute top-[40%] right-[30%] w-2 h-2 bg-pink-400/35 rounded-full blur-sm animate-float-delay-3"></div>
+          <div className="absolute top-[70%] left-[40%] w-3 h-3 bg-cyan-400/30 rounded-full blur-sm animate-float"></div>
+          <div className="absolute top-[15%] right-[45%] w-2 h-2 bg-green-400/35 rounded-full blur-sm animate-float-delay-1"></div>
+          <div className="absolute top-[85%] left-[60%] w-2 h-2 bg-yellow-400/40 rounded-full blur-sm animate-float-delay-2"></div>
+          <div className="absolute top-[50%] right-[15%] w-3 h-3 bg-indigo-400/30 rounded-full blur-sm animate-float-delay-3"></div>
+        </div>
+      </div>
+
+      {/* Add custom animations to the page */}
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -30px) scale(1.05); }
+          66% { transform: translate(-20px, 20px) scale(0.95); }
+        }
+        @keyframes float-delay-1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-25px, 25px) scale(1.05); }
+          66% { transform: translate(30px, -20px) scale(0.95); }
+        }
+        @keyframes float-delay-2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(20px, 30px) scale(0.95); }
+          66% { transform: translate(-30px, -25px) scale(1.05); }
+        }
+        @keyframes float-delay-3 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-30px, -20px) scale(1.05); }
+          66% { transform: translate(25px, 30px) scale(0.95); }
+        }
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.1); }
+        }
+        @keyframes gradient {
+          0%, 100% { transform: translate(0, 0) rotate(0deg); }
+          50% { transform: translate(10%, 10%) rotate(5deg); }
+        }
+        @keyframes gradient-reverse {
+          0%, 100% { transform: translate(0, 0) rotate(0deg); }
+          50% { transform: translate(-10%, -10%) rotate(-5deg); }
+        }
+        .animate-float {
+          animation: float 20s ease-in-out infinite;
+        }
+        .animate-float-delay-1 {
+          animation: float-delay-1 25s ease-in-out infinite;
+        }
+        .animate-float-delay-2 {
+          animation: float-delay-2 30s ease-in-out infinite;
+        }
+        .animate-float-delay-3 {
+          animation: float-delay-3 22s ease-in-out infinite;
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 8s ease-in-out infinite;
+        }
+        .animate-gradient {
+          animation: gradient 15s ease-in-out infinite;
+        }
+        .animate-gradient-reverse {
+          animation: gradient-reverse 20s ease-in-out infinite;
+        }
+      `}</style>
+
       {/* Header */}
       <section className="bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white py-16 border-b border-gray-800">
         <div className="container-custom">
@@ -306,7 +405,7 @@ const CoursesPage = () => {
                 Web3 Courses
               </span>
             </h1>
-            <p className="text-xl text-gray-300 mb-8">
+            <p className="text-xl text-gray-400 mb-8">
               Learn from verified KOLs, professionals, and experts
             </p>
             {/* Search Bar */}
@@ -321,7 +420,7 @@ const CoursesPage = () => {
               />
             </div>
 
-            {/* ADD: View All Courses Button - RIGHT UNDER SEARCH */}
+            {/* View All Courses Button */}
             <div className="flex items-center justify-center space-x-4 mt-6">
               <button
                 onClick={() => setViewMode("all")}
@@ -347,7 +446,7 @@ const CoursesPage = () => {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                      🌟 Featured Courses
+                      ⭐ Featured Courses
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400">
                       Hand-picked by our team of experts
@@ -368,6 +467,7 @@ const CoursesPage = () => {
                 </div>
               </section>
             )}
+
             {/* Trending Courses */}
             {trendingCourses.length > 0 && (
               <section className="mb-16">
@@ -398,9 +498,15 @@ const CoursesPage = () => {
                 </div>
               </section>
             )}
+
             {/* Browse by Category */}
-            {/* Browse by Category */}
-            <section className="mb-12">
+            <section className="mb-12 relative">
+              {/* Enhanced background glassmorphism effect */}
+              <div className="absolute inset-0 -z-10 overflow-hidden">
+                <div className="absolute top-20 left-10 w-[500px] h-[500px] bg-gradient-to-br from-primary-400/20 to-purple-400/20 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full blur-3xl"></div>
+              </div>
+
               <div className="mb-8">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                   Browse by Category
@@ -423,362 +529,236 @@ const CoursesPage = () => {
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {categories
                       .slice(0, showAllCategories ? categories.length : 6)
-                      .map((category) => {
-                        const categoryCourses = courses.filter(
-                          (c) =>
-                            c.category ===
-                            category.name.toLowerCase().replace(/\s+/g, "-")
-                        );
-
-                        // Color gradients for each category
-                        const colorGradients = [
-                          "from-pink-500 to-rose-500",
-                          "from-blue-500 to-cyan-500",
-                          "from-green-500 to-emerald-500",
-                          "from-purple-500 to-violet-500",
-                          "from-yellow-500 to-orange-500",
-                          "from-indigo-500 to-blue-500",
-                          "from-red-500 to-pink-500",
-                          "from-teal-500 to-green-500",
-                          "from-orange-500 to-red-500",
-                          "from-cyan-500 to-blue-500",
-                          "from-violet-500 to-purple-500",
-                          "from-lime-500 to-green-500",
-                          "from-fuchsia-500 to-pink-500",
-                          "from-sky-500 to-blue-500",
-                          "from-amber-500 to-orange-500",
+                      .map((category, index) => {
+                        // Subtle accent colors for borders and glows only
+                        const categoryAccents = [
+                          {
+                            border:
+                              "border-pink-400/30 dark:border-pink-400/20",
+                            glow: "hover:shadow-pink-400/20",
+                            gradient: "from-pink-500/5 to-transparent",
+                          },
+                          {
+                            border:
+                              "border-blue-400/30 dark:border-blue-400/20",
+                            glow: "hover:shadow-blue-400/20",
+                            gradient: "from-blue-500/5 to-transparent",
+                          },
+                          {
+                            border:
+                              "border-green-400/30 dark:border-green-400/20",
+                            glow: "hover:shadow-green-400/20",
+                            gradient: "from-green-500/5 to-transparent",
+                          },
+                          {
+                            border:
+                              "border-purple-400/30 dark:border-purple-400/20",
+                            glow: "hover:shadow-purple-400/20",
+                            gradient: "from-purple-500/5 to-transparent",
+                          },
+                          {
+                            border:
+                              "border-orange-400/30 dark:border-orange-400/20",
+                            glow: "hover:shadow-orange-400/20",
+                            gradient: "from-orange-500/5 to-transparent",
+                          },
+                          {
+                            border:
+                              "border-indigo-400/30 dark:border-indigo-400/20",
+                            glow: "hover:shadow-indigo-400/20",
+                            gradient: "from-indigo-500/5 to-transparent",
+                          },
                         ];
-
-                        const colorIndex =
-                          categories.indexOf(category) % colorGradients.length;
-                        const gradient = colorGradients[colorIndex];
-
-                        // Icon mapping
-                        const iconMap = {
-                          "Web3 Development": <Code className="w-6 h-6" />,
-                          "Blockchain Fundamentals": (
-                            <Sparkles className="w-6 h-6" />
-                          ),
-                          DeFi: <Coins className="w-6 h-6" />,
-                          "NFTs & Digital Art": <Palette className="w-6 h-6" />,
-                          "Smart Contracts": <Code className="w-6 h-6" />,
-                          "Community Building": (
-                            <MessageSquare className="w-6 h-6" />
-                          ),
-                          "Marketing & Growth": (
-                            <TrendingUp className="w-6 h-6" />
-                          ),
-                          "Trading & Investment": <Fire className="w-6 h-6" />,
-                          "Security & Auditing": <Shield className="w-6 h-6" />,
-                          "DAOs & Governance": <Users className="w-6 h-6" />,
-                          "Gaming & Metaverse": <Zap className="w-6 h-6" />,
-                          "Content Creation": <Palette className="w-6 h-6" />,
-                          "Business & Entrepreneurship": (
-                            <Trophy className="w-6 h-6" />
-                          ),
-                          "Design & UX": <Palette className="w-6 h-6" />,
-                          "Legal & Compliance": <Shield className="w-6 h-6" />,
-                        };
+                        const accent =
+                          categoryAccents[index % categoryAccents.length];
 
                         return (
-                          <div
-                            key={category.name}
-                            className="group relative overflow-hidden rounded-2xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-primary-400 transition-all duration-300 cursor-pointer hover:shadow-2xl hover:-translate-y-1"
-                            onClick={() =>
-                              handleFilterChange("category", category.name)
-                            }
+                          <button
+                            key={`${category.id}-${index}`}
+                            onClick={() => {
+                              handleFilterChange("category", category.name);
+                              setViewMode("all");
+                            }}
+                            className={`group relative p-6 rounded-2xl border-2 ${
+                              accent.border
+                            } transition-all duration-500 hover:-translate-y-2 bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl hover:shadow-2xl ${
+                              accent.glow
+                            } isolate ${
+                              filters.category === category.name
+                                ? "shadow-2xl scale-105 bg-white/80 dark:bg-gray-900/80"
+                                : ""
+                            }`}
+                            style={{ isolation: "isolate" }}
                           >
-                            {/* Gradient Background */}
+                            {/* Multi-layer glass overlay */}
                             <div
-                              className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-5 group-hover:opacity-10 transition-opacity`}
+                              className={`absolute inset-0 bg-gradient-to-br ${accent.gradient} rounded-2xl pointer-events-none`}
                             ></div>
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/40 dark:from-white/10 via-white/20 dark:via-white/5 to-transparent rounded-2xl pointer-events-none"></div>
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.1),transparent)] dark:bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.05),transparent)] pointer-events-none"></div>
 
-                            {/* Content */}
-                            <div className="relative p-6">
-                              <div className="flex items-start justify-between mb-4">
-                                <div
-                                  className={`p-3 rounded-xl bg-gradient-to-br ${gradient} text-white shadow-lg`}
-                                >
-                                  {iconMap[category.name] || (
-                                    <BookOpen className="w-6 h-6" />
-                                  )}
+                            {/* Animated shimmer effect on hover */}
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 overflow-hidden rounded-2xl pointer-events-none">
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 dark:via-white/10 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                            </div>
+
+                            {/* Top shine line */}
+                            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/60 dark:via-white/20 to-transparent pointer-events-none"></div>
+
+                            <div className="relative z-10">
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-white/40 dark:bg-white/10 backdrop-blur-md rounded-xl text-gray-700 dark:text-white shadow-lg ring-1 ring-white/40 dark:ring-white/20">
+                                  {categoryList.find(
+                                    (c) => c.name === category.name
+                                  )?.icon || <Code className="w-6 h-6" />}
                                 </div>
-                                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-primary-400 group-hover:translate-x-1 transition-all" />
+                                <ChevronRight className="w-5 h-5 text-gray-600 dark:text-white opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                               </div>
-
-                              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary-400 transition">
+                              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 drop-shadow-sm">
                                 {category.name}
                               </h3>
-
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2 min-h-[2.5rem]">
+                              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                                 {category.description}
                               </p>
-
-                              {/* Subcategories Preview */}
-                              {category.subcategories &&
-                                category.subcategories.length > 0 && (
-                                  <div className="flex flex-wrap gap-1.5 mb-4">
-                                    {category.subcategories
-                                      .slice(0, 3)
-                                      .map((sub, idx) => (
-                                        <span
-                                          key={idx}
-                                          className="px-2 py-1 bg-purple-500/10 text-purple-400 rounded-md text-xs font-medium border border-purple-500/20"
-                                        >
-                                          {sub}
-                                        </span>
-                                      ))}
-                                    {category.subcategories.length > 3 && (
-                                      <span className="px-2 py-1 bg-gray-500/10 text-gray-400 rounded-md text-xs font-medium">
-                                        +{category.subcategories.length - 3}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-
-                              <div className="flex items-center justify-between text-sm pt-4 border-t border-gray-200 dark:border-gray-800">
-                                <span className="text-gray-600 dark:text-gray-400 font-medium">
-                                  {categoryCourses.length} courses
-                                </span>
-                                <span className="text-primary-400 font-bold group-hover:underline flex items-center space-x-1">
-                                  <span>Explore</span>
-                                  <span>→</span>
+                              <div className="flex items-center justify-between text-gray-600 dark:text-gray-400 text-sm font-medium">
+                                <span className="backdrop-blur-sm bg-white/30 dark:bg-white/10 px-3 py-1.5 rounded-lg ring-1 ring-white/20">
+                                  {category.courseCount || 0} courses
                                 </span>
                               </div>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                   </div>
-
-                  {/* Load More Button */}
                   {categories.length > 6 && (
-                    <div className="mt-8 text-center">
-                      <button
-                        onClick={() => setShowAllCategories(!showAllCategories)}
-                        className="inline-flex items-center space-x-2 px-8 py-4 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl font-bold hover:border-primary-400 hover:shadow-lg transition-all"
-                      >
-                        {showAllCategories ? (
-                          <>
-                            <ChevronUp className="w-5 h-5" />
-                            <span>Show Less</span>
-                          </>
-                        ) : (
-                          <>
-                            <span>Load More Categories</span>
-                            <span className="text-primary-400">
-                              ({categories.length - 6} more)
-                            </span>
-                            <ChevronDown className="w-5 h-5" />
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setShowAllCategories(!showAllCategories)}
+                      className="mt-8 mx-auto flex items-center space-x-2 px-6 py-3 border-2 border-gray-300 dark:border-gray-700 rounded-xl hover:border-primary-400 transition font-medium backdrop-blur-xl bg-white/60 dark:bg-gray-900/60 hover:bg-white/80 dark:hover:bg-gray-900/80"
+                    >
+                      <span>
+                        {showAllCategories
+                          ? "Show Less"
+                          : "View All Categories"}
+                      </span>
+                      {showAllCategories ? (
+                        <ChevronUp className="w-5 h-5" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5" />
+                      )}
+                    </button>
                   )}
                 </>
               )}
             </section>
           </>
         ) : (
-          /* All Courses Mode - With Filters */
-          /* All Courses Mode - With Filters */
+          /* All Courses View */
           <>
-            {/* Back Button & Filter Bar */}
-            <div className="mb-8">
+            {/* Filters Bar */}
+            <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
               <button
-                onClick={() => clearFilters()}
-                className="inline-flex items-center space-x-2 text-primary-400 hover:text-primary-500 font-medium mb-6"
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center space-x-2 px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-400 transition"
               >
-                <ChevronRight className="w-5 h-5 rotate-180" />
-                <span>Back to Browse</span>
+                <SlidersHorizontal className="w-4 h-4" />
+                <span>Filters</span>
               </button>
-              <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                {/* Filter Button & Quick Category Filters */}
-                <div className="flex items-center gap-3 overflow-x-auto pb-2 hide-scrollbar w-full lg:w-auto">
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="inline-flex items-center space-x-2 px-5 py-3 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl font-medium hover:border-primary-400 transition flex-shrink-0"
-                  >
-                    <SlidersHorizontal className="w-5 h-5" />
-                    <span>Filters</span>
-                  </button>
 
-                  {/* Quick Category Filters - Using Real Data */}
-                  {categories.slice(0, 5).map((cat) => (
-                    <button
-                      key={cat.name}
-                      onClick={() =>
-                        handleFilterChange(
-                          "category",
-                          filters.category === cat.name ? "" : cat.name
-                        )
-                      }
-                      className={`px-4 py-3 rounded-xl font-medium transition whitespace-nowrap text-sm flex-shrink-0 ${
-                        filters.category === cat.name
-                          ? "bg-primary-400 text-black"
-                          : "bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800"
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
+              <div className="flex items-center space-x-4">
+                <select
+                  value={filters.sort}
+                  onChange={(e) => handleFilterChange("sort", e.target.value)}
+                  className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black"
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
+                </select>
 
-                  {categories.length > 5 && (
-                    <button
-                      onClick={() => setShowFilters(true)}
-                      className="px-4 py-3 rounded-xl font-medium transition whitespace-nowrap text-sm bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 flex-shrink-0"
-                    >
-                      +{categories.length - 5} more
-                    </button>
-                  )}
-                </div>
-
-                {/* Sort & Results */}
-                <div className="flex items-center gap-4 flex-shrink-0">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    <span className="font-bold text-gray-900 dark:text-white">
-                      {courses.length}
-                    </span>{" "}
-                    courses
-                  </span>
-                  <select
-                    className="px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 focus:border-primary-400 transition text-sm font-medium"
-                    value={filters.sort}
-                    onChange={(e) => handleFilterChange("sort", e.target.value)}
-                  >
-                    {sortOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <button
+                  onClick={() => setViewMode("browse")}
+                  className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-400 transition"
+                >
+                  Back to Browse
+                </button>
               </div>
             </div>
 
-            {/* Advanced Filters */}
+            {/* Filters Panel */}
             {showFilters && (
-              <div className="mb-8 p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                    Advanced Filters
-                  </h3>
-                  <button
-                    onClick={() => setShowFilters(false)}
-                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {/* All Categories */}
+              <div className="mb-6 p-6 border-2 border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-gray-900">
+                <div className="grid md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-sm font-bold mb-3">
-                      All Categories
+                    <label className="block text-sm font-medium mb-2">
+                      Category
                     </label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                    <select
+                      value={filters.category}
+                      onChange={(e) =>
+                        handleFilterChange("category", e.target.value)
+                      }
+                      className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black"
+                    >
+                      <option value="">All Categories</option>
                       {categories.map((cat) => (
-                        <button
-                          key={cat.name}
-                          onClick={() =>
-                            handleFilterChange(
-                              "category",
-                              filters.category === cat.name ? "" : cat.name
-                            )
-                          }
-                          className={`px-3 py-2 rounded-lg text-xs font-medium transition ${
-                            filters.category === cat.name
-                              ? "bg-primary-400 text-black"
-                              : "bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 hover:border-primary-400"
-                          }`}
-                        >
+                        <option key={cat.id} value={cat.name}>
                           {cat.name}
-                        </button>
+                        </option>
                       ))}
-                    </div>
+                    </select>
                   </div>
 
-                  {/* Other Filters */}
-                  <div className="grid md:grid-cols-4 gap-6">
-                    {/* Level */}
-                    <div>
-                      <label className="block text-sm font-bold mb-3">
-                        Level
-                      </label>
-                      <select
-                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
-                        value={filters.level}
-                        onChange={(e) =>
-                          handleFilterChange("level", e.target.value)
-                        }
-                      >
-                        {levels.map((level) => (
-                          <option
-                            key={level}
-                            value={level === "All Levels" ? "" : level}
-                          >
-                            {level}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Level
+                    </label>
+                    <select
+                      value={filters.level}
+                      onChange={(e) =>
+                        handleFilterChange("level", e.target.value)
+                      }
+                      className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black"
+                    >
+                      {levels.map((level) => (
+                        <option key={level} value={level}>
+                          {level}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    {/* Price Range */}
-                    <div>
-                      <label className="block text-sm font-bold mb-3">
-                        Min Price
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="$0"
-                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
-                        value={filters.minPrice}
-                        onChange={(e) =>
-                          handleFilterChange("minPrice", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold mb-3">
-                        Max Price
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="Any"
-                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
-                        value={filters.maxPrice}
-                        onChange={(e) =>
-                          handleFilterChange("maxPrice", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    {/* Rating */}
-                    <div>
-                      <label className="block text-sm font-bold mb-3">
-                        Min Rating
-                      </label>
-                      <select
-                        className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-black"
-                        value={filters.rating}
-                        onChange={(e) =>
-                          handleFilterChange("rating", e.target.value)
-                        }
-                      >
-                        <option value="">Any Rating</option>
-                        <option value="4.5">4.5+ Stars</option>
-                        <option value="4.0">4.0+ Stars</option>
-                        <option value="3.5">3.5+ Stars</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Min Rating
+                    </label>
+                    <select
+                      value={filters.rating}
+                      onChange={(e) =>
+                        handleFilterChange("rating", e.target.value)
+                      }
+                      className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black"
+                    >
+                      <option value="">Any Rating</option>
+                      <option value="4.5">4.5+ Stars</option>
+                      <option value="4.0">4.0+ Stars</option>
+                      <option value="3.5">3.5+ Stars</option>
+                      <option value="3.0">3.0+ Stars</option>
+                    </select>
                   </div>
                 </div>
+
+                <button
+                  onClick={clearFilters}
+                  className="mt-4 px-4 py-2 text-sm text-primary-400 hover:text-primary-500 font-medium"
+                >
+                  Clear all filters
+                </button>
               </div>
             )}
 
-            {/* Course Grid */}
+            {/* Courses Grid */}
             {loading ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[...Array(8)].map((_, i) => (
@@ -832,6 +812,7 @@ const CourseCard = ({
   getBadgeColorFromBadge,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+
   return (
     <Link
       to={`/courses/${course.slug}`}
@@ -839,192 +820,226 @@ const CourseCard = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative rounded-2xl overflow-hidden border-2 border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-primary-400 transition-all hover:shadow-2xl hover:-translate-y-1 duration-300">
-        {/* Thumbnail */}
+      <div className="relative rounded-2xl overflow-hidden backdrop-blur-3xl border-2 border-white/30 dark:border-white/10 hover:border-primary-400/60 transition-all hover:shadow-[0_20px_80px_-20px_rgba(0,0,0,0.3)] hover:shadow-primary-400/30 hover:-translate-y-3 duration-700 bg-gradient-to-br from-white/80 via-white/60 to-white/40 dark:from-gray-900/80 dark:via-gray-900/60 dark:to-gray-900/40 isolate">
+        {/* LAYER 1: Base frosted glass effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/70 via-white/50 to-white/30 dark:from-white/10 dark:via-white/5 dark:to-transparent pointer-events-none"></div>
+
+        {/* LAYER 2: Radial gradient for depth - multiple sources */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.3),transparent_50%)] dark:bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.08),transparent_50%)] pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(139,92,246,0.15),transparent_60%)] dark:bg-[radial-gradient(circle_at_70%_80%,rgba(139,92,246,0.08),transparent_60%)] pointer-events-none"></div>
+
+        {/* LAYER 3: Animated gradient orbs - LARGER and MORE VISIBLE */}
+        <div className="absolute -top-32 -right-32 w-64 h-64 bg-gradient-to-br from-primary-400/40 via-purple-400/30 to-blue-400/20 dark:from-primary-400/25 dark:via-purple-400/20 dark:to-blue-400/15 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700 animate-pulse-slow"></div>
         <div
-          className={`relative ${
-            compact ? "h-40" : "h-48"
-          } overflow-hidden bg-gray-200 dark:bg-gray-800`}
+          className="absolute -bottom-32 -left-32 w-64 h-64 bg-gradient-to-br from-blue-400/35 via-cyan-400/25 to-green-400/20 dark:from-blue-400/20 dark:via-cyan-400/15 dark:to-green-400/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700 animate-pulse-slow"
+          style={{ transitionDelay: "150ms" }}
+        ></div>
+
+        {/* LAYER 4: Shimmer overlay on hover */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 dark:via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1500 skew-x-12"></div>
+        </div>
+
+        {/* LAYER 5: Top edge shine - more prominent */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/40 to-transparent pointer-events-none"></div>
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-white/50 dark:via-white/20 to-transparent blur-sm pointer-events-none"></div>
+
+        {/* LAYER 6: Inner glow effect */}
+        <div className="absolute inset-[1px] rounded-2xl bg-gradient-to-b from-white/40 dark:from-white/10 to-transparent pointer-events-none"></div>
+
+        {/* Thumbnail Section with ENHANCED effects */}
+        <div
+          className={`relative ${compact ? "h-40" : "h-48"} overflow-hidden`}
         >
           <img
             src={course.thumbnail}
             alt={course.title}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent"></div>
+
+          {/* Enhanced multi-layer gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-black/30"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-500/20 via-transparent to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+
+          {/* Colorful glow on hover - more vibrant */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-400/30 via-purple-400/20 to-blue-400/30 opacity-0 group-hover:opacity-100 mix-blend-overlay transition-opacity duration-700"></div>
+
+          {/* Enhanced badges with better glass effect */}
           {course.trending && (
-            <div className="absolute top-3 left-3">
-              <div className="flex items-center space-x-1 px-2 py-1 bg-orange-500 text-white text-xs font-bold rounded-full">
-                <TrendingUp className="w-3 h-3" />
-                <span>HOT</span>
+            <div className="absolute top-3 left-3 z-10">
+              <div className="relative group/badge">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg blur-md opacity-60"></div>
+                <div className="relative flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-br from-orange-500/95 to-red-500/95 backdrop-blur-xl text-white text-xs font-bold rounded-lg border border-orange-400/50 shadow-xl">
+                  <Fire className="w-3.5 h-3.5 animate-pulse" />
+                  <span className="drop-shadow-lg">Trending</span>
+                </div>
               </div>
             </div>
           )}
-          <div className="absolute top-3 right-3">
-            <span className="px-2 py-1 bg-black/80 backdrop-blur-sm text-white text-xs font-bold rounded-full border border-white/20">
+
+          {/* Level badge with premium glass */}
+          <div className="absolute top-3 right-3 z-10">
+            <div className="px-3 py-1.5 bg-white/25 dark:bg-black/50 backdrop-blur-2xl text-white text-xs font-semibold rounded-lg border border-white/40 shadow-2xl ring-1 ring-white/30 hover:scale-105 transition-transform">
               {course.level}
-            </span>
+            </div>
           </div>
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs">
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-1 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md">
-                <Clock className="w-3 h-3" />
-                <span className="font-medium">{course.duration}</span>
-              </div>
-              <div className="flex items-center space-x-1 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md">
-                <Play className="w-3 h-3" />
-                <span className="font-medium">{course.lessons}</span>
-              </div>
+
+          {/* Enhanced course meta badges */}
+          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white z-10">
+            <div className="flex items-center space-x-1.5 text-xs font-semibold backdrop-blur-2xl bg-white/20 dark:bg-black/40 px-3 py-1.5 rounded-lg border border-white/40 shadow-xl ring-1 ring-white/20">
+              <Clock className="w-3.5 h-3.5" />
+              <span>{course.duration}</span>
+            </div>
+            <div className="flex items-center space-x-1.5 text-xs font-semibold backdrop-blur-2xl bg-white/20 dark:bg-black/40 px-3 py-1.5 rounded-lg border border-white/40 shadow-xl ring-1 ring-white/20">
+              <Play className="w-3.5 h-3.5" />
+              <span>{course.lessons} lessons</span>
             </div>
           </div>
         </div>
-        {/* Content */}
-        <div className={compact ? "p-4" : "p-5"}>
-          <div className="text-xs font-bold text-primary-400 mb-2 uppercase tracking-wide">
-            {course.category}
-          </div>
+
+        {/* Content area with MAXIMUM glass effect */}
+        <div className="p-5 relative">
+          {/* Multi-layer inner lighting */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/30 dark:from-white/8 via-transparent to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary-400/10 via-transparent to-purple-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+
+          {/* Subtle category pills with vibrant glass */}
           {course.subcategories && course.subcategories.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {course.subcategories.slice(0, 2).map((sub, idx) => (
+            <div className="flex flex-wrap gap-1.5 mb-3 relative z-10">
+              {course.subcategories.slice(0, 2).map((sub, index) => (
                 <span
-                  key={idx}
-                  className="px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded text-xs font-medium border border-purple-500/20"
+                  key={index}
+                  className="relative group/pill px-2.5 py-1 text-[10px] font-semibold rounded-md uppercase tracking-wide backdrop-blur-xl shadow-lg hover:scale-105 transition-transform overflow-hidden"
                 >
-                  {sub}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary-400/30 to-purple-400/30 dark:from-primary-400/20 dark:to-purple-400/20"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/40 dark:from-white/10 to-transparent"></div>
+                  <span className="relative z-10 text-primary-700 dark:text-primary-300 drop-shadow-sm">
+                    {sub}
+                  </span>
+                  <div className="absolute inset-0 border border-primary-400/40 dark:border-primary-400/30 rounded-md"></div>
                 </span>
               ))}
-              {course.subcategories.length > 2 && (
-                <span className="px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded text-xs font-medium">
-                  +{course.subcategories.length - 2}
-                </span>
-              )}
             </div>
           )}
+
+          {/* Title with gradient on hover */}
           <h3
             className={`${
               compact ? "text-sm" : "text-base"
-            } font-bold mb-2 text-gray-900 dark:text-white group-hover:text-primary-400 transition-colors line-clamp-2 ${
+            } font-bold mb-3 text-gray-900 dark:text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-primary-600 group-hover:to-purple-600 dark:group-hover:from-primary-400 dark:group-hover:to-purple-400 transition-all line-clamp-2 leading-snug ${
               compact ? "min-h-[2.5rem]" : "min-h-[3rem]"
-            }`}
+            } relative z-10`}
           >
             {course.title}
           </h3>
-          {/* Instructor */}
-          <div className="flex items-center space-x-2 mb-3">
-            <img
-              src={course.instructor.avatar}
-              alt={course.instructor.username}
-              className={`${compact ? "w-6 h-6" : "w-8 h-8"} rounded-full`}
-            />
+
+          {/* Enhanced instructor section */}
+          <div className="flex items-center space-x-2.5 mb-4 pb-4 border-b border-gray-300/40 dark:border-gray-700/40 relative z-10">
+            <div className="relative group/avatar">
+              {/* Glowing ring animation */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary-400 to-purple-400 opacity-0 group-hover:opacity-60 blur-md transition-opacity duration-500"></div>
+              <img
+                src={course.instructor.avatar}
+                alt={course.instructor.username}
+                className={`${
+                  compact ? "w-8 h-8" : "w-9 h-9"
+                } rounded-full ring-2 ring-primary-400/50 shadow-xl relative z-10 group-hover:ring-primary-400 transition-all`}
+              />
+              <div className="absolute inset-0 rounded-full ring-1 ring-white/50 dark:ring-white/30"></div>
+            </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-1.5 mb-1">
                 <span
                   className={`${
                     compact ? "text-xs" : "text-sm"
-                  } font-medium text-gray-700 dark:text-gray-300 truncate`}
+                  } font-semibold text-gray-800 dark:text-gray-100 truncate`}
                 >
                   {course.instructor.name}
                 </span>
                 {course.instructor.verified && (
-                  <Award className="w-3 h-3 text-primary-400 flex-shrink-0" />
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-primary-400/40 blur-sm rounded-full"></div>
+                    <Award className="w-3.5 h-3.5 text-primary-500 relative z-10 drop-shadow-lg" />
+                  </div>
                 )}
               </div>
-              {/* ✅ Multiple badges */}
-              <div className="flex flex-wrap gap-1 mt-1">
-                {course.instructor.badges?.map((badge, index) => (
+
+              {/* Vibrant badge design */}
+              <div className="flex items-center gap-1.5">
+                {course.instructor.badges?.slice(0, 2).map((badge, index) => (
                   <div
                     key={index}
-                    className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-xs font-bold border ${getBadgeColors(
-                      getBadgeColorFromBadge(badge)
-                    )}`}
+                    className="relative group/badge inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[10px] font-semibold backdrop-blur-xl shadow-lg overflow-hidden"
                   >
-                    {getBadgeIcon(badge)}
-                    <span>{badge}</span>
+                    <div className="absolute inset-0 bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/50 dark:from-white/10 to-transparent"></div>
+                    <span className="relative z-10 w-2 h-2 rounded-full bg-gradient-to-br from-primary-400 via-purple-400 to-blue-400 shadow-lg"></span>
+                    <span className="relative z-10 text-gray-700 dark:text-gray-200">
+                      {badge}
+                    </span>
+                    <div className="absolute inset-0 border border-gray-300/50 dark:border-gray-600/50 rounded-md"></div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
-          {/* Stats */}
-          {/* Stats */}
-          {/* Stats */}
-          <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
-            <div className="flex items-center space-x-1">
-              <Star className="w-4 h-4 text-primary-400 fill-primary-400" />
+
+          {/* Stats row with better design */}
+          <div className="flex items-center justify-between mb-4 relative z-10">
+            <div className="flex items-center space-x-1.5">
+              <div className="relative">
+                <div className="absolute inset-0 bg-yellow-400/40 blur-md rounded-full"></div>
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 relative z-10 drop-shadow-lg" />
+              </div>
               <span
-                className={`${compact ? "text-sm" : "text-base"} font-bold`}
+                className={`${
+                  compact ? "text-sm" : "text-base"
+                } font-bold text-gray-900 dark:text-white`}
               >
                 {course.rating}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
                 ({(course.totalRatings || 0).toLocaleString()})
               </span>
             </div>
-            <div className="flex items-center space-x-1 text-xs text-gray-500">
-              <Users className="w-3 h-3" />
+            <div className="flex items-center space-x-1.5 text-xs text-gray-600 dark:text-gray-400 font-medium">
+              <Users className="w-3.5 h-3.5" />
               <span>{course.students.toLocaleString()}</span>
             </div>
           </div>
-          {/* Price */}
-          <div className="flex items-center justify-between">
-            <div>
+
+          {/* Price and CTA with ultimate glass button */}
+          <div className="flex items-center justify-between relative z-10">
+            <div className="relative">
               <div
                 className={`${
-                  compact ? "text-xl" : "text-2xl"
-                } font-bold text-gray-900 dark:text-white`}
+                  compact ? "text-2xl" : "text-3xl"
+                } font-black bg-gradient-to-br from-gray-900 via-gray-700 to-gray-900 dark:from-white dark:via-gray-100 dark:to-white bg-clip-text text-transparent drop-shadow-sm`}
               >
                 ${course.price.usd}
               </div>
-              <div className="text-xs text-gray-500">
-                or {course.price.fdr} $FDR
-              </div>
             </div>
-            <div
-              className={`${
-                compact ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm"
-              } rounded-lg font-bold transition-all ${
-                isHovered
-                  ? "bg-primary-400 text-black"
-                  : "bg-primary-400/10 text-primary-400"
-              }`}
-            >
-              View
-            </div>
-          </div>
-        </div>
-        {/* Hover Preview - What You'll Learn */}
-        {isHovered && !compact && (
-          <div className="absolute inset-0 bg-black/95 backdrop-blur-sm p-5 flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <div>
-              <h4 className="text-lg font-bold text-white mb-3">
-                {course.title}
-              </h4>
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-primary-400 uppercase tracking-wide">
-                  What you'll learn:
-                </p>
-                <ul className="space-y-1.5">
-                  {course.whatYouWillLearn.map((item, i) => (
-                    <li
-                      key={i}
-                      className="text-xs text-gray-300 flex items-start"
-                    >
-                      <span className="text-primary-400 mr-2 flex-shrink-0">
-                        ✓
-                      </span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <button className="w-full py-3 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-lg font-bold hover:shadow-xl transition">
-              Enroll Now - ${course.price.usd}
+            <button className="relative group/btn overflow-hidden px-5 py-2.5 rounded-lg text-sm font-bold text-white transition-all hover:scale-105 active:scale-100 hover:shadow-2xl hover:shadow-primary-400/50">
+              {/* Animated gradient background */}
+              <div className="absolute inset-0 bg-gradient-to-r from-primary-400 via-primary-500 to-primary-600 transition-transform group-hover/btn:scale-110"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-primary-500 via-purple-500 to-primary-500 opacity-0 group-hover/btn:opacity-100 transition-opacity"></div>
+
+              {/* Glass overlay */}
+              <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent"></div>
+
+              {/* Shimmer effect */}
+              <div className="absolute inset-0 translate-x-[-200%] group-hover/btn:translate-x-[200%] transition-transform duration-700 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12"></div>
+
+              {/* Border glow */}
+              <div className="absolute inset-0 rounded-lg ring-1 ring-white/40 group-hover/btn:ring-white/60 transition-all"></div>
+
+              <span className="relative z-10 drop-shadow-lg">Enroll Now</span>
             </button>
           </div>
-        )}
+        </div>
       </div>
     </Link>
   );
 };
+
 export default CoursesPage;
