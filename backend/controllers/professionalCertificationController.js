@@ -182,17 +182,23 @@ const getCertificationDetails = async (req, res) => {
  * Creates secure session, validates eligibility
  */
 const startTestAttempt = async (req, res) => {
+  console.log("🔍 Start test attempt called");
   try {
     const { certificationId } = req.body;
     const userId = req.userId;
     const requestKey = `${userId}_${certificationId}`;
 
     if (activeStartRequests.has(requestKey)) {
+      console.log("⚠️ Duplicate request detected, ignoring");
       return res.status(429).json({ error: "Request already in progress" });
     }
 
     activeStartRequests.add(requestKey);
 
+    // Auto-cleanup after 10 seconds in case something goes wrong
+    setTimeout(() => {
+      activeStartRequests.delete(requestKey);
+    }, 10000);
     try {
       const certification = await ProfessionalCertification.findById(
         certificationId

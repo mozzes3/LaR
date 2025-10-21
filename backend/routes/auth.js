@@ -7,7 +7,7 @@ const { authenticate } = require("../middleware/auth");
 // ✅ SECURITY: Rate limit auth endpoints
 const authLimiter = rateLimit({
   windowMs: 1 * 60 * 100, // 15 minutes
-  max: 5000, // 5 attempts per IP
+  max: 100000, // 5 attempts per IP
   message: "Too many authentication attempts, please try again later",
   standardHeaders: true,
   legacyHeaders: false,

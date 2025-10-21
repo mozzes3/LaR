@@ -139,10 +139,11 @@ const ProfessionalCertificationTestPage = () => {
   // Load/start test
   useEffect(() => {
     let isMounted = true;
-    let retryTimeout;
+    let hasStarted = false; // ADD THIS FLAG
 
     const startTest = async (retryCount = 0) => {
-      if (!isMounted) return;
+      if (!isMounted || hasStarted) return; // CHECK FLAG
+      hasStarted = true; // SET FLAG
 
       try {
         setLoading(true);
@@ -182,21 +183,26 @@ const ProfessionalCertificationTestPage = () => {
       } catch (error) {
         if (!isMounted) return;
 
-        // Retry on 429 (duplicate request) - wait longer
-        if (error.response?.status === 429 && retryCount < 3) {
+        // Retry on 429 - but only if not already started
+        if (error.response?.status === 429 && retryCount < 2 && !hasStarted) {
+          hasStarted = false; // Reset for retry
           console.log(`Retrying... attempt ${retryCount + 1}`);
-          retryTimeout = setTimeout(() => {
+          setTimeout(() => {
             if (isMounted) {
               startTest(retryCount + 1);
             }
-          }, 300 * (retryCount + 1)); // Exponential backoff: 300ms, 600ms, 900ms
+          }, 1000 * (retryCount + 1)); // 1s, 2s backoff
           return;
         }
 
         console.error("Start test error:", error);
         toast.error(error.response?.data?.error || "Failed to start test");
         setLoading(false);
-        navigate(`/professional-certifications/${certificationId}`);
+
+        // Don't navigate away on 429, let user retry manually
+        if (error.response?.status !== 429) {
+          navigate(`/professional-certifications/${certificationId}`);
+        }
       }
     };
 
@@ -204,9 +210,6 @@ const ProfessionalCertificationTestPage = () => {
 
     return () => {
       isMounted = false;
-      if (retryTimeout) {
-        clearTimeout(retryTimeout);
-      }
     };
   }, [certificationId, navigate]);
   // Timer countdown

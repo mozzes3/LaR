@@ -574,31 +574,39 @@ const purchaseCertificate = async (req, res) => {
 /**
  * Record certificate on blockchain (async)
  */
+/**
+ * Record certificate on blockchain (async)
+ */
 const recordCertificateOnBlockchain = async (certificate) => {
   try {
-    const { getBlockchainService } = require("../services/blockchainService");
-    const blockchainService = getBlockchainService();
+    console.log("🔗 Starting blockchain recording...");
+    console.log("📋 Certificate:", certificate.certificateNumber);
+
+    const {
+      getProfessionalCertBlockchainService,
+    } = require("../services/professionalCertificateBlockchainService");
+    const blockchainService = getProfessionalCertBlockchainService();
 
     console.log("📝 Recording professional certificate on blockchain...");
 
     const result = await blockchainService.recordProfessionalCertificate({
       certificateNumber: certificate.certificateNumber,
-      certificateType: certificate.certificateType,
+      certificateType:
+        certificate.certificateType || "Professional Certificate of Competency",
       studentName: certificate.studentName,
-      studentWallet: certificate.studentWallet,
+      studentWallet: certificate.studentWallet || "Not Connected",
       certificationTitle: certificate.certificationTitle,
       category: certificate.category,
-      level: certificate.level,
       score: certificate.score,
       grade: certificate.grade,
-      totalQuestions: certificate.totalQuestions,
-      correctAnswers: certificate.correctAnswers,
-      attemptNumber: certificate.attemptNumber,
       completedDate: certificate.completedDate,
       issuedDate: certificate.issuedDate,
     });
 
-    // Update certificate with blockchain info
+    console.log("✅ Blockchain SUCCESS!");
+    console.log("📝 TX:", result.transactionHash);
+    console.log("🔗 Explorer:", result.explorerUrl);
+
     certificate.blockchainHash = result.transactionHash;
     certificate.blockchainExplorerUrl = result.explorerUrl;
     certificate.blockchainBlock = result.blockNumber;
@@ -606,16 +614,12 @@ const recordCertificateOnBlockchain = async (certificate) => {
     certificate.blockchainVerifiedAt = new Date();
     await certificate.save();
 
-    console.log(
-      "✅ Certificate recorded on blockchain:",
-      result.transactionHash
-    );
+    console.log("✅ Certificate updated with blockchain info");
   } catch (error) {
-    console.error("❌ Blockchain recording failed:", error);
-    // Don't throw - certificate is still valid without blockchain
+    console.error("❌ Blockchain recording FAILED:", error.message);
+    console.error("❌ Stack:", error.stack);
   }
 };
-
 /**
  * Verify certificate by number (public)
  */

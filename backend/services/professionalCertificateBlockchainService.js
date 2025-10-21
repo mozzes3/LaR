@@ -1,13 +1,13 @@
 // backend/services/professionalCertificateBlockchainService.js
 const { ethers } = require("ethers");
 
-// Professional Certificate ABI
+// UPDATED ABI - Matches simplified contract (no uint16 fields, no level, no revoked)
 const PROFESSIONAL_CERT_ABI = [
-  "function recordCertificate(string certificateNumber, string certificateType, string studentName, string studentWallet, string certificationTitle, string category, string level, uint256 score, string grade, uint16 totalQuestions, uint16 correctAnswers, uint16 attemptNumber, uint256 completedDate, uint256 issuedDate) public returns (bytes32)",
-  "function verifyCertificate(string certificateNumber) public view returns (bool exists, bool revoked, string studentName, string certificationTitle, string category, string level, uint256 score, string grade, uint16 correctAnswers, uint16 totalQuestions, uint256 completedDate, uint256 issuedDate)",
+  "function recordCertificate(string certificateNumber, string certificateType, string studentName, string studentWallet, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate) public returns (bytes32)",
+  "function verifyCertificate(string certificateNumber) public view returns (bool exists, string studentName, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate)",
   "function isCertificateValid(string certificateNumber) public view returns (bool)",
-  "function getCertificateByNumber(string certificateNumber) public view returns (tuple(string certificateNumber, string certificateType, string studentName, string studentWallet, string certificationTitle, string category, string level, uint256 score, string grade, uint16 totalQuestions, uint16 correctAnswers, uint16 attemptNumber, uint256 completedDate, uint256 issuedDate, uint256 recordedAt, bool exists, bool revoked, string revokedReason))",
-  "event CertificateRecorded(bytes32 indexed certificateHash, string certificateNumber, string studentName, string certificationTitle, uint256 score, string grade, uint256 timestamp)",
+  "function getCertificateByNumber(string certificateNumber) public view returns (tuple(string certificateNumber, string certificateType, string studentName, string studentWallet, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate, uint256 recordedAt, bool exists))",
+  "event CertificateRecorded(bytes32 indexed certificateHash, string certificateNumber, string studentName, string certificationTitle, uint256 timestamp)",
 ];
 
 /**
@@ -41,7 +41,7 @@ class ProfessionalCertificateBlockchainService {
 
   /**
    * Record professional certificate on blockchain
-   * Gas optimized with proper uint16 handling
+   * UPDATED: Matches simplified contract (10 parameters)
    */
   async recordProfessionalCertificate(certificateData) {
     try {
@@ -56,12 +56,8 @@ class ProfessionalCertificateBlockchainService {
         studentWallet,
         certificationTitle,
         category,
-        level,
         score,
         grade,
-        totalQuestions,
-        correctAnswers,
-        attemptNumber,
         completedDate,
         issuedDate,
       } = certificateData;
@@ -82,6 +78,16 @@ class ProfessionalCertificateBlockchainService {
       );
       const issuedTimestamp = Math.floor(new Date(issuedDate).getTime() / 1000);
 
+      console.log("📋 Certificate data:", {
+        certificateNumber,
+        certificateType,
+        studentName,
+        certificationTitle,
+        category,
+        score,
+        grade,
+      });
+
       // Estimate gas
       const gasEstimate = await this.contract.recordCertificate.estimateGas(
         certificateNumber,
@@ -90,22 +96,17 @@ class ProfessionalCertificateBlockchainService {
         studentWallet || "Not Connected",
         certificationTitle,
         category,
-        level,
-        Math.floor(score), // uint256
         grade,
-        totalQuestions, // uint16
-        correctAnswers, // uint16
-        attemptNumber, // uint16
+        score,
         completedTimestamp,
         issuedTimestamp
       );
 
       console.log(`⛽ Estimated gas: ${gasEstimate.toString()}`);
 
-      // Add 20% buffer for safety
-      const gasLimit = gasEstimate + (gasEstimate * 20n) / 100n;
+      // Send transaction with 20% gas buffer
+      const gasLimit = (gasEstimate * 120n) / 100n;
 
-      // Send transaction
       const tx = await this.contract.recordCertificate(
         certificateNumber,
         certificateType,
@@ -113,36 +114,26 @@ class ProfessionalCertificateBlockchainService {
         studentWallet || "Not Connected",
         certificationTitle,
         category,
-        level,
-        Math.floor(score),
         grade,
-        totalQuestions,
-        correctAnswers,
-        attemptNumber,
+        score,
         completedTimestamp,
         issuedTimestamp,
         {
-          gasLimit,
-          gasPrice,
+          gasLimit: gasLimit,
+          gasPrice: gasPrice,
         }
       );
 
       console.log(`📤 Transaction sent: ${tx.hash}`);
-      console.log(`⏳ Waiting for confirmation...`);
+      console.log("⏳ Waiting for confirmation...");
 
-      // Wait for confirmation
       const receipt = await tx.wait();
 
       console.log(`✅ Transaction confirmed in block ${receipt.blockNumber}`);
-      console.log(`⛽ Gas used: ${receipt.gasUsed.toString()}`);
-
-      // Calculate actual cost
-      const gasCost = receipt.gasUsed * gasPrice;
-      const gasCostEth = ethers.formatEther(gasCost);
       console.log(
-        `💰 Transaction cost: ${gasCostEth} ${
+        `⛽ Gas used: ${receipt.gasUsed.toString()} (${
           this.network === "mainnet" ? "STT" : "testnet STT"
-        }`
+        })`
       );
 
       // Get explorer URL
@@ -166,7 +157,6 @@ class ProfessionalCertificateBlockchainService {
         error
       );
 
-      // Parse error for better logging
       if (error.reason) {
         console.error("Error reason:", error.reason);
       }
@@ -195,15 +185,11 @@ class ProfessionalCertificateBlockchainService {
 
       return {
         exists: result.exists,
-        revoked: result.revoked,
         studentName: result.studentName,
         certificationTitle: result.certificationTitle,
         category: result.category,
-        level: result.level,
-        score: Number(result.score),
         grade: result.grade,
-        correctAnswers: result.correctAnswers,
-        totalQuestions: result.totalQuestions,
+        score: Number(result.score),
         completedDate: new Date(Number(result.completedDate) * 1000),
         issuedDate: new Date(Number(result.issuedDate) * 1000),
       };
@@ -214,7 +200,7 @@ class ProfessionalCertificateBlockchainService {
   }
 
   /**
-   * Check if certificate is valid (exists and not revoked)
+   * Check if certificate is valid
    */
   async isCertificateValid(certificateNumber) {
     try {
@@ -250,45 +236,16 @@ class ProfessionalCertificateBlockchainService {
         studentWallet: cert.studentWallet,
         certificationTitle: cert.certificationTitle,
         category: cert.category,
-        level: cert.level,
-        score: Number(cert.score),
         grade: cert.grade,
-        totalQuestions: cert.totalQuestions,
-        correctAnswers: cert.correctAnswers,
-        attemptNumber: cert.attemptNumber,
+        score: Number(cert.score),
         completedDate: new Date(Number(cert.completedDate) * 1000),
         issuedDate: new Date(Number(cert.issuedDate) * 1000),
         recordedAt: new Date(Number(cert.recordedAt) * 1000),
         exists: cert.exists,
-        revoked: cert.revoked,
-        revokedReason: cert.revokedReason,
       };
     } catch (error) {
       console.error("Get certificate details error:", error);
       throw new Error(`Failed to get certificate: ${error.message}`);
-    }
-  }
-
-  /**
-   * Get contract statistics
-   */
-  async getContractStats() {
-    try {
-      if (!this.contract) {
-        return null;
-      }
-
-      const stats = await this.contract.getStats();
-
-      return {
-        totalIssued: Number(stats.totalIssued),
-        totalRevoked: Number(stats.totalRevoked),
-        totalActive: Number(stats.totalActive),
-        isPaused: stats.isPaused,
-      };
-    } catch (error) {
-      console.error("Get contract stats error:", error);
-      return null;
     }
   }
 }
