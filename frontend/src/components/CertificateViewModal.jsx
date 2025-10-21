@@ -252,7 +252,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <p className="font-bold text-gray-900 dark:text-white mb-1">
-                    Blockchain Verified on Somnia
+                    Blockchain Verified
                   </p>
                   <p className="text-xs text-gray-500">
                     This certificate is permanently recorded on the blockchain
@@ -289,7 +289,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-primary-400 text-primary-400 rounded-lg font-medium hover:bg-primary-400 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    <span>View on Somnia Explorer</span>
+                    <span>View on Explorer</span>
                   </button>
                 </div>
               )}
