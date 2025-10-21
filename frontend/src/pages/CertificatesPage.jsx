@@ -111,7 +111,7 @@ const CertificatesPage = () => {
       const response = await professionalCertificationApi.getMyCertificates();
       setProfessionalCertificates(response.data.certificates || []);
     } catch (error) {
-      console.error("Error loading professional certificates:", error);
+      console.error("Error loading Certificate of Competency:", error);
     } finally {
       setLoadingProfessional(false);
     }
@@ -330,16 +330,14 @@ const CertificatesPage = () => {
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
               {courseCertificates.length}
             </div>
-            <div className="text-sm text-gray-500">Course Certificates</div>
+            <div className="text-sm text-gray-500">Completion Certificates</div>
           </div>
           <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border-2 border-yellow-500/30 rounded-2xl p-6">
             <Shield className="w-8 h-8 text-yellow-500 mb-2" />
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
               {professionalCertificates.length}
             </div>
-            <div className="text-sm text-gray-500">
-              Professional Certificates
-            </div>
+            <div className="text-sm text-gray-500">Competency Certificates</div>
           </div>
           <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-2 border-green-500/30 rounded-2xl p-6">
             <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
@@ -631,7 +629,7 @@ const CertificatesPage = () => {
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400 mb-6">
                       Pass a professional test to become eligible for
-                      certificate purchase
+                      certificate validation
                     </p>
                     <button
                       onClick={() => navigate("/professional-certifications")}
@@ -645,7 +643,7 @@ const CertificatesPage = () => {
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                       <Star className="w-6 h-6 text-yellow-500" />
-                      Eligible for Certificate Purchase
+                      Eligible for Certificate Validation
                     </h3>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {eligibleAttempts.map((attempt) => (
@@ -1086,7 +1084,7 @@ const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
               </div>
             </div>
             <p className="text-green-400 text-[9px] font-bold tracking-[0.2em] uppercase">
-              Professional Certificate
+              Certificate of Competency
             </p>
           </div>
 
@@ -1141,11 +1139,11 @@ const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
             className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-bold hover:from-green-600 hover:to-emerald-600 hover:shadow-xl transition flex items-center justify-center gap-2"
           >
             <Shield className="w-5 h-5" />
-            BUY CERTIFICATE ($5)
+            VALIDATE ($5)
           </button>
 
           <p className="text-center text-xs text-gray-500 mt-2">
-            Get your blockchain-verified certificate
+            Get your blockchain-verified NFT certificate
           </p>
         </div>
       </div>

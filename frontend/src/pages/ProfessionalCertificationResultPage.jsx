@@ -490,7 +490,7 @@ const ProfessionalCertificationResultPage = () => {
                   className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-primary-500 to-purple-600 text-white rounded-xl font-bold hover:shadow-xl hover:shadow-primary-500/30 transition-all group"
                 >
                   <Award className="w-5 h-5 group-hover:scale-110 transition" />
-                  Purchase Certificate
+                  Validate Certificate
                   <span className="text-sm opacity-90">
                     ${certification.certificatePrice?.usd || 5}
                   </span>

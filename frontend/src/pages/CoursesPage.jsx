@@ -39,7 +39,7 @@ const CoursesPage = () => {
 
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
-    category: "",
+    category: [],
     level: "",
     minPrice: "",
     maxPrice: "",
@@ -143,7 +143,10 @@ const CoursesPage = () => {
       // Real API call
       const response = await courseApi.getAll({
         search: filters.search,
-        category: filters.category,
+        category:
+          Array.isArray(filters.category) && filters.category.length > 0
+            ? filters.category.join(",")
+            : "",
         level: filters.level === "All Levels" ? "" : filters.level,
         minPrice: filters.minPrice,
         maxPrice: filters.maxPrice,
@@ -224,14 +227,27 @@ const CoursesPage = () => {
   };
 
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    if (key === "category") {
+      setFilters((prev) => {
+        const categories = Array.isArray(prev.category) ? prev.category : [];
+        const isSelected = categories.includes(value);
+        return {
+          ...prev,
+          category: isSelected
+            ? categories.filter((c) => c !== value)
+            : [...categories, value],
+        };
+      });
+    } else {
+      setFilters((prev) => ({ ...prev, [key]: value }));
+    }
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const clearFilters = () => {
     setFilters({
       search: "",
-      category: "",
+      category: [],
       level: "",
       minPrice: "",
       maxPrice: "",
@@ -292,111 +308,113 @@ const CoursesPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 relative overflow-hidden">
-      {/* BREATHTAKING Multi-layer Glassmorphism Background */}
+      {/* MASSIVE GLOWING ORBS - BODY BACKGROUND ONLY */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        {/* Layer 1: Large animated gradient orbs with MORE opacity and size */}
-        <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-gradient-to-br from-primary-400/25 via-purple-400/20 to-blue-400/15 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute top-1/3 right-1/4 w-[700px] h-[700px] bg-gradient-to-br from-blue-400/25 via-cyan-400/20 to-green-400/15 rounded-full blur-3xl animate-float-delay-1"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-[750px] h-[750px] bg-gradient-to-br from-purple-400/25 via-pink-400/20 to-rose-400/15 rounded-full blur-3xl animate-float-delay-2"></div>
-        <div className="absolute bottom-0 right-1/3 w-[700px] h-[700px] bg-gradient-to-br from-green-400/20 via-emerald-400/15 to-teal-400/10 rounded-full blur-3xl animate-float-delay-3"></div>
-
-        {/* Layer 2: Medium orbs for mid-depth */}
-        <div className="absolute top-1/4 right-1/3 w-[400px] h-[400px] bg-gradient-to-br from-yellow-400/20 to-orange-400/15 rounded-full blur-2xl animate-pulse-slow"></div>
+        {/* Light Mode - HUGE Visible Glowing Orbs */}
+        <div className="absolute top-[50px] left-[-20%] w-[2000px] h-[2000px] bg-gradient-to-br from-primary-300/35 via-primary-400/18 to-transparent rounded-full blur-3xl animate-float dark:opacity-0"></div>
+        <div className="absolute top-[400px] right-[-25%] w-[2200px] h-[2200px] bg-gradient-to-br from-purple-300/35 via-purple-400/18 to-transparent rounded-full blur-3xl animate-float-delay-1 dark:opacity-0"></div>
+        <div className="absolute top-[1000px] left-[-15%] w-[1900px] h-[1900px] bg-gradient-to-br from-blue-300/35 via-blue-400/18 to-transparent rounded-full blur-3xl animate-float-delay-2 dark:opacity-0"></div>
+        <div className="absolute top-[1600px] right-[-20%] w-[2100px] h-[2100px] bg-gradient-to-br from-pink-300/35 via-pink-400/18 to-transparent rounded-full blur-3xl animate-float-delay-3 dark:opacity-0"></div>
+        <div className="absolute top-[2200px] left-[-18%] w-[2000px] h-[2000px] bg-gradient-to-br from-cyan-300/35 via-cyan-400/18 to-transparent rounded-full blur-3xl animate-float dark:opacity-0"></div>
+        <div className="absolute top-[2800px] right-[-22%] w-[1900px] h-[1900px] bg-gradient-to-br from-orange-300/32 via-orange-400/16 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"></div>
         <div
-          className="absolute bottom-1/3 left-1/4 w-[450px] h-[450px] bg-gradient-to-br from-indigo-400/20 to-violet-400/15 rounded-full blur-2xl animate-pulse-slow"
-          style={{ animationDelay: "1s" }}
+          className="absolute top-[3400px] left-[-15%] w-[2000px] h-[2000px] bg-gradient-to-br from-green-300/32 via-green-400/16 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"
+          style={{ animationDelay: "1.5s" }}
         ></div>
+        <div className="absolute top-[700px] left-[40%] w-[1800px] h-[1800px] bg-gradient-to-br from-yellow-300/28 via-yellow-400/12 to-transparent rounded-full blur-3xl animate-float-delay-1 dark:opacity-0"></div>
+        <div className="absolute top-[2000px] left-[35%] w-[1900px] h-[1900px] bg-gradient-to-br from-indigo-300/28 via-indigo-400/12 to-transparent rounded-full blur-3xl animate-float-delay-3 dark:opacity-0"></div>
 
-        {/* Layer 3: Animated mesh gradient overlay */}
-        <div className="absolute inset-0 opacity-30 dark:opacity-20">
+        {/* Dark Mode - HUGE Visible Glowing Orbs */}
+        <div className="absolute top-[50px] left-[-20%] w-[2000px] h-[2000px] bg-gradient-to-br from-primary-500/25 via-primary-600/12 to-transparent rounded-full blur-3xl animate-float opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[400px] right-[-25%] w-[2200px] h-[2200px] bg-gradient-to-br from-purple-500/25 via-purple-600/12 to-transparent rounded-full blur-3xl animate-float-delay-1 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[1000px] left-[-15%] w-[1900px] h-[1900px] bg-gradient-to-br from-blue-500/25 via-blue-600/12 to-transparent rounded-full blur-3xl animate-float-delay-2 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[1600px] right-[-20%] w-[2100px] h-[2100px] bg-gradient-to-br from-pink-500/25 via-pink-600/12 to-transparent rounded-full blur-3xl animate-float-delay-3 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[2200px] left-[-18%] w-[2000px] h-[2000px] bg-gradient-to-br from-cyan-500/25 via-cyan-600/12 to-transparent rounded-full blur-3xl animate-float opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[2800px] right-[-22%] w-[1900px] h-[1900px] bg-gradient-to-br from-orange-500/22 via-orange-600/10 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"></div>
+        <div
+          className="absolute top-[3400px] left-[-15%] w-[2000px] h-[2000px] bg-gradient-to-br from-green-500/22 via-green-600/10 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"
+          style={{ animationDelay: "1.5s" }}
+        ></div>
+        <div className="absolute top-[700px] left-[40%] w-[1800px] h-[1800px] bg-gradient-to-br from-yellow-500/20 via-yellow-600/9 to-transparent rounded-full blur-3xl animate-float-delay-1 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[2000px] left-[35%] w-[1900px] h-[1900px] bg-gradient-to-br from-indigo-500/20 via-indigo-600/9 to-transparent rounded-full blur-3xl animate-float-delay-3 opacity-0 dark:opacity-100"></div>
+
+        {/* MASSIVE Center Spotlight */}
+        <div className="absolute top-[1800px] left-[50%] -translate-x-1/2 w-[2500px] h-[2500px] bg-gradient-radial from-white/35 via-white/12 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"></div>
+        <div className="absolute top-[1800px] left-[50%] -translate-x-1/2 w-[2500px] h-[2500px] bg-gradient-radial from-white/15 via-white/5 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"></div>
+
+        {/* Subtle mesh gradient overlay */}
+        <div className="absolute inset-0 opacity-15 dark:opacity-10">
           <div className="absolute inset-0 bg-gradient-to-br from-primary-400/10 via-transparent to-purple-400/10 animate-gradient"></div>
           <div className="absolute inset-0 bg-gradient-to-tl from-blue-400/10 via-transparent to-pink-400/10 animate-gradient-reverse"></div>
         </div>
-
-        {/* Layer 4: Noise texture for depth */}
-        <div className="absolute inset-0 opacity-[0.015] dark:opacity-[0.025] mix-blend-overlay bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxwYXRoIGQ9Ik0wIDBoMzAwdjMwMEgweiIgZmlsdGVyPSJ1cmwoI2EpIiBvcGFjaXR5PSIuMDUiLz48L3N2Zz4=')]"></div>
-
-        {/* Layer 5: Enhanced grid pattern with glow */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080801a_1px,transparent_1px),linear-gradient(to_bottom,#8080801a_1px,transparent_1px)] bg-[size:48px_48px] dark:bg-[linear-gradient(to_right,#ffffff0f_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0f_1px,transparent_1px)]"></div>
-
-        {/* Layer 6: Radial gradient vignette for focus */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.05)_100%)] dark:bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.3)_100%)]"></div>
-
-        {/* Layer 7: Top light beam effect */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-white/10 dark:from-white/5 to-transparent blur-3xl"></div>
-
-        {/* Layer 8: Floating particles/sparkles */}
-        <div className="absolute inset-0">
-          <div className="absolute top-[10%] left-[15%] w-2 h-2 bg-primary-400/40 rounded-full blur-sm animate-float"></div>
-          <div className="absolute top-[25%] right-[20%] w-3 h-3 bg-purple-400/30 rounded-full blur-sm animate-float-delay-1"></div>
-          <div className="absolute top-[60%] left-[25%] w-2 h-2 bg-blue-400/40 rounded-full blur-sm animate-float-delay-2"></div>
-          <div className="absolute top-[40%] right-[30%] w-2 h-2 bg-pink-400/35 rounded-full blur-sm animate-float-delay-3"></div>
-          <div className="absolute top-[70%] left-[40%] w-3 h-3 bg-cyan-400/30 rounded-full blur-sm animate-float"></div>
-          <div className="absolute top-[15%] right-[45%] w-2 h-2 bg-green-400/35 rounded-full blur-sm animate-float-delay-1"></div>
-          <div className="absolute top-[85%] left-[60%] w-2 h-2 bg-yellow-400/40 rounded-full blur-sm animate-float-delay-2"></div>
-          <div className="absolute top-[50%] right-[15%] w-3 h-3 bg-indigo-400/30 rounded-full blur-sm animate-float-delay-3"></div>
-        </div>
       </div>
 
-      {/* Add custom animations to the page */}
+      {/* Custom animations */}
       <style>{`
         @keyframes float {
           0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -30px) scale(1.05); }
-          66% { transform: translate(-20px, 20px) scale(0.95); }
+          33% { transform: translate(20px, -20px) scale(1.05); }
+          66% { transform: translate(-15px, 15px) scale(0.95); }
         }
         @keyframes float-delay-1 {
           0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(-25px, 25px) scale(1.05); }
-          66% { transform: translate(30px, -20px) scale(0.95); }
+          33% { transform: translate(-18px, 18px) scale(1.05); }
+          66% { transform: translate(20px, -15px) scale(0.95); }
         }
         @keyframes float-delay-2 {
           0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(20px, 30px) scale(0.95); }
-          66% { transform: translate(-30px, -25px) scale(1.05); }
+          33% { transform: translate(15px, 20px) scale(1.05); }
+          66% { transform: translate(-20px, -18px) scale(0.95); }
         }
         @keyframes float-delay-3 {
           0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(-30px, -20px) scale(1.05); }
-          66% { transform: translate(25px, 30px) scale(0.95); }
+          33% { transform: translate(-15px, -15px) scale(1.05); }
+          66% { transform: translate(18px, 20px) scale(0.95); }
         }
         @keyframes pulse-slow {
-          0%, 100% { opacity: 0.3; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.1); }
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.05); }
         }
         @keyframes gradient {
           0%, 100% { transform: translate(0, 0) rotate(0deg); }
-          50% { transform: translate(10%, 10%) rotate(5deg); }
+          50% { transform: translate(5%, 5%) rotate(2deg); }
         }
         @keyframes gradient-reverse {
           0%, 100% { transform: translate(0, 0) rotate(0deg); }
-          50% { transform: translate(-10%, -10%) rotate(-5deg); }
+          50% { transform: translate(-5%, -5%) rotate(-2deg); }
         }
-        .animate-float {
-          animation: float 20s ease-in-out infinite;
-        }
-        .animate-float-delay-1 {
-          animation: float-delay-1 25s ease-in-out infinite;
-        }
-        .animate-float-delay-2 {
-          animation: float-delay-2 30s ease-in-out infinite;
-        }
-        .animate-float-delay-3 {
-          animation: float-delay-3 22s ease-in-out infinite;
-        }
-        .animate-pulse-slow {
-          animation: pulse-slow 8s ease-in-out infinite;
-        }
-        .animate-gradient {
-          animation: gradient 15s ease-in-out infinite;
-        }
-        .animate-gradient-reverse {
-          animation: gradient-reverse 20s ease-in-out infinite;
-        }
+        .animate-float { animation: float 20s ease-in-out infinite; }
+        .animate-float-delay-1 { animation: float-delay-1 22s ease-in-out infinite; }
+        .animate-float-delay-2 { animation: float-delay-2 24s ease-in-out infinite; }
+        .animate-float-delay-3 { animation: float-delay-3 26s ease-in-out infinite; }
+        .animate-pulse-slow { animation: pulse-slow 8s ease-in-out infinite; }
+        .animate-gradient { animation: gradient 15s ease-in-out infinite; }
+        .animate-gradient-reverse { animation: gradient-reverse 15s ease-in-out infinite; }
       `}</style>
 
       {/* Header */}
-      <section className="bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white py-16 border-b border-gray-800">
+      <section className="relative bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-gray-900 dark:via-black dark:to-gray-900 text-gray-900 dark:text-white py-16 border-b border-gray-200 dark:border-gray-800 overflow-hidden">
+        {/* Glassmorphism Background Effects */}
+        <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+          {/* Large animated gradient orbs */}
+          <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-gradient-to-br from-primary-400/20 via-purple-400/15 to-blue-400/10 rounded-full blur-3xl animate-float"></div>
+          <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] bg-gradient-to-br from-blue-400/15 via-cyan-400/10 to-green-400/10 rounded-full blur-3xl animate-float-delay-1"></div>
+          <div className="absolute bottom-1/4 left-1/3 w-[550px] h-[550px] bg-gradient-to-br from-purple-400/15 via-pink-400/10 to-rose-400/10 rounded-full blur-3xl animate-float-delay-2"></div>
+
+          {/* Radial gradients for depth */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(139,92,246,0.12),transparent_50%)]"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(59,130,246,0.12),transparent_60%)]"></div>
+
+          {/* Noise texture for realism */}
+          <div className="absolute inset-0 opacity-[0.015] dark:opacity-[0.025] mix-blend-overlay bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxwYXRoIGQ9Ik0wIDBoMzAwdjMwMEgweiIgZmlsdGVyPSJ1cmwoI2EpIiBvcGFjaXR5PSIuMDUiLz48L3N2Zz4=')]"></div>
+
+          {/* Grid pattern */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080801a_1px,transparent_1px),linear-gradient(to_bottom,#8080801a_1px,transparent_1px)] bg-[size:48px_48px] dark:bg-[linear-gradient(to_right,#ffffff0f_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0f_1px,transparent_1px)]"></div>
+
+          {/* Top light beam */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-white/10 dark:from-white/5 to-transparent blur-3xl"></div>
+        </div>
+
         <div className="container-custom">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-5xl md:text-6xl font-bold mb-4">
@@ -501,12 +519,6 @@ const CoursesPage = () => {
 
             {/* Browse by Category */}
             <section className="mb-12 relative">
-              {/* Enhanced background glassmorphism effect */}
-              <div className="absolute inset-0 -z-10 overflow-hidden">
-                <div className="absolute top-20 left-10 w-[500px] h-[500px] bg-gradient-to-br from-primary-400/20 to-purple-400/20 rounded-full blur-3xl"></div>
-                <div className="absolute bottom-10 right-10 w-[500px] h-[500px] bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full blur-3xl"></div>
-              </div>
-
               <div className="mb-8">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                   Browse by Category
@@ -655,106 +667,293 @@ const CoursesPage = () => {
           /* All Courses View */
           <>
             {/* Filters Bar */}
-            <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center space-x-2 px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-400 transition"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                <span>Filters</span>
-              </button>
+            <div className="mb-6 space-y-3">
+              {/* Main Filter Bar - Compact */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center space-x-2 px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-400 transition text-sm"
+                  >
+                    <SlidersHorizontal className="w-4 h-4" />
+                    <span>Filters</span>
+                  </button>
 
-              <div className="flex items-center space-x-4">
-                <select
-                  value={filters.sort}
-                  onChange={(e) => handleFilterChange("sort", e.target.value)}
-                  className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black"
-                >
-                  {sortOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
+                  {/* Quick Category Filters - Compact */}
+                  {categories.slice(0, 4).map((cat) => (
+                    <button
+                      key={cat._id || cat.name}
+                      onClick={() => handleFilterChange("category", cat.name)}
+                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                        filters.category.includes(cat.name)
+                          ? "bg-primary-400 text-black"
+                          : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
                   ))}
-                </select>
 
-                <button
-                  onClick={() => setViewMode("browse")}
-                  className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-400 transition"
-                >
-                  Back to Browse
-                </button>
+                  {categories.length > 4 && (
+                    <button
+                      onClick={() => setShowFilters(true)}
+                      className="px-3 py-2 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
+                    >
+                      +{categories.length - 4}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={filters.sort}
+                    onChange={(e) => handleFilterChange("sort", e.target.value)}
+                    className="px-3 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black text-sm"
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => setViewMode("browse")}
+                    className="px-3 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-400 transition text-sm whitespace-nowrap"
+                  >
+                    Back to Browse
+                  </button>
+                </div>
               </div>
+
+              {/* Active Filters Display - Compact */}
+              {(filters.category.length > 0 ||
+                filters.level ||
+                filters.minPrice ||
+                filters.maxPrice ||
+                filters.rating) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                    Active:
+                  </span>
+                  {filters.category.map((cat) => (
+                    <span
+                      key={cat}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-400 text-black rounded-lg text-xs font-medium"
+                    >
+                      {cat}
+                      <button
+                        onClick={() => handleFilterChange("category", cat)}
+                        className="hover:bg-black/10 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {filters.level && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-400 text-black rounded-lg text-xs font-medium">
+                      {filters.level}
+                      <button
+                        onClick={() => handleFilterChange("level", "")}
+                        className="hover:bg-black/10 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {(filters.minPrice || filters.maxPrice) && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-400 text-black rounded-lg text-xs font-medium">
+                      ${filters.minPrice || "0"} - ${filters.maxPrice || "∞"}
+                      <button
+                        onClick={() => {
+                          handleFilterChange("minPrice", "");
+                          handleFilterChange("maxPrice", "");
+                        }}
+                        className="hover:bg-black/10 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {filters.rating && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-400 text-black rounded-lg text-xs font-medium">
+                      {filters.rating}+ ⭐
+                      <button
+                        onClick={() => handleFilterChange("rating", "")}
+                        className="hover:bg-black/10 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  <button
+                    onClick={clearFilters}
+                    className="text-xs text-primary-400 hover:text-primary-500 font-medium underline"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Filters Panel */}
             {showFilters && (
-              <div className="mb-6 p-6 border-2 border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-gray-900">
-                <div className="grid md:grid-cols-3 gap-6">
+              <div className="mb-6 p-4 border-2 border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-gray-900">
+                <div className="space-y-4">
+                  {/* Categories - Box Style */}
                   <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Category
+                    <label className="block text-sm font-bold mb-2 text-gray-900 dark:text-white">
+                      Categories (Multiple)
                     </label>
-                    <select
-                      value={filters.category}
-                      onChange={(e) =>
-                        handleFilterChange("category", e.target.value)
-                      }
-                      className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black"
-                    >
-                      <option value="">All Categories</option>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-2">
                       {categories.map((cat) => (
-                        <option key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </option>
+                        <button
+                          key={cat._id || cat.name}
+                          onClick={() =>
+                            handleFilterChange("category", cat.name)
+                          }
+                          className={`group relative px-2.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                            filters.category.includes(cat.name)
+                              ? "bg-primary-400 text-black shadow-lg scale-105"
+                              : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-primary-400 hover:shadow-md text-gray-700 dark:text-gray-300"
+                          }`}
+                        >
+                          <span className="relative z-10">{cat.name}</span>
+                          {filters.category.includes(cat.name) && (
+                            <div className="absolute inset-0 bg-primary-500/20 rounded-lg blur-sm"></div>
+                          )}
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Level
-                    </label>
-                    <select
-                      value={filters.level}
-                      onChange={(e) =>
-                        handleFilterChange("level", e.target.value)
-                      }
-                      className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black"
-                    >
-                      {levels.map((level) => (
-                        <option key={level} value={level}>
-                          {level}
-                        </option>
-                      ))}
-                    </select>
+                  {/* Other Filters - Compact Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Level */}
+                    <div>
+                      <label className="block text-xs font-bold mb-2 text-gray-900 dark:text-white">
+                        Level
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {levels.map((level) => (
+                          <button
+                            key={level}
+                            onClick={() =>
+                              handleFilterChange(
+                                "level",
+                                filters.level === level ? "" : level
+                              )
+                            }
+                            className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                              filters.level === level
+                                ? "bg-primary-400 text-black shadow-lg"
+                                : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-primary-400 text-gray-700 dark:text-gray-300"
+                            }`}
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Price Range */}
+                    <div>
+                      <label className="block text-xs font-bold mb-2 text-gray-900 dark:text-white">
+                        Price Range
+                      </label>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        {[
+                          { label: "Free", min: "0", max: "0" },
+                          { label: "$0-$50", min: "0", max: "50" },
+                          { label: "$50-$100", min: "50", max: "100" },
+                          { label: "$100+", min: "100", max: "" },
+                        ].map((range) => (
+                          <button
+                            key={range.label}
+                            onClick={() => {
+                              handleFilterChange("minPrice", range.min);
+                              handleFilterChange("maxPrice", range.max);
+                            }}
+                            className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                              filters.minPrice === range.min &&
+                              filters.maxPrice === range.max
+                                ? "bg-primary-400 text-black shadow-lg"
+                                : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-primary-400 text-gray-700 dark:text-gray-300"
+                            }`}
+                          >
+                            {range.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Price */}
+                    <div>
+                      <label className="block text-xs font-bold mb-2 text-gray-900 dark:text-white">
+                        Custom Price
+                      </label>
+                      <div className="space-y-1.5">
+                        <input
+                          type="number"
+                          placeholder="Min"
+                          className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-medium focus:border-primary-400 focus:ring-1 focus:ring-primary-400/20 transition-all"
+                          value={filters.minPrice}
+                          onChange={(e) =>
+                            handleFilterChange("minPrice", e.target.value)
+                          }
+                        />
+                        <input
+                          type="number"
+                          placeholder="Max"
+                          className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-medium focus:border-primary-400 focus:ring-1 focus:ring-primary-400/20 transition-all"
+                          value={filters.maxPrice}
+                          onChange={(e) =>
+                            handleFilterChange("maxPrice", e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* Rating */}
+                    <div>
+                      <label className="block text-xs font-bold mb-2 text-gray-900 dark:text-white">
+                        Min Rating
+                      </label>
+                      <div className="grid grid-cols-1 gap-1.5">
+                        {[
+                          { label: "Any", value: "" },
+                          { label: "3.5+⭐", value: "3.5" },
+                          { label: "4.0+⭐", value: "4.0" },
+                          { label: "4.5+⭐", value: "4.5" },
+                        ].map((rating) => (
+                          <button
+                            key={rating.label}
+                            onClick={() =>
+                              handleFilterChange("rating", rating.value)
+                            }
+                            className={`px-2 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                              filters.rating === rating.value
+                                ? "bg-primary-400 text-black shadow-lg"
+                                : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-primary-400 text-gray-700 dark:text-gray-300"
+                            }`}
+                          >
+                            {rating.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Min Rating
-                    </label>
-                    <select
-                      value={filters.rating}
-                      onChange={(e) =>
-                        handleFilterChange("rating", e.target.value)
-                      }
-                      className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-black"
+                  {/* Clear Filters Button */}
+                  <div className="flex justify-end pt-1">
+                    <button
+                      onClick={clearFilters}
+                      className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700 transition-all"
                     >
-                      <option value="">Any Rating</option>
-                      <option value="4.5">4.5+ Stars</option>
-                      <option value="4.0">4.0+ Stars</option>
-                      <option value="3.5">3.5+ Stars</option>
-                      <option value="3.0">3.0+ Stars</option>
-                    </select>
+                      Clear All
+                    </button>
                   </div>
                 </div>
-
-                <button
-                  onClick={clearFilters}
-                  className="mt-4 px-4 py-2 text-sm text-primary-400 hover:text-primary-500 font-medium"
-                >
-                  Clear all filters
-                </button>
               </div>
             )}
 

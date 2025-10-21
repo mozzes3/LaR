@@ -117,13 +117,11 @@ const PremiumCertificatePurchaseModal = ({
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h2 className="text-2xl font-bold text-white">
-                      Purchase Certificate
+                      Validate Certificate
                     </h2>
                     <Sparkles className="w-5 h-5 text-primary-400 animate-pulse" />
                   </div>
-                  <p className="text-gray-400">
-                    Official Certificate of Competency
-                  </p>
+                  <p className="text-gray-400">Certificate of Competency</p>
                 </div>
               </div>
             </div>
@@ -168,7 +166,7 @@ const PremiumCertificatePurchaseModal = ({
               {/* Features */}
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { icon: Shield, label: "Blockchain Verified" },
+                  { icon: Shield, label: "NFT Blockchain Verified" },
                   { icon: Lock, label: "Tamper-Proof" },
                   { icon: Award, label: "Globally Recognized" },
                   { icon: Zap, label: "Instant Delivery" },
@@ -189,9 +187,7 @@ const PremiumCertificatePurchaseModal = ({
               <div className="bg-gradient-to-r from-primary-500/10 to-purple-500/10 border border-primary-500/30 rounded-2xl p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-400 mb-1">
-                      Certificate Price
-                    </p>
+                    <p className="text-sm text-gray-400 mb-1">Validation Fee</p>
                     <p className="text-4xl font-bold text-white">
                       ${certification.certificatePrice?.usd || 5}
                       <span className="text-lg text-gray-400 ml-2">USD</span>
@@ -214,7 +210,7 @@ const PremiumCertificatePurchaseModal = ({
                 className="w-full py-4 bg-gradient-to-r from-primary-500 to-purple-600 hover:from-primary-600 hover:to-purple-700 text-white font-bold rounded-xl transition shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <Award className="w-5 h-5" />
-                <span>Purchase Certificate Now</span>
+                <span>Validate Certificate Now</span>
               </button>
 
               <p className="text-xs text-center text-gray-500">

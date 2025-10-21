@@ -113,13 +113,13 @@ const ProfessionalCertificationsPage = () => {
               </div>
               <div className="h-12 w-px bg-white/20"></div>
               <div className="text-center">
-                <div className="text-4xl font-bold mb-2">3</div>
+                <div className="text-4xl font-bold mb-2">2</div>
                 <div className="text-sm text-white/70">Attempts</div>
               </div>
               <div className="h-12 w-px bg-white/20"></div>
               <div className="text-center">
                 <div className="text-4xl font-bold mb-2">$5</div>
-                <div className="text-sm text-white/70">Per Certificate</div>
+                <div className="text-sm text-white/70">Starting from</div>
               </div>
             </div>
           </div>
@@ -370,7 +370,7 @@ const ProfessionalCertificationsPage = () => {
                 <div className="text-xs text-white/70">Tests</div>
               </div>
               <div className="px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
-                <div className="text-2xl font-bold">$5</div>
+                <div className="text-2xl font-bold">$5+</div>
                 <div className="text-xs text-white/70">Certificate</div>
               </div>
             </div>
