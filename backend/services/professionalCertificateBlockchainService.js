@@ -21,21 +21,46 @@ class ProfessionalCertificateBlockchainService {
     this.contractAddress = process.env.PROFESSIONAL_CERT_CONTRACT_ADDRESS;
     this.network = blockchainService.network;
 
+    console.log("🔍 DEBUG - Contract Address from ENV:", this.contractAddress); // Add this
+
     if (!this.contractAddress) {
       console.warn(
         "⚠️ PROFESSIONAL_CERT_CONTRACT_ADDRESS not set - professional certificates will not be recorded on blockchain"
       );
       this.contract = null;
     } else {
-      this.contract = new ethers.Contract(
-        this.contractAddress,
-        PROFESSIONAL_CERT_ABI,
-        this.wallet
-      );
-      console.log(
-        "✅ Professional Certificate Contract initialized:",
-        this.contractAddress
-      );
+      // Wait for wallet to be ready before creating contract
+      if (!this.wallet) {
+        console.warn("⚠️ Wallet not initialized yet");
+        this.contract = null;
+      } else {
+        this.contract = new ethers.Contract(
+          this.contractAddress,
+          PROFESSIONAL_CERT_ABI,
+          this.wallet
+        );
+        console.log(
+          "✅ Professional Certificate Contract initialized:",
+          this.contractAddress
+        );
+      }
+    }
+  }
+
+  async ensureContractReady() {
+    if (!this.contract && this.contractAddress) {
+      // Wallet should be ready now
+      this.wallet = this.service.wallet;
+      if (this.wallet) {
+        this.contract = new ethers.Contract(
+          this.contractAddress,
+          PROFESSIONAL_CERT_ABI,
+          this.wallet
+        );
+        console.log(
+          "✅ Professional Certificate Contract initialized (delayed)"
+        );
+      }
     }
   }
 
@@ -45,6 +70,7 @@ class ProfessionalCertificateBlockchainService {
    */
   async recordProfessionalCertificate(certificateData) {
     try {
+      await this.ensureContractReady(); // Add this line
       if (!this.contract) {
         throw new Error("Professional certificate contract not initialized");
       }
@@ -137,14 +163,12 @@ class ProfessionalCertificateBlockchainService {
       );
 
       // Get explorer URL
-      const explorerBaseUrl =
-        this.network === "mainnet"
-          ? "https://somniascan.io"
-          : "https://testnet.somniascan.io";
+      const explorerBaseUrl = "https://shannon-explorer.somnia.network";
       const explorerUrl = `${explorerBaseUrl}/tx/${tx.hash}`;
 
       return {
         success: true,
+        hash: tx.hash, // Changed from transactionHash to hash
         transactionHash: tx.hash,
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed.toString(),
@@ -253,10 +277,10 @@ class ProfessionalCertificateBlockchainService {
 // Singleton instance
 let professionalCertBlockchainService = null;
 
-const getProfessionalCertBlockchainService = () => {
+const getProfessionalCertBlockchainService = async () => {
   if (!professionalCertBlockchainService) {
     const { getBlockchainService } = require("./blockchainService");
-    const baseService = getBlockchainService();
+    const baseService = await getBlockchainService(); // Add await
     professionalCertBlockchainService =
       new ProfessionalCertificateBlockchainService(baseService);
   }

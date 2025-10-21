@@ -71,6 +71,8 @@ const professionalCertificateSchema = new mongoose.Schema(
 
     // Certificate image
     templateImage: String, // Bunny CDN URL
+    certificateUrl: String,
+    transactionHash: String,
 
     // Blockchain verification
     blockchainHash: {
@@ -81,7 +83,7 @@ const professionalCertificateSchema = new mongoose.Schema(
     blockchainBlock: Number,
     blockchainNetwork: {
       type: String,
-      default: "polygon",
+      default: "Somnia",
     },
     blockchainVerified: {
       type: Boolean,

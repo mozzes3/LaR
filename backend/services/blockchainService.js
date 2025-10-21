@@ -264,12 +264,24 @@ class BlockchainService {
 }
 
 let blockchainService = null;
+let initPromise = null;
 
-const getBlockchainService = () => {
+const getBlockchainService = async () => {
   if (!blockchainService) {
     blockchainService = new BlockchainService();
+    initPromise = blockchainService.initializeWallet();
   }
+
+  // Wait for wallet to be ready
+  if (initPromise) {
+    await initPromise;
+    initPromise = null;
+  }
+
   return blockchainService;
 };
 
-module.exports = { getBlockchainService };
+module.exports = {
+  BlockchainService,
+  getBlockchainService,
+};

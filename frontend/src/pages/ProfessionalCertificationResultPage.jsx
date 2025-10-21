@@ -90,7 +90,9 @@ const ProfessionalCertificationResultPage = () => {
     try {
       const response = await professionalCertificationApi.getMyCertificates();
       const hasCert = response.data.certificates.some(
-        (cert) => cert.certification._id === certification._id
+        (cert) =>
+          cert.certificationId?._id?.toString() ===
+          certification._id?.toString()
       );
       setHasCertificate(hasCert);
     } catch (error) {

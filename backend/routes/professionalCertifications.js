@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router();
-const { authenticate } = require("../middleware/auth");
+const { authenticate, optionalAuth } = require("../middleware/auth");
 const profCertController = require("../controllers/professionalCertificationController");
 
 // Public routes
 router.get("/", profCertController.getAllCertifications);
-router.get("/:slug", profCertController.getCertificationDetails);
+router.get("/:slug", optionalAuth, profCertController.getCertificationDetails);
 
 // Protected routes
 router.post("/start-test", authenticate, profCertController.startTestAttempt);

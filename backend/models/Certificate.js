@@ -43,7 +43,7 @@ const certificateSchema = new mongoose.Schema(
     },
     blockchainNetwork: {
       type: String,
-      default: "polygon",
+      default: "Somnia",
     },
 
     verificationUrl: { type: String, required: true },

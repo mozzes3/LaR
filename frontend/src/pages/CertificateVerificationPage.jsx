@@ -11,7 +11,7 @@ import {
   BookOpen,
   Trophy,
 } from "lucide-react";
-import { certificateApi } from "@services/api";
+import { certificateApi, professionalCertificationApi } from "@services/api";
 
 const CertificateVerificationPage = () => {
   const { certificateNumber } = useParams();
@@ -24,18 +24,38 @@ const CertificateVerificationPage = () => {
     const verifyCertificate = async () => {
       try {
         setLoading(true);
-        const response = await certificateApi.verifyCertificate(
-          certificateNumber
-        );
 
-        if (response.data.valid) {
-          setCertificate(response.data.certificate);
-        } else {
-          setError("Certificate not found or invalid");
+        // Try professional certificate first (has COC in the number)
+        if (certificateNumber.includes("COC")) {
+          try {
+            const response =
+              await professionalCertificationApi.verifyCertificate(
+                certificateNumber
+              );
+            setCertificate(response.data.certificate);
+            return;
+          } catch (profError) {
+            console.log(
+              "Not a professional certificate, trying course certificate...",
+              profError
+            );
+          }
         }
-      } catch (err) {
-        console.error("Verification error:", err);
-        setError("Failed to verify certificate. Please try again.");
+
+        // Try course certificate
+        try {
+          const response = await certificateApi.verifyCertificate(
+            certificateNumber
+          );
+          if (response.data.valid) {
+            setCertificate(response.data.certificate);
+          } else {
+            setError("Certificate not found or invalid");
+          }
+        } catch (err) {
+          console.error("Verification error:", err);
+          setError("Failed to verify certificate. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
@@ -157,62 +177,128 @@ const CertificateVerificationPage = () => {
             </div>
           </div>
 
-          {/* Course Info */}
-          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-            <div className="flex items-start space-x-3 mb-3">
-              <div className="p-2 bg-primary-400/10 rounded-lg">
-                <BookOpen className="w-5 h-5 text-primary-400" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-gray-500 mb-1">Course Title</p>
-                <p className="font-bold text-lg text-gray-900 dark:text-white">
-                  {certificate.courseTitle}
-                </p>
-              </div>
-            </div>
+          {/* Conditional Content Based on Certificate Type */}
+          {certificate.certificationTitle ? (
+            // Professional Certificate Content
+            <>
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                <div className="flex items-start space-x-3 mb-3">
+                  <div className="p-2 bg-primary-400/10 rounded-lg">
+                    <Award className="w-5 h-5 text-primary-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 mb-1">
+                      Certification Title
+                    </p>
+                    <p className="font-bold text-lg text-gray-900 dark:text-white">
+                      {certificate.certificationTitle}
+                    </p>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Instructor</p>
-                <p className="font-semibold text-gray-900 dark:text-white">
-                  {certificate.instructor}
-                </p>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Category</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {certificate.category}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Level</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {certificate.level}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Total Hours</p>
-                <p className="font-semibold text-gray-900 dark:text-white">
-                  {certificate.totalHours}h
-                </p>
+
+              {/* Professional Certificate Performance */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl text-center">
+                  <Trophy className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 mb-1">Grade</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.grade}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl text-center">
+                  <Award className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 mb-1">Score</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.score}%
+                  </p>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl text-center">
+                  <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 mb-1">Correct Answers</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.correctAnswers}/{certificate.totalQuestions}
+                  </p>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          ) : (
+            // Course Certificate Content
+            <>
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                <div className="flex items-start space-x-3 mb-3">
+                  <div className="p-2 bg-primary-400/10 rounded-lg">
+                    <BookOpen className="w-5 h-5 text-primary-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 mb-1">Course Title</p>
+                    <p className="font-bold text-lg text-gray-900 dark:text-white">
+                      {certificate.courseTitle}
+                    </p>
+                  </div>
+                </div>
 
-          {/* Performance */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl text-center">
-              <Trophy className="w-6 h-6 text-purple-500 mx-auto mb-2" />
-              <p className="text-xs text-gray-500 mb-1">Grade</p>
-              <p className="font-bold text-gray-900 dark:text-white">
-                {certificate.grade}
-              </p>
-            </div>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Instructor</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {certificate.instructor}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Total Hours</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {certificate.totalHours}h
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            <div className="p-4 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl text-center">
-              <Award className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-              <p className="text-xs text-gray-500 mb-1">Score</p>
-              <p className="font-bold text-gray-900 dark:text-white">
-                {certificate.finalScore}%
-              </p>
-            </div>
+              {/* Course Certificate Performance */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl text-center">
+                  <Trophy className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 mb-1">Grade</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.grade}
+                  </p>
+                </div>
 
-            <div className="p-4 bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl text-center">
-              <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
-              <p className="text-xs text-gray-500 mb-1">Lessons</p>
-              <p className="font-bold text-gray-900 dark:text-white">
-                {certificate.totalLessons}
-              </p>
-            </div>
-          </div>
+                <div className="p-4 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl text-center">
+                  <Award className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 mb-1">Score</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.finalScore}%
+                  </p>
+                </div>
+
+                <div className="p-4 bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl text-center">
+                  <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 mb-1">Lessons</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.totalLessons}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Blockchain Verification */}
           <div className="p-4 bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-xl">

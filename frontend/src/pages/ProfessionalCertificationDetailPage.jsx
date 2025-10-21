@@ -31,7 +31,7 @@ const ProfessionalCertificationDetailPage = () => {
 
   useEffect(() => {
     loadCertification();
-  }, [slug]);
+  }, [slug, isConnected]);
 
   const loadCertification = async () => {
     try {

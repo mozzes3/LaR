@@ -4,6 +4,9 @@ const CertificationAttempt = require("../models/CertificationAttempt");
 const ProfessionalCertificate = require("../models/ProfessionalCertificate");
 const AttemptReset = require("../models/AttemptReset");
 const {
+  getProfessionalCertBlockchainService,
+} = require("../services/professionalCertificateBlockchainService");
+const {
   createProfessionalCertificateImage,
 } = require("./professionalCertificateController");
 const jwt = require("jsonwebtoken");
@@ -99,8 +102,6 @@ const getCertificationDetails = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    console.log("🔍 Request userId:", req.userId); // ADD THIS
-
     const certification = await ProfessionalCertification.findOne({
       slug,
       status: "published",
@@ -111,46 +112,23 @@ const getCertificationDetails = async (req, res) => {
     if (!certification) {
       return res.status(404).json({ error: "Certification not found" });
     }
+    console.log("🔍 Certification ID:", certification._id);
+    console.log("🔍 User ID:", req.userId);
 
-    console.log("🔍 User authenticated:", !!req.userId); // ADD THIS
-
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-    let userId = null;
-
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.userId);
-        if (user && user.isActive && !user.isBanned) {
-          userId = user._id;
-        }
-      } catch (error) {
-        // Invalid token, treat as unauthenticated
-      }
-    }
-
-    console.log("🔍 User authenticated:", !!userId);
-
-    if (userId) {
-      console.log("✅ Fetching attempts for user:", userId);
-
+    // Check if user is authenticated
+    if (req.userId) {
       const attempts = await CertificationAttempt.find({
-        user: userId,
         user: req.userId,
-        certification: certification._id,
+        certification: certification._id.toString(),
       })
         .select("attemptNumber score passed completedAt status")
         .sort({ attemptNumber: -1 })
         .lean();
 
-      console.log("📊 Found attempts:", attempts); // ADD THIS
-
       certification.userAttempts = attempts;
       certification.attemptsUsed = attempts.filter(
         (a) => a.status === "completed" || a.status === "cancelled"
       ).length;
-
-      console.log("📊 Attempts used:", certification.attemptsUsed); // ADD THIS
 
       certification.canTakeTest =
         certification.attemptsUsed < certification.maxAttempts;
@@ -161,14 +139,9 @@ const getCertificationDetails = async (req, res) => {
         paid: false,
         status: "pending-payment",
       });
-      certification.hasPendingCertificate = !!pendingCert;
-    } else {
-      console.log("❌ User not authenticated"); // ADD THIS
-    }
 
-    console.log("📤 Sending response:", {
-      attemptsUsed: certification.attemptsUsed,
-    }); // ADD THIS
+      certification.hasPendingCertificate = !!pendingCert;
+    }
 
     res.json({ success: true, certification });
   } catch (error) {
@@ -259,23 +232,11 @@ const startTestAttempt = async (req, res) => {
       if (existingAttempt) {
         await CertificationAttempt.deleteOne({ _id: existingAttempt._id });
       }
-
       const completedAttempts = await CertificationAttempt.countDocuments({
         user: userId,
         certification: certificationId,
         status: { $in: ["completed", "cancelled"] },
       });
-
-      if (completedAttempts >= certification.maxAttempts) {
-        activeStartRequests.delete(requestKey);
-        return res.status(403).json({
-          error: "Maximum attempts reached",
-          maxAttempts: certification.maxAttempts,
-          canResetAttempts: certification.attemptResetEnabled,
-          resetPrice: certification.attemptResetPrice,
-        });
-      }
-
       // NEW: Randomly select questions from pool
       let allQuestions = JSON.parse(JSON.stringify(certification.questions));
 
@@ -830,7 +791,7 @@ const purchaseCertificate = async (req, res) => {
 
     const verificationUrl = `${
       process.env.FRONTEND_URL || "http://localhost:3000"
-    }/certificates/verify/${certificateNumber}`;
+    }/verify/${certificateNumber}`;
 
     const certificate = await ProfessionalCertificate.create({
       // Required fields from model
@@ -848,14 +809,14 @@ const purchaseCertificate = async (req, res) => {
       // Certificate details
       certificateNumber,
       certificateUrl,
-      templateImage: certificateUrl, // ADD THIS LINE - for backwards compatibility
+      templateImage: certificateUrl,
       grade: calculateGrade(attempt.score, attempt.certification.passingScore),
       score: attempt.score,
-      totalQuestions: attempt.totalQuestions, // ADD THIS LINE
-      correctAnswers: attempt.correctAnswers, // ADD THIS LINE
-      testDuration: attempt.certification.duration, // ADD THIS LINE - duration in minutes
-      category: attempt.certification.category, // ADD THIS LINE
-      level: attempt.certification.level, // ADD THIS LINE
+      totalQuestions: attempt.totalQuestions,
+      correctAnswers: attempt.correctAnswers,
+      testDuration: attempt.certification.duration,
+      category: attempt.certification.category,
+      level: attempt.certification.level,
 
       // Payment details
       paymentAmount: attempt.certification.certificatePrice.usd,
@@ -884,11 +845,54 @@ const purchaseCertificate = async (req, res) => {
     attempt.certificateIssued = true;
     await attempt.save();
 
-    // TODO: Record on blockchain (implement later)
-    // const blockchainTx = await recordCertificateOnChain(certificate);
-    // certificate.blockchainVerified = true;
-    // certificate.blockchainTxHash = blockchainTx.hash;
-    // await certificate.save();
+    // Record on blockchain
+    try {
+      console.log("📝 Recording certificate on blockchain...");
+      console.log(
+        "🔍 Type of import:",
+        typeof getProfessionalCertBlockchainService
+      );
+      console.log("🔍 Import value:", getProfessionalCertBlockchainService);
+
+      if (typeof getProfessionalCertBlockchainService !== "function") {
+        throw new Error(
+          "getProfessionalCertBlockchainService is not a function - import failed"
+        );
+      }
+
+      const blockchainService = await getProfessionalCertBlockchainService();
+      console.log("🔍 Service instance:", blockchainService);
+
+      const blockchainTx =
+        await blockchainService.recordProfessionalCertificate({
+          certificateNumber: certificate.certificateNumber,
+          certificateType: "Professional Competency",
+          studentName: certificate.studentName,
+          studentWallet:
+            certificate.studentWallet === "N/A"
+              ? "0x0000000000000000000000000000000000000000"
+              : certificate.studentWallet,
+          certificationTitle: certificate.certificationTitle,
+          category: certificate.category,
+          score: certificate.score,
+          grade: certificate.grade,
+          completedDate: certificate.completedDate,
+          issuedDate: certificate.issuedDate,
+        });
+
+      certificate.blockchainVerified = true;
+      certificate.blockchainHash = blockchainTx.hash;
+      certificate.blockchainExplorerUrl = blockchainTx.explorerUrl;
+      certificate.blockchainBlock = blockchainTx.blockNumber;
+      certificate.blockchainNetwork = "Somnia";
+      certificate.blockchainVerifiedAt = new Date(); // Also set this
+      await certificate.save();
+
+      console.log("✅ Certificate recorded on blockchain:", blockchainTx.hash);
+    } catch (blockchainError) {
+      console.error("❌ Blockchain recording failed:", blockchainError.message);
+      console.error("❌ Full error:", blockchainError);
+    }
 
     // Populate certificate for response
     const populatedCert = await ProfessionalCertificate.findById(
@@ -928,7 +932,7 @@ const getEligibleCertificates = async (req, res) => {
     const attemptIds = passedAttempts.map((a) => a._id.toString());
     const purchased = await ProfessionalCertificate.find({
       userId: userId,
-      attemptId: { $in: attemptIds }, // Changed to check by attemptId
+      attemptId: { $in: attemptIds },
       status: { $ne: "revoked" },
     }).select("attemptId");
 
@@ -959,12 +963,12 @@ const getMyCertificates = async (req, res) => {
     const userId = req.userId;
 
     const certificates = await ProfessionalCertificate.find({
-      userId: userId, // Changed from 'user' to 'userId'
+      userId: userId,
       status: { $ne: "revoked" },
     })
-      .populate("certificationId", "title thumbnail category subcategories") // Changed to certificationId
-      .populate("userId", "username displayName avatar") // Changed to userId
-      .sort({ issuedDate: -1 }); // Changed from issueDate
+      .populate("certificationId", "title thumbnail category subcategories")
+      .populate("userId", "username displayName avatar")
+      .sort({ issuedDate: -1 });
 
     res.json({
       success: true,
@@ -985,8 +989,8 @@ const verifyCertificate = async (req, res) => {
       isValid: true,
       status: "active",
     })
-      .populate("certification", "title category subcategories")
-      .populate("user", "username displayName avatar");
+      .populate("certificationId", "title category subcategories") // CORRECT
+      .populate("userId", "username displayName avatar"); // CORRECT
 
     if (!certificate) {
       return res
