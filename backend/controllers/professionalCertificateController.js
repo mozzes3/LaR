@@ -408,17 +408,19 @@ const getMyCertificates = async (req, res) => {
     const userId = req.userId;
 
     const certificates = await ProfessionalCertificate.find({
-      userId,
-      paid: true,
-      status: "active",
+      user: userId,
+      status: { $ne: "revoked" },
     })
-      .populate("certificationId", "title thumbnail category level")
-      .sort({ createdAt: -1 })
-      .lean();
+      .populate("certification", "title thumbnail category subcategories")
+      .populate("user", "username displayName avatar")
+      .sort({ issueDate: -1 });
 
-    res.json({ success: true, certificates });
+    res.json({
+      success: true,
+      certificates,
+    });
   } catch (error) {
-    console.error("Get certificates error:", error);
+    console.error("Get my certificates error:", error);
     res.status(500).json({ error: "Failed to fetch certificates" });
   }
 };

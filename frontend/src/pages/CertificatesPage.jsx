@@ -26,7 +26,7 @@ import {
   Shield,
   Zap,
 } from "lucide-react";
-import toast from "react-hot-toast";
+import toast, { CheckmarkIcon } from "react-hot-toast";
 import { certificateApi, professionalCertificationApi } from "@services/api";
 import { useWallet } from "@contexts/WalletContext";
 
@@ -464,7 +464,11 @@ const CertificatesPage = () => {
                         <CompetencyCertificateCard
                           key={cert._id}
                           cert={cert}
+                          user={user}
                           getCompetencyGrade={getCompetencyGrade}
+                          onView={handleView}
+                          onShare={handleShare}
+                          onCopyLink={handleCopyLink}
                         />
                       )
                     )}
@@ -588,7 +592,11 @@ const CertificatesPage = () => {
                         <CompetencyCertificateCard
                           key={cert._id}
                           cert={cert}
+                          user={user}
                           getCompetencyGrade={getCompetencyGrade}
+                          onView={handleView}
+                          onShare={handleShare}
+                          onCopyLink={handleCopyLink}
                         />
                       ))}
                     </div>
@@ -596,7 +604,6 @@ const CertificatesPage = () => {
                 )}
               </div>
             )}
-
             {competencySubTab === "eligible" && (
               <div>
                 {eligibleAttempts.length === 0 ? (
@@ -751,6 +758,7 @@ const CertificatesPage = () => {
 };
 
 // Component: Completion Certificate Card (Your existing design)
+// Component: Certificate of Completion Card
 const CompletionCertificateCard = ({
   cert,
   user,
@@ -760,9 +768,7 @@ const CompletionCertificateCard = ({
   getGradeColor,
 }) => (
   <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-2xl hover:border-primary-400/50 transition-all duration-300 group">
-    {/* Your existing certificate preview design */}
     <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-gray-900 to-black p-6 flex flex-col overflow-hidden">
-      {/* Elegant background pattern */}
       <div className="absolute inset-0 opacity-5">
         <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -806,7 +812,6 @@ const CompletionCertificateCard = ({
         </div>
       </div>
 
-      {/* Glowing orbs */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-400/5 rounded-full blur-3xl"></div>
       <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-2xl"></div>
 
@@ -870,39 +875,32 @@ const CompletionCertificateCard = ({
 
     {/* Certificate Info */}
     <div className="p-4">
-      <div className="flex items-center space-x-2 mb-3">
-        <img
-          src={cert.instructorAvatar}
-          alt={cert.instructor}
-          className="w-6 h-6 rounded-full ring-2 ring-gray-200 dark:ring-gray-800"
-        />
-        <span className="text-sm text-gray-500 font-medium">
-          {cert.instructor}
-        </span>
-      </div>
       <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-2">
+          <img
+            src={cert.instructorAvatar}
+            alt={cert.instructor}
+            className="w-6 h-6 rounded-full ring-2 ring-gray-200 dark:ring-gray-800"
+          />
+          <span className="text-sm text-gray-500 font-medium">
+            {cert.instructor}
+          </span>
+        </div>
+        <div className="text-right">
+          <div className="flex items-center justify-end text-xs text-gray-500">
+            <Calendar className="w-3 h-3 mr-1" />
+            <span>{new Date(cert.completedDate).toLocaleDateString()}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-4">
         <div
           className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getGradeColor(
             cert.grade
           )}`}
         >
           {cert.grade}
-        </div>
-        <div className="text-sm text-gray-500">
-          Score:{" "}
-          <span className="font-bold text-gray-900 dark:text-white">
-            {cert.finalScore}%
-          </span>
-        </div>
-      </div>
-      <div className="flex items-center space-x-4 text-xs text-gray-500 mb-4">
-        <div className="flex items-center space-x-1">
-          <Calendar className="w-3 h-3" />
-          <span>{new Date(cert.completedDate).toLocaleDateString()}</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <CheckCircle className="w-3 h-3" />
-          <span>{cert.totalLessons} lessons</span>
         </div>
       </div>
 
@@ -960,9 +958,15 @@ const CompletionCertificateCard = ({
     </div>
   </div>
 );
-
-// Component: Competency Certificate Card
-const CompetencyCertificateCard = ({ cert, getCompetencyGrade }) => {
+// Component: Certificate of Competency Card
+const CompetencyCertificateCard = ({
+  cert,
+  getCompetencyGrade,
+  onView,
+  onShare,
+  onCopyLink,
+  user,
+}) => {
   const grade = getCompetencyGrade(cert.score);
 
   return (
@@ -972,64 +976,141 @@ const CompetencyCertificateCard = ({ cert, getCompetencyGrade }) => {
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/20 to-orange-600/20"></div>
           <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/20 rounded-full blur-3xl"></div>
 
+          {/* Official Badge */}
           <div className="absolute top-3 right-3 z-10">
             <div className="px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full text-[8px] font-bold text-black flex items-center gap-1 shadow-lg">
-              <Shield className="w-2.5 h-2.5" />
-              VERIFIED
+              <CheckCircle className="w-2.5 h-2.5" />
+              OFFICIAL
             </div>
           </div>
 
-          <div className="relative z-10 text-center mb-2">
-            <div className="flex justify-center mb-1">
-              <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/50">
-                <Shield className="w-5 h-5 text-black" strokeWidth={2.5} />
+          {/* Header Section */}
+          <div className="relative z-10 flex-shrink-0">
+            <div className="text-center space-y-2">
+              <div className="flex justify-center mb-1">
+                <div className="relative">
+                  <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-yellow-500/50">
+                    <Shield className="w-5 h-5 text-black" strokeWidth={2.5} />
+                  </div>
+                  <div className="absolute inset-0 bg-yellow-400 rounded-full blur-md opacity-40 animate-pulse"></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-center space-x-2 mb-1.5">
+                  <div className="h-px w-6 bg-gradient-to-r from-transparent to-yellow-400/50"></div>
+                  <Star className="w-2.5 h-2.5 text-yellow-400" />
+                  <div className="h-px w-6 bg-gradient-to-l from-transparent to-yellow-400/50"></div>
+                </div>
+                <p className="text-yellow-400 text-[9px] font-bold tracking-[0.2em] uppercase mb-1.5">
+                  Certificate of Competency
+                </p>
+                <div className="h-px w-16 bg-gradient-to-r from-transparent via-yellow-400/30 to-transparent mx-auto"></div>
               </div>
             </div>
-            <p className="text-yellow-400 text-[9px] font-bold tracking-[0.2em] uppercase">
-              Professional Certificate
-            </p>
           </div>
 
-          <div className="relative z-10 flex-grow flex items-center justify-center">
-            <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-4 text-center">
-              {cert.certificationTitle}
+          {/* Course Title */}
+          <div className="relative z-10 flex-grow flex items-center justify-center py-2">
+            <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-6 text-center">
+              {cert.certificationTitle || cert.certificationId?.title}
             </h3>
           </div>
 
-          <div className="relative z-10 text-center">
-            <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-lg border border-yellow-400/30">
-              <p className="text-white/70 text-[8px] tracking-wider uppercase mb-0.5">
-                Score
-              </p>
-              <p className="text-white font-bold text-[13px]">{cert.score}%</p>
+          {/* Footer Section */}
+          <div className="relative z-10 flex-shrink-0">
+            <div className="text-center space-y-1.5">
+              <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-lg border border-yellow-400/20 shadow-xl">
+                <p className="text-white/50 text-[8px] tracking-wider uppercase mb-0.5">
+                  Awarded to
+                </p>
+                <p className="text-white font-bold text-[11px] tracking-wide">
+                  {cert.studentName || user?.username || "Student"}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center space-x-1.5 text-[8px] text-white/30 tracking-wider">
+                <span className="font-semibold">LIZARD ACADEMY</span>
+                <span>•</span>
+                <span>
+                  {new Date(
+                    cert.issuedDate || cert.completedDate
+                  ).getFullYear()}
+                </span>
+                <span>•</span>
+                <Lock className="w-2 h-2" />
+              </div>
             </div>
           </div>
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 pointer-events-none"></div>
         </div>
 
+        {/* Certificate Info */}
         <div className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-2">
+              <img
+                src={
+                  cert.studentAvatar ||
+                  user?.avatar ||
+                  `https://api.dicebear.com/7.x/avataaars/svg?seed=${
+                    cert.studentName || user?.username
+                  }`
+                }
+                alt={cert.studentName || user?.username}
+                className="w-6 h-6 rounded-full ring-2 ring-gray-200 dark:ring-gray-800"
+              />
+              <span className="text-sm font-bold text-gray-900 dark:text-white">
+                {cert.studentName || user?.displayName || user?.username}
+              </span>
+            </div>
+            <div className="text-right">
+              <div className="flex items-center justify-end text-xs text-gray-500">
+                <Calendar className="w-3 h-3 mr-1" />
+                <span>
+                  {new Date(
+                    cert.issuedDate || cert.completedDate
+                  ).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <div
               className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${grade.bgColor} ${grade.borderColor} ${grade.textColor}`}
             >
               {grade.text}
             </div>
-            <div className="text-xs text-gray-500 flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              {new Date(cert.issueDate).toLocaleDateString()}
-            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* Action Buttons */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <button
+              onClick={() => onView(cert)}
+              className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
+            >
+              View
+            </button>
             <button
               onClick={async () => {
                 try {
+                  const response = await fetch(
+                    cert.certificateUrl || cert.templateImage
+                  );
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
                   const link = document.createElement("a");
-                  link.href = cert.templateImage;
-                  link.download = `professional-certificate-${cert.certificateNumber}.png`;
+                  link.href = url;
+                  link.download = `${cert.certificateNumber}.png`;
+                  document.body.appendChild(link);
                   link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
                   toast.success("Certificate downloaded!");
                 } catch (error) {
-                  toast.error("Failed to download");
+                  toast.error("Failed to download certificate");
                 }
               }}
               className="py-2.5 border-2 border-gray-200 dark:border-gray-800 rounded-xl text-sm font-semibold hover:border-yellow-500 hover:bg-yellow-500/5 transition"
@@ -1037,23 +1118,20 @@ const CompetencyCertificateCard = ({ cert, getCompetencyGrade }) => {
               Download
             </button>
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(cert.verificationUrl);
-                toast.success("Link copied!");
-              }}
+              onClick={() => onShare(cert)}
               className="py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-xl text-sm font-bold hover:shadow-lg transition"
             >
               Share
             </button>
           </div>
 
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-800 mt-4">
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
             <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
               <Lock className="w-3 h-3" />
               <span className="font-mono">{cert.certificateNumber}</span>
             </div>
             <button
-              onClick={() => window.open(cert.blockchainExplorerUrl, "_blank")}
+              onClick={() => onCopyLink(cert.verificationUrl)}
               className="text-xs text-yellow-500 hover:text-yellow-600 font-semibold flex items-center space-x-1 hover:underline transition"
             >
               <Shield className="w-3 h-3" />
@@ -1065,7 +1143,6 @@ const CompetencyCertificateCard = ({ cert, getCompetencyGrade }) => {
     </div>
   );
 };
-
 // Component: Eligible Certificate Card
 const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
   const grade = getCompetencyGrade(attempt.score);

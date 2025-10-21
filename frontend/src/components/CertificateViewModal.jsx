@@ -1,17 +1,65 @@
-import { X, Download, Share2, ExternalLink, Lock, Copy } from "lucide-react";
+import {
+  X,
+  Download,
+  Share2,
+  ExternalLink,
+  Lock,
+  Copy,
+  CheckCircle,
+  Clock,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { certificateApi } from "@services/api";
 
 const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [signedImageUrl, setSignedImageUrl] = useState(null);
   const [loadingToken, setLoadingToken] = useState(true);
 
+  // Detect certificate type
+  const isCompetency =
+    certificate.certificationTitle || certificate.certificationId;
+
   useEffect(() => {
-    setSignedImageUrl(certificate.templateImage);
+    // For professional certificates, use certificateUrl or templateImage directly
+    const imageUrl = certificate.certificateUrl || certificate.templateImage;
+    console.log("🖼️ Loading certificate image:", imageUrl);
+    setSignedImageUrl(imageUrl);
     setLoadingToken(false);
-  }, [certificate.templateImage]);
+  }, [certificate]);
+
+  // Format duration helper
+  const formatDuration = (seconds) => {
+    if (!seconds) return "N/A";
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    } else if (minutes > 0) {
+      return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
+    } else {
+      return `${secs}s`;
+    }
+  };
+
+  // Format hours for completion certificates
+  const formatHours = (totalHours) => {
+    if (!totalHours) return "N/A";
+
+    const hours = Math.floor(totalHours);
+    const minutes = Math.round((totalHours - hours) * 60);
+
+    if (hours > 0 && minutes > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      return `${hours}h`;
+    } else {
+      return `${minutes}m`;
+    }
+  };
 
   const handleDownload = async () => {
     try {
@@ -55,7 +103,6 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
     if (certificate.blockchainExplorerUrl) {
       window.open(certificate.blockchainExplorerUrl, "_blank");
     } else if (certificate.blockchainHash) {
-      // Fallback: construct Somnia explorer URL
       const explorerUrl = `https://shannon-explorer.somnia.network/tx/${certificate.blockchainHash}`;
       window.open(explorerUrl, "_blank");
     }
@@ -74,7 +121,10 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white truncate">
-                  {certificate.courseTitle}
+                  {isCompetency
+                    ? certificate.certificationTitle ||
+                      certificate.certificationId?.title
+                    : certificate.courseTitle}
                 </h2>
                 <div className="flex items-center space-x-2 mt-1">
                   <Lock className="w-3 h-3 text-gray-500" />
@@ -132,37 +182,70 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                   className={`w-full h-auto ${
                     imageLoaded ? "opacity-100" : "opacity-0"
                   } transition-opacity duration-300`}
-                  onLoad={() => setImageLoaded(true)}
+                  onLoad={() => {
+                    console.log("✅ Certificate image loaded successfully");
+                    setImageLoaded(true);
+                  }}
                   onError={(e) => {
-                    console.error("Image load error:", e);
+                    console.error("❌ Image load error:", e);
+                    console.error("Failed URL:", signedImageUrl);
                     toast.error("Failed to load certificate image");
                   }}
                 />
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mt-6">
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Grade</p>
-                <p className="font-bold text-gray-900 dark:text-white">
-                  {certificate.grade}
-                </p>
-              </div>
+            {/* Certificate Details */}
+            {isCompetency ? (
+              // Professional Competency Certificate Details
+              <div className="grid grid-cols-3 gap-4 mt-6">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Grade</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.grade}
+                  </p>
+                </div>
 
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Score</p>
-                <p className="font-bold text-gray-900 dark:text-white">
-                  {certificate.finalScore}%
-                </p>
-              </div>
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Score</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.score}%
+                  </p>
+                </div>
 
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                <p className="text-xs text-gray-500 mb-1">Total Hours</p>
-                <p className="font-bold text-gray-900 dark:text-white">
-                  {certificate.totalHours}h ({certificate.totalLessons} lessons)
-                </p>
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Correct Answers</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.correctAnswers}/{certificate.totalQuestions}
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              // Course Completion Certificate Details
+              <div className="grid grid-cols-3 gap-4 mt-6">
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Grade</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.grade}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Score</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {certificate.finalScore}%
+                  </p>
+                </div>
+
+                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Course Duration</p>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {formatHours(certificate.totalHours)} (
+                    {certificate.totalLessons} lessons)
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Blockchain Verification Section */}
             <div className="mt-6 p-4 bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-xl">
@@ -172,60 +255,67 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                     Blockchain Verified on Somnia
                   </p>
                   <p className="text-xs text-gray-500">
-                    This certificate is permanently recorded on Somnia
-                    blockchain
+                    This certificate is permanently recorded on the blockchain
                   </p>
                 </div>
-                <div className="px-3 py-1 bg-green-500/20 text-green-500 text-xs font-bold rounded-lg border border-green-500/30">
-                  VERIFIED ✓
-                </div>
+                {certificate.blockchainHash && (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                )}
               </div>
 
-              {/* Transaction Hash */}
               {certificate.blockchainHash && (
-                <div className="mb-3 p-3 bg-white dark:bg-gray-900 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Transaction Hash</p>
-                  <div className="flex items-center space-x-2">
-                    <p className="text-xs font-mono text-gray-900 dark:text-white break-all flex-1">
-                      {certificate.blockchainHash}
-                    </p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-500 mb-1">
+                        Transaction Hash
+                      </p>
+                      <p className="text-xs font-mono text-gray-900 dark:text-white truncate">
+                        {certificate.blockchainHash}
+                      </p>
+                    </div>
                     <button
                       onClick={handleCopyHash}
-                      className="p-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition flex-shrink-0"
-                      title="Copy transaction hash"
+                      className="ml-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+                      title="Copy hash"
                     >
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-4 h-4 text-gray-500" />
                     </button>
                   </div>
+
+                  <button
+                    onClick={handleViewOnBlockchain}
+                    disabled={!certificate.blockchainHash}
+                    className="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-primary-400 text-primary-400 rounded-lg font-medium hover:bg-primary-400 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>View on Somnia Explorer</span>
+                  </button>
                 </div>
               )}
 
-              <div className="space-y-2">
-                {/* Verification URL */}
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={certificate.verificationUrl}
-                    readOnly
-                    className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs"
-                  />
-                  <button
-                    onClick={handleCopyLink}
-                    className="p-2 bg-primary-400 text-black rounded-lg hover:bg-primary-500 transition"
-                    title="Copy verification link"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </div>
+              {!certificate.blockchainHash && (
+                <p className="text-sm text-gray-500 text-center">
+                  Blockchain verification pending...
+                </p>
+              )}
+            </div>
 
-                {/* View on Blockchain Explorer Button */}
+            {/* Verification URL */}
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500 mb-1">Verification URL</p>
+                  <p className="text-xs font-mono text-gray-900 dark:text-white truncate">
+                    {certificate.verificationUrl}
+                  </p>
+                </div>
                 <button
-                  onClick={handleViewOnBlockchain}
-                  disabled={!certificate.blockchainHash}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-primary-400 text-primary-400 rounded-lg font-medium hover:bg-primary-400 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleCopyLink}
+                  className="ml-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
+                  title="Copy verification link"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>View on Somnia Explorer</span>
+                  <Copy className="w-4 h-4 text-gray-500" />
                 </button>
               </div>
             </div>

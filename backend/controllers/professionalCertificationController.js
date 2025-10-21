@@ -28,6 +28,7 @@ const activeStartRequests = new Set();
  * Generate unique certificate number
  * Format: LA-COC-YYYY-XXXXXX (Certificate of Competency)
  */
+
 const generateCertificateNumber = () => {
   const year = new Date().getFullYear();
   const random = crypto.randomBytes(3).toString("hex").toUpperCase();
@@ -508,7 +509,7 @@ const submitTestAttempt = async (req, res) => {
         unansweredQuestions: attempt.unansweredQuestions,
         totalQuestions: originalQuestions.length,
         duration: actualDuration,
-        grade: calculateGrade(score),
+        grade: calculateGrade(score, attempt.certification.passingScore),
         attemptNumber: attempt.attemptNumber,
       },
     });
@@ -593,7 +594,10 @@ const getAttemptDetails = async (req, res) => {
         totalQuestions: attempt.totalQuestions,
         duration: attempt.duration,
         completedAt: attempt.completedAt,
-        grade: calculateGrade(attempt.score),
+        grade: calculateGrade(
+          attempt.score,
+          attempt.certification.passingScore
+        ),
       },
       certification: {
         slug: attempt.certification.slug,
@@ -682,12 +686,11 @@ const shuffleArray = (array) => {
   return shuffled;
 };
 
-const calculateGrade = (score) => {
+const calculateGrade = (score, passingScore = 70) => {
   if (score >= 95) return "Outstanding";
   if (score >= 85) return "Excellent";
   if (score >= 75) return "Very Good";
-  if (score >= 70) return "Good";
-  if (score >= 60) return "Pass";
+  if (score >= passingScore) return "Pass"; // Dynamic based on certification's passing score
   return "Fail";
 };
 
@@ -749,14 +752,14 @@ const purchaseCertificate = async (req, res) => {
     // Check if certificate already exists
     const existingCert = await ProfessionalCertificate.findOne({
       userId: userId,
-      certificationId: attempt.certification._id,
+      attemptId: attemptId, // Check by attemptId, not certificationId
       status: { $ne: "revoked" },
     })
       .populate("certificationId", "title thumbnail category subcategories")
       .populate("userId", "username displayName avatar");
 
     if (existingCert) {
-      console.log("📜 Certificate already exists, returning existing one");
+      console.log("📜 Certificate already exists for this attempt");
       return res.json({
         success: true,
         certificate: existingCert,
@@ -766,7 +769,7 @@ const purchaseCertificate = async (req, res) => {
     }
     // Generate certificate number
     const certificateNumber = generateCertificateNumber();
-
+    const verificationCode = generateVerificationCode();
     // Generate certificate image
     const studentName = attempt.user.displayName || attempt.user.username;
     const certificationData = {
@@ -839,8 +842,14 @@ const purchaseCertificate = async (req, res) => {
       // Certificate details
       certificateNumber,
       certificateUrl,
-      grade: attempt.grade || "Pass",
+      templateImage: certificateUrl, // ADD THIS LINE - for backwards compatibility
+      grade: calculateGrade(attempt.score, attempt.certification.passingScore),
       score: attempt.score,
+      totalQuestions: attempt.totalQuestions, // ADD THIS LINE
+      correctAnswers: attempt.correctAnswers, // ADD THIS LINE
+      testDuration: attempt.certification.duration, // ADD THIS LINE - duration in minutes
+      category: attempt.certification.category, // ADD THIS LINE
+      level: attempt.certification.level, // ADD THIS LINE
 
       // Payment details
       paymentAmount: attempt.certification.certificatePrice.usd,
@@ -909,15 +918,19 @@ const getEligibleCertificates = async (req, res) => {
       "title thumbnail category subcategories certificatePrice"
     );
 
+    // Check which attempts already have certificates
+    const attemptIds = passedAttempts.map((a) => a._id.toString());
     const purchased = await ProfessionalCertificate.find({
-      user: userId,
+      userId: userId,
+      attemptId: { $in: attemptIds }, // Changed to check by attemptId
       status: { $ne: "revoked" },
-    }).select("certification");
+    }).select("attemptId");
 
-    const purchasedIds = purchased.map((p) => p.certification.toString());
+    const purchasedAttemptIds = purchased.map((p) => p.attemptId.toString());
 
+    // Filter out attempts that already have certificates
     const eligible = passedAttempts.filter(
-      (attempt) => !purchasedIds.includes(attempt.certification._id.toString())
+      (attempt) => !purchasedAttemptIds.includes(attempt._id.toString())
     );
 
     res.json({
@@ -940,12 +953,12 @@ const getMyCertificates = async (req, res) => {
     const userId = req.userId;
 
     const certificates = await ProfessionalCertificate.find({
-      user: userId,
+      userId: userId, // Changed from 'user' to 'userId'
       status: { $ne: "revoked" },
     })
-      .populate("certification", "title thumbnail category subcategories")
-      .populate("user", "username displayName avatar")
-      .sort({ issueDate: -1 });
+      .populate("certificationId", "title thumbnail category subcategories") // Changed to certificationId
+      .populate("userId", "username displayName avatar") // Changed to userId
+      .sort({ issuedDate: -1 }); // Changed from issueDate
 
     res.json({
       success: true,
