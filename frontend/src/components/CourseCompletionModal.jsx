@@ -22,13 +22,12 @@ const CourseCompletionModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      // Reset to step 1 when modal opens
+      // Step 1: Lessons completed (immediate)
       setStep(1);
 
       // Fire confetti
       const duration = 3000;
       const end = Date.now() + duration;
-
       const colors = ["#00ff87", "#00d4ff", "#ffed4e"];
 
       (function frame() {
@@ -51,19 +50,22 @@ const CourseCompletionModal = ({
           requestAnimationFrame(frame);
         }
       })();
-
-      // Progress through steps automatically
-      const timer1 = setTimeout(() => setStep(2), 1500);
-      const timer2 = setTimeout(() => setStep(3), 3000);
-      const timer3 = setTimeout(() => setStep(4), 5000);
-
-      return () => {
-        clearTimeout(timer1);
-        clearTimeout(timer2);
-        clearTimeout(timer3);
-      };
     }
   }, [isOpen]);
+
+  // Watch for certificateId to progress steps
+  useEffect(() => {
+    if (certificateId) {
+      // Step 2: Certificate generated
+      setStep(2);
+
+      // Step 3: Blockchain minting (wait a bit for UI smoothness)
+      setTimeout(() => setStep(3), 1000);
+
+      // Step 4: Complete (show success buttons)
+      setTimeout(() => setStep(4), 2000);
+    }
+  }, [certificateId]);
 
   const handleViewCertificate = () => {
     onClose();
@@ -74,7 +76,7 @@ const CourseCompletionModal = ({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - CANNOT CLOSE UNTIL COMPLETE */}
       <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         {/* Modal */}
         <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-primary-400 rounded-3xl max-w-2xl w-full overflow-hidden">
@@ -128,18 +130,10 @@ const CourseCompletionModal = ({
                     step >= 1 ? "bg-green-500 scale-110" : "bg-gray-700"
                   }`}
                 >
-                  {step >= 1 ? (
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  ) : (
-                    <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-                  )}
+                  <CheckCircle className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <p
-                    className={`font-semibold ${
-                      step >= 1 ? "text-white" : "text-gray-400"
-                    }`}
-                  >
+                  <p className="font-semibold text-white">
                     All lessons completed
                   </p>
                   <p className="text-sm text-gray-500">Course progress: 100%</p>
@@ -182,12 +176,14 @@ const CourseCompletionModal = ({
                       : "Generating certificate..."}
                   </p>
                   <p className="text-sm text-gray-500">
-                    Creating your achievement proof
+                    {step >= 2
+                      ? "Image created and uploaded"
+                      : "Creating your achievement proof"}
                   </p>
                 </div>
               </div>
 
-              {/* Step 3: Blockchain Verification */}
+              {/* Step 3: NFT Minting */}
               <div
                 className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all duration-500 ${
                   step >= 3
@@ -219,19 +215,19 @@ const CourseCompletionModal = ({
                     }`}
                   >
                     {step >= 3
-                      ? "Verified on Somnia blockchain"
-                      : "Recording on blockchain..."}
+                      ? "NFT minted on Somnia blockchain"
+                      : "Minting NFT on blockchain..."}
                   </p>
                   <p className="text-sm text-gray-500">
                     {step >= 3
                       ? "Permanently secured on-chain"
-                      : "Ensuring authenticity"}
+                      : "Uploading to IPFS and minting"}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - ONLY SHOW WHEN NFT IS MINTED */}
             {step >= 4 && (
               <div className="space-y-3 animate-fade-in">
                 <button
@@ -239,7 +235,7 @@ const CourseCompletionModal = ({
                   className="w-full py-4 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold text-lg hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-primary-400/30"
                 >
                   <Award className="w-6 h-6" />
-                  View Your Certificate
+                  View Your Certificate NFT
                 </button>
                 <button
                   onClick={onClose}
@@ -252,8 +248,13 @@ const CourseCompletionModal = ({
 
             {/* Loading state message */}
             {step < 4 && (
-              <div className="text-center text-gray-400 text-sm animate-pulse">
-                Please wait while we process your achievement...
+              <div className="text-center space-y-2">
+                <div className="text-gray-400 text-sm animate-pulse">
+                  Please wait while we mint your certificate NFT...
+                </div>
+                <div className="text-xs text-gray-500">
+                  This may take 30-60 seconds. Do not close this window.
+                </div>
               </div>
             )}
           </div>

@@ -449,6 +449,7 @@ const DashboardPage = () => {
             {/* Quick Actions */}
             <div className="grid md:grid-cols-3 gap-4">
               <button
+                key="quick-action-courses"
                 onClick={() => navigate("/courses")}
                 className="p-4 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition text-left group"
               >
@@ -459,6 +460,7 @@ const DashboardPage = () => {
                 <p className="text-xs text-gray-500">Discover new skills</p>
               </button>
               <button
+                key="quick-action-certificates"
                 onClick={() => navigate("/certificates")}
                 className="p-4 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition text-left group"
               >
@@ -469,6 +471,7 @@ const DashboardPage = () => {
                 <p className="text-xs text-gray-500">View achievements</p>
               </button>
               <button
+                key="quick-action-progress"
                 onClick={() => navigate("/progress")}
                 className="p-4 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition text-left group"
               >
@@ -497,17 +500,16 @@ const DashboardPage = () => {
                 enrolledCourses
                   .filter((c) => c.lastAccessedAt)
                   .sort((a, b) => {
-                    // Sort by most recent first - FIX: Use lastAccessedAt instead of lastWatched
                     const dateA = new Date(a.lastAccessedAt);
                     const dateB = new Date(b.lastAccessedAt);
                     return dateB - dateA;
                   })
                   .slice(0, 5)
-                  .map((course, index) => (
+                  .map((course) => (
                     <div
-                      key={course.id}
+                      key={`activity-${course.id}`}
                       className="flex items-start space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition cursor-pointer"
-                      onClick={() => navigate(`/learn/${course.slug}`)}
+                      onClick={() => navigate(`/courses/${course.slug}/learn`)}
                     >
                       <div className="w-10 h-10 bg-primary-400/10 rounded-lg flex items-center justify-center flex-shrink-0">
                         {course.status === "completed" ? (
@@ -604,11 +606,8 @@ const DashboardPage = () => {
               className="flex gap-6 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-600 cursor-grab active:cursor-grabbing"
             >
               {filteredCourses.map((course) => (
-                <div key={course._id} className="flex-shrink-0 w-80">
-                  <div
-                    key={course.id}
-                    className="bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden hover:shadow-lg transition group flex flex-col"
-                  >
+                <div key={`course-${course.id}`} className="flex-shrink-0 w-80">
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden hover:shadow-lg transition group flex flex-col">
                     <div className="relative">
                       <img
                         src={course.thumbnail}

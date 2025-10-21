@@ -3,12 +3,11 @@ const { createCanvas, loadImage, registerFont } = require("canvas");
 const path = require("path");
 const crypto = require("crypto");
 const axios = require("axios");
+const { ethers } = require("ethers");
 const Certificate = require("../models/Certificate");
 const User = require("../models/User");
 const Course = require("../models/Course");
 const Purchase = require("../models/Purchase");
-const { getBlockchainService } = require("./blockchainService");
-
 // Register fonts
 try {
   registerFont(path.join(__dirname, "../assets/fonts/Poppins-Bold.ttf"), {
@@ -368,6 +367,9 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 /**
  * Generate certificate for completed course
  */
+/**
+ * Generate certificate for completed course
+ */
 const generateCertificate = async (userId, courseId) => {
   try {
     console.log(
@@ -439,27 +441,115 @@ const generateCertificate = async (userId, courseId) => {
 
     const verificationUrl = `${process.env.FRONTEND_URL}/verify/${certificateNumber}`;
 
-    console.log("📝 Recording certificate on blockchain...");
+    console.log("📝 Minting Completion Certificate NFT...");
 
-    // Record on blockchain automatically (backend pays gas)
-    const blockchainService = getBlockchainService();
-    const blockchainResult = await blockchainService.recordCertificate({
-      certificateNumber,
-      studentName: user.displayName || user.username,
-      studentWallet: user.walletAddress || "Not Connected",
-      courseTitle: course.title,
-      instructor:
-        course.instructor?.displayName ||
-        course.instructor?.username ||
-        "Instructor",
-      completedDate: purchase.completedAt || new Date(),
-      grade,
-      finalScore,
-      totalHours,
-      totalLessons: course.totalLessons || 0,
-    });
+    // Upload to IPFS and mint NFT
+    let blockchainResult = {
+      transactionHash: null,
+      blockNumber: null,
+      tokenId: null,
+      contractAddress: null,
+      explorerUrl: null,
+    };
 
-    console.log(`✅ Blockchain recorded: ${blockchainResult.transactionHash}`);
+    let nftMetadataURI = null;
+    let nftImageURI = null;
+
+    try {
+      if (user.walletAddress && user.walletAddress !== "Not Connected") {
+        const { getIPFSService } = require("./ipfsService");
+        const { getNFTBlockchainService } = require("./nftBlockchainService");
+
+        console.log("📤 Uploading certificate image to IPFS...");
+        const ipfsService = getIPFSService();
+        const ipfsImage = await ipfsService.uploadImage(
+          certificateImageBuffer,
+          `${certificateNumber}.png`
+        );
+        console.log(`✅ Image uploaded to IPFS: ${ipfsImage.url}`);
+
+        // Create NFT metadata
+        const metadata = {
+          name: `${course.title} - Certificate of Completion`,
+          description: `Soul-bound Certificate of Completion issued to ${
+            user.displayName || user.username
+          } by Lizard Academy for completing ${
+            course.title
+          }. This certificate represents verified achievement in ${
+            course.category
+          }.`,
+          image: ipfsImage.url,
+          external_url: verificationUrl,
+          attributes: [
+            { trait_type: "Certificate Number", value: certificateNumber },
+            {
+              trait_type: "Student",
+              value: user.displayName || user.username,
+            },
+            { trait_type: "Course", value: course.title },
+            { trait_type: "Category", value: course.category || "General" },
+            {
+              trait_type: "Total Hours",
+              value: totalHours,
+              display_type: "number",
+            },
+            {
+              trait_type: "Total Lessons",
+              value: course.totalLessons || 0,
+              display_type: "number",
+            },
+            {
+              trait_type: "Instructor",
+              value:
+                course.instructor?.displayName ||
+                course.instructor?.username ||
+                "Instructor",
+            },
+            {
+              trait_type: "Completed Date",
+              value: Math.floor(
+                (purchase.completedAt || new Date()).getTime() / 1000
+              ),
+              display_type: "date",
+            },
+            {
+              trait_type: "Issued Date",
+              value: Math.floor(new Date().getTime() / 1000),
+              display_type: "date",
+            },
+            { trait_type: "Type", value: "Soul-bound Certificate" },
+          ],
+          properties: {
+            category: "certificates",
+            type: "completion",
+            skills: skills.slice(0, 5),
+            creators: [{ address: "Lizard Academy", share: 100 }],
+          },
+        };
+
+        console.log("📤 Uploading metadata to IPFS...");
+        const ipfsMetadata = await ipfsService.uploadMetadata(metadata);
+        console.log(`✅ Metadata uploaded to IPFS: ${ipfsMetadata.url}`);
+
+        console.log("🎨 Minting Completion NFT on blockchain...");
+        const nftService = await getNFTBlockchainService();
+        blockchainResult = await nftService.mintCompletionCertificate(
+          user.walletAddress,
+          certificateNumber,
+          ipfsMetadata.url
+        );
+
+        nftMetadataURI = ipfsMetadata.url;
+        nftImageURI = ipfsImage.url;
+
+        console.log(`✅ NFT minted: ${blockchainResult.transactionHash}`);
+      } else {
+        throw new Error("Wallet address not connected - NFT minting required");
+      }
+    } catch (nftError) {
+      console.error("❌ NFT minting failed:", nftError.message);
+      throw new Error(`Certificate generation failed: ${nftError.message}`);
+    }
 
     const certificate = await Certificate.create({
       userId,
@@ -480,8 +570,18 @@ const generateCertificate = async (userId, courseId) => {
       totalHours,
       totalLessons: course.totalLessons || 0,
       blockchainHash: blockchainResult.transactionHash,
-      blockchainExplorerUrl: blockchainResult.explorerUrl,
+      blockchainExplorerUrl:
+        blockchainResult.explorerUrl ||
+        (blockchainResult.transactionHash
+          ? `https://shannon-explorer.somnia.network/tx/${blockchainResult.transactionHash}`
+          : null),
       blockchainBlock: blockchainResult.blockNumber,
+      nftTokenId: blockchainResult.tokenId,
+      nftContractAddress: blockchainResult.contractAddress,
+      nftMetadataURI: nftMetadataURI,
+      nftImageURI: nftImageURI,
+      nftMinted: !!blockchainResult.tokenId,
+      nftMintedAt: blockchainResult.tokenId ? new Date() : null,
       verificationUrl,
     });
 
@@ -496,7 +596,6 @@ const generateCertificate = async (userId, courseId) => {
     throw error;
   }
 };
-
 module.exports = {
   generateCertificate,
   generateCertificateNumber,

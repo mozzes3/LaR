@@ -16,7 +16,7 @@ const NFTCertificateViewer = () => {
   const [nft, setNft] = useState(null);
   const [error, setError] = useState("");
 
-  const CONTRACT_ADDRESS = "0x9094CFF8A9980b817fE5fa04fd3c9b44663d3e23";
+  const CONTRACT_ADDRESS = "0x2F6D5838A287EE67AB999dC6728FbA738A908b4B";
   const RPC_URL = "https://dream-rpc.somnia.network";
 
   const fetchNFT = async () => {
