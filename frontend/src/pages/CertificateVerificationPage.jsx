@@ -272,26 +272,20 @@ const CertificateVerificationPage = () => {
               </div>
 
               {/* Course Certificate Performance */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl text-center">
-                  <Trophy className="w-6 h-6 text-purple-500 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500 mb-1">Grade</p>
-                  <p className="font-bold text-gray-900 dark:text-white">
-                    {certificate.grade}
-                  </p>
-                </div>
-
+              <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="p-4 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl text-center">
                   <Award className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500 mb-1">Score</p>
+                  <p className="text-xs text-gray-500 mb-1">Total Hours</p>
                   <p className="font-bold text-gray-900 dark:text-white">
-                    {certificate.finalScore}%
+                    {certificate.totalHours}h
                   </p>
                 </div>
 
                 <div className="p-4 bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl text-center">
                   <CheckCircle className="w-6 h-6 text-green-500 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500 mb-1">Lessons</p>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Lessons Completed
+                  </p>
                   <p className="font-bold text-gray-900 dark:text-white">
                     {certificate.totalLessons}
                   </p>

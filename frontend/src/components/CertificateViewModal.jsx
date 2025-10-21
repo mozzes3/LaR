@@ -6,7 +6,7 @@ import {
   Lock,
   Copy,
   CheckCircle,
-  Clock,
+  Trophy,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
@@ -15,6 +15,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [signedImageUrl, setSignedImageUrl] = useState(null);
   const [loadingToken, setLoadingToken] = useState(true);
+
   // Detect certificate type
   const isCompetency =
     certificate.certificationTitle || certificate.certificationId;
@@ -22,8 +23,6 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   useEffect(() => {
     console.log("🔍 Full certificate object:", certificate);
     console.log("🔍 Available fields:", Object.keys(certificate));
-    console.log("🔍 blockchainVerified:", certificate.blockchainVerified);
-    console.log("🔍 blockchainHash:", certificate.nftTransactionHash);
     console.log("🔍 nftMinted:", certificate.nftMinted);
     console.log("🔍 nftTransactionHash:", certificate.nftTransactionHash);
 
@@ -35,26 +34,12 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
     setSignedImageUrl(imageUrl);
     setLoadingToken(false);
   }, [certificate]);
-  const txHash = certificate.blockchainHash || certificate.nftTransactionHash;
-  const explorerUrl =
-    certificate.blockchainExplorerUrl ||
-    (txHash ? `https://shannon-explorer.somnia.network/tx/${txHash}` : null);
-  // Format duration helper
-  const formatDuration = (seconds) => {
-    if (!seconds) return "N/A";
 
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-    } else if (minutes > 0) {
-      return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
-    } else {
-      return `${secs}s`;
-    }
-  };
+  // NFT transaction hash (both types use this now)
+  const nftTxHash = certificate.nftTransactionHash;
+  const explorerUrl = nftTxHash
+    ? `https://shannon-explorer.somnia.network/tx/${nftTxHash}`
+    : null;
 
   // Format hours for completion certificates
   const formatHours = (totalHours) => {
@@ -104,8 +89,8 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   };
 
   const handleCopyHash = () => {
-    if (txHash) {
-      navigator.clipboard.writeText(txHash);
+    if (nftTxHash) {
+      navigator.clipboard.writeText(nftTxHash);
       toast.success("Transaction hash copied!");
     }
   };
@@ -142,6 +127,12 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                   <span className="text-xs text-gray-500">
                     {certificate.certificateNumber}
                   </span>
+                  {certificate.nftMinted && (
+                    <span className="text-xs px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full font-semibold border border-purple-500/30 flex items-center gap-1">
+                      <Trophy className="w-3 h-3" />
+                      NFT
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -208,7 +199,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
 
             {/* Certificate Details */}
             {isCompetency ? (
-              // Professional Competency Certificate Details
+              // Professional Competency Certificate Details (KEEP grade/score)
               <div className="grid grid-cols-3 gap-4 mt-6">
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                   <p className="text-xs text-gray-500 mb-1">Grade</p>
@@ -232,83 +223,97 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                 </div>
               </div>
             ) : (
-              // Course Completion Certificate Details
-              <div className="grid grid-cols-3 gap-4 mt-6">
+              // Course Completion Certificate Details (NO grade/score)
+              <div className="grid grid-cols-2 gap-4 mt-6">
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <p className="text-xs text-gray-500 mb-1">Grade</p>
+                  <p className="text-xs text-gray-500 mb-1">Total Hours</p>
                   <p className="font-bold text-gray-900 dark:text-white">
-                    {certificate.grade}
+                    {formatHours(certificate.totalHours)}
                   </p>
                 </div>
 
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <p className="text-xs text-gray-500 mb-1">Score</p>
-                  <p className="font-bold text-gray-900 dark:text-white">
-                    {certificate.finalScore}%
+                  <p className="text-xs text-gray-500 mb-1">
+                    Lessons Completed
                   </p>
-                </div>
-
-                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                  <p className="text-xs text-gray-500 mb-1">Course Duration</p>
                   <p className="font-bold text-gray-900 dark:text-white">
-                    {formatHours(certificate.totalHours)} (
-                    {certificate.totalLessons} lessons)
+                    {certificate.totalLessons} lessons
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Blockchain Verification Section */}
-            <div className="mt-6 p-4 bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-xl">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="font-bold text-gray-900 dark:text-white mb-1">
-                    Blockchain Verified
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    This certificate is permanently recorded on the blockchain
-                  </p>
-                </div>
-                {txHash && <CheckCircle className="w-5 h-5 text-green-500" />}
-              </div>
-
-              {txHash && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-500 mb-1">
-                        Transaction Hash
-                      </p>
-                      <p className="text-xs font-mono text-gray-900 dark:text-white truncate">
-                        {txHash}
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleCopyHash}
-                      className="ml-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
-                      title="Copy hash"
-                    >
-                      <Copy className="w-4 h-4 text-gray-500" />
-                    </button>
+            {/* NFT Verification Section */}
+            {certificate.nftMinted && (
+              <div className="mt-6 p-4 bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-xl">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-primary-400" />
+                      NFT Certificate
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Soul-bound NFT minted on Somnia blockchain
+                    </p>
                   </div>
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                </div>
+
+                <div className="space-y-2">
+                  {nftTxHash && (
+                    <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Transaction Hash
+                        </p>
+                        <p className="text-xs font-mono text-gray-600 dark:text-gray-400 truncate">
+                          {nftTxHash}
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleCopyHash}
+                        className="ml-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+                        title="Copy hash"
+                      >
+                        <Copy className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  )}
+
+                  {certificate.nftMetadataURI && (
+                    <button
+                      onClick={() =>
+                        window.open(certificate.nftMetadataURI, "_blank")
+                      }
+                      className="w-full py-2 text-xs font-semibold text-primary-400 hover:text-primary-500 flex items-center justify-center gap-1 hover:bg-primary-400/5 rounded-lg transition-all"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      View NFT Metadata
+                    </button>
+                  )}
 
                   <button
                     onClick={handleViewOnBlockchain}
-                    disabled={!txHash}
+                    disabled={!nftTxHash}
                     className="w-full flex items-center justify-center space-x-2 px-4 py-2 border-2 border-primary-400 text-primary-400 rounded-lg font-medium hover:bg-primary-400 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ExternalLink className="w-4 h-4" />
                     <span>View NFT on Explorer</span>
                   </button>
                 </div>
-              )}
+              </div>
+            )}
 
-              {!txHash && (
-                <p className="text-sm text-gray-500 text-center">
-                  Blockchain verification pending...
+            {/* If NFT not minted */}
+            {!certificate.nftMinted && (
+              <div className="mt-6 p-4 bg-yellow-500/10 border-2 border-yellow-500/30 rounded-xl">
+                <p className="text-sm text-yellow-600 dark:text-yellow-400 font-semibold">
+                  {certificate.studentWallet
+                    ? "NFT minting in progress..."
+                    : "Connect wallet to mint NFT certificate"}
                 </p>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Verification URL */}
             <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">

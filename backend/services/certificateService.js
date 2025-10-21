@@ -255,22 +255,6 @@ const createCertificateImage = async (data) => {
   const statsY = 800;
   const spacing = 400;
 
-  // Left: Grade
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "bold 40px Poppins Bold, Arial";
-  ctx.fillText(grade, width / 2 - spacing, statsY);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-  ctx.font = "18px Poppins, Arial";
-  ctx.fillText("GRADE", width / 2 - spacing, statsY + 35);
-
-  // Center: Score
-  ctx.fillStyle = "#00ff87";
-  ctx.font = "bold 40px Poppins Bold, Arial";
-  ctx.fillText(`${finalScore}%`, width / 2, statsY);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-  ctx.font = "18px Poppins, Arial";
-  ctx.fillText("FINAL SCORE", width / 2, statsY + 35);
-
   // Right: Hours
   ctx.fillStyle = "#00ff87";
   ctx.font = "bold 40px Poppins Bold, Arial";

@@ -654,151 +654,94 @@ const UserProfilePage = () => {
                             </div>
                           </div>
                         ) : (
-                          // Completion Certificate Card
+                          // Completion Certificate Card - NO GRADE/SCORE
                           <div
                             key={cert._id}
-                            className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-xl hover:border-primary-400/50 transition-all duration-300"
+                            className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-xl hover:border-primary-400/50 transition-all duration-300 cursor-pointer"
+                            onClick={() => navigate("/certificates")}
                           >
-                            {/* Certificate Preview Card */}
-                            <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-gray-900 to-black p-6 flex flex-col overflow-hidden">
-                              {/* Background pattern */}
-                              <div className="absolute inset-0 opacity-5">
-                                <svg
-                                  className="w-full h-full"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <defs>
-                                    <pattern
-                                      id={`grid-${cert._id}`}
-                                      width="40"
-                                      height="40"
-                                      patternUnits="userSpaceOnUse"
-                                    >
-                                      <path
-                                        d="M 40 0 L 0 0 0 40"
-                                        fill="none"
-                                        stroke="white"
-                                        strokeWidth="0.5"
-                                      />
-                                    </pattern>
-                                  </defs>
-                                  <rect
-                                    width="100%"
-                                    height="100%"
-                                    fill={`url(#grid-${cert._id})`}
-                                  />
-                                </svg>
-                              </div>
+                            {/* Certificate Preview */}
+                            <div className="relative aspect-video bg-gradient-to-br from-primary-900 via-purple-900 to-primary-900 p-6 flex flex-col overflow-hidden">
+                              <div className="absolute inset-0 bg-gradient-to-br from-primary-600/20 to-purple-600/20"></div>
+                              <div className="absolute top-0 right-0 w-64 h-64 bg-primary-400/20 rounded-full blur-3xl"></div>
 
-                              {/* Corner ornaments */}
-                              <div className="absolute top-2 left-2">
-                                <div className="w-8 h-8 border-t-2 border-l-2 border-primary-400/60 relative">
-                                  <div className="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-                                </div>
-                              </div>
-                              <div className="absolute top-2 right-2">
-                                <div className="w-8 h-8 border-t-2 border-r-2 border-primary-400/60 relative">
-                                  <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-                                </div>
-                              </div>
-                              <div className="absolute bottom-2 left-2">
-                                <div className="w-8 h-8 border-b-2 border-l-2 border-primary-400/60 relative">
-                                  <div className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-                                </div>
-                              </div>
-                              <div className="absolute bottom-2 right-2">
-                                <div className="w-8 h-8 border-b-2 border-r-2 border-primary-400/60 relative">
-                                  <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
+                              {/* Completion Badge */}
+                              <div className="absolute top-3 right-3 z-10">
+                                <div className="px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full text-[8px] font-bold text-black flex items-center gap-1 shadow-lg">
+                                  <CheckCircle className="w-2.5 h-2.5" />
+                                  COMPLETED
                                 </div>
                               </div>
 
-                              {/* Glowing orbs */}
-                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-400/5 rounded-full blur-3xl"></div>
+                              {/* NFT Badge if minted */}
+                              {cert.nftMinted && (
+                                <div className="absolute top-3 left-3 z-10">
+                                  <div className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-[8px] font-bold text-white flex items-center gap-1 shadow-lg">
+                                    <Trophy className="w-2.5 h-2.5" />
+                                    NFT
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Header */}
-                              <div className="relative z-10 flex-shrink-0">
-                                <div className="text-center space-y-2">
-                                  <div className="flex justify-center mb-1">
-                                    <div className="relative">
-                                      <div className="w-10 h-10 bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-500/50">
-                                        <Award
-                                          className="w-5 h-5 text-black"
-                                          strokeWidth={2.5}
-                                        />
-                                      </div>
-                                      <div className="absolute inset-0 bg-primary-400 rounded-full blur-md opacity-40 animate-pulse"></div>
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div className="flex items-center justify-center space-x-2 mb-1.5">
-                                      <div className="h-px w-6 bg-gradient-to-r from-transparent to-primary-400/50"></div>
-                                      <Star className="w-2.5 h-2.5 text-primary-400" />
-                                      <div className="h-px w-6 bg-gradient-to-l from-transparent to-primary-400/50"></div>
-                                    </div>
-                                    <p className="text-primary-400 text-[9px] font-bold tracking-[0.2em] uppercase mb-1.5">
-                                      Certificate of Completion
-                                    </p>
-                                    <div className="h-px w-16 bg-gradient-to-r from-transparent via-primary-400/30 to-transparent mx-auto"></div>
+                              <div className="relative z-10 flex-shrink-0 mb-auto">
+                                <div className="flex items-center justify-center mb-2">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <BookOpen className="w-4 h-4 text-white" />
                                   </div>
                                 </div>
+                                <p className="text-[10px] text-white/60 text-center uppercase tracking-wider font-bold">
+                                  Certificate of Completion
+                                </p>
                               </div>
 
                               {/* Course Title */}
-                              <div className="relative z-10 flex-grow flex items-center justify-center py-2">
-                                <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-6 text-center">
+                              <div className="relative z-10 text-center">
+                                <h4 className="text-sm font-bold text-white line-clamp-2 mb-1">
                                   {cert.courseTitle}
-                                </h3>
+                                </h4>
                               </div>
-
-                              {/* Footer */}
-                              <div className="relative z-10 flex-shrink-0">
-                                <div className="text-center space-y-1.5">
-                                  <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-lg border border-primary-400/20 shadow-xl">
-                                    <p className="text-white/50 text-[8px] tracking-wider uppercase mb-0.5">
-                                      Awarded to
-                                    </p>
-                                    <p className="text-white font-bold text-[11px] tracking-wide">
-                                      {profile.username}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center justify-center space-x-1.5 text-[8px] text-white/30 tracking-wider">
-                                    <span className="font-semibold">
-                                      LIZARD ACADEMY
-                                    </span>
-                                    <span>•</span>
-                                    <span>
-                                      {new Date(
-                                        cert.completedDate
-                                      ).getFullYear()}
-                                    </span>
-                                    <span>•</span>
-                                    <Lock className="w-2 h-2" />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 pointer-events-none"></div>
                             </div>
 
-                            {/* Certificate Info */}
+                            {/* Certificate Details */}
                             <div className="p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div
-                                  className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getGradeColor(
-                                    cert.grade
-                                  )}`}
-                                >
-                                  {cert.grade}
+                              <div className="flex items-start space-x-3 mb-3">
+                                <div className="p-2 bg-primary-400/10 rounded-lg">
+                                  <BookOpen className="w-5 h-5 text-primary-400" />
                                 </div>
-                                <div className="text-sm text-gray-500">
-                                  Score:{" "}
-                                  <span className="font-bold text-gray-900 dark:text-white">
-                                    {cert.finalScore}%
-                                  </span>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-gray-900 dark:text-white mb-1 line-clamp-1">
+                                    {cert.courseTitle}
+                                  </h3>
+                                  <p className="text-xs text-gray-500">
+                                    {cert.instructor}
+                                  </p>
                                 </div>
                               </div>
-                              <div className="flex items-center space-x-4 text-xs text-gray-500">
-                                <div className="flex items-center space-x-1">
+
+                              {/* Stats - Hours and Lessons ONLY (NO grade/score) */}
+                              <div className="grid grid-cols-2 gap-2 mb-3">
+                                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+                                  <div className="text-lg font-bold text-gray-900 dark:text-white">
+                                    {cert.totalHours}h
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Total Hours
+                                  </div>
+                                </div>
+                                <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+                                  <div className="text-lg font-bold text-gray-900 dark:text-white">
+                                    {cert.totalLessons}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Lessons
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Date and Status */}
+                              <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-800">
+                                <div className="flex items-center space-x-1 text-xs text-gray-500">
                                   <Calendar className="w-3 h-3" />
                                   <span>
                                     {new Date(
@@ -806,10 +749,14 @@ const UserProfilePage = () => {
                                     ).toLocaleDateString()}
                                   </span>
                                 </div>
-                                <div className="flex items-center space-x-1">
-                                  <CheckCircle className="w-3 h-3" />
-                                  <span>{cert.totalLessons} lessons</span>
-                                </div>
+                                {cert.nftMinted && (
+                                  <div className="flex items-center space-x-1 text-xs text-purple-500">
+                                    <Trophy className="w-3 h-3" />
+                                    <span className="font-semibold">
+                                      NFT Minted
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>

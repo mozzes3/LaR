@@ -93,7 +93,7 @@ const getCertificate = async (req, res) => {
   }
 };
 
-// Verify certificate by number (PUBLIC)
+// Verify certificate by number (PUBLIC) - Updated for NFT system
 const verifyCertificate = async (req, res) => {
   try {
     const certificate = await Certificate.findOne({
@@ -109,10 +109,41 @@ const verifyCertificate = async (req, res) => {
       });
     }
 
-    res.json({
+    // Return certificate data with NFT information
+    const responseData = {
       valid: true,
-      certificate,
-    });
+      certificate: {
+        certificateNumber: certificate.certificateNumber,
+        studentName: certificate.studentName,
+        courseTitle: certificate.courseTitle,
+        instructor: certificate.instructor,
+        completedDate: certificate.completedDate,
+        totalHours: certificate.totalHours,
+        totalLessons: certificate.totalLessons,
+        skills: certificate.skills,
+        templateImage: certificate.templateImage,
+        verificationUrl: certificate.verificationUrl,
+
+        // NFT data
+        nftMinted: certificate.nftMinted || false,
+        nftTokenId: certificate.nftTokenId,
+        nftContractAddress: certificate.nftContractAddress,
+        nftMetadataURI: certificate.nftMetadataURI,
+        nftTransactionHash: certificate.nftTransactionHash,
+        nftMintedAt: certificate.nftMintedAt,
+
+        // User info (populated)
+        student: {
+          username: certificate.userId?.username,
+          displayName: certificate.userId?.displayName,
+        },
+        course: {
+          title: certificate.courseId?.title,
+        },
+      },
+    };
+
+    res.json(responseData);
   } catch (error) {
     console.error("Verify certificate error:", error);
     res.status(500).json({ error: error.message });
