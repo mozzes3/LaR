@@ -25,6 +25,7 @@ import {
   ArrowRight,
   Shield,
   Zap,
+  BookOpen,
 } from "lucide-react";
 import toast, { CheckmarkIcon } from "react-hot-toast";
 import { certificateApi, professionalCertificationApi } from "@services/api";
@@ -76,17 +77,22 @@ const CertificatesPage = () => {
         type: "completion",
         courseTitle: cert.courseTitle,
         instructor: cert.instructor,
-        instructorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cert.instructor}`, // ADD THIS LINE
+        instructorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cert.instructor}`,
         completedDate: cert.completedDate,
         certificateNumber: cert.certificateNumber,
-        grade: cert.grade,
         finalScore: cert.finalScore,
-        thumbnail: cert.courseId?.thumbnail || cert.templateImage,
         totalHours: cert.totalHours,
         totalLessons: cert.totalLessons,
         verificationUrl: cert.verificationUrl,
+        // NFT & Blockchain fields
+        nftImageURI: cert.nftImageURI,
+        nftTransactionHash: cert.nftTransactionHash,
+        nftTokenId: cert.nftTokenId,
+        nftContractAddress: cert.nftContractAddress,
+        nftMinted: cert.nftMinted,
         blockchainHash: cert.blockchainHash,
         blockchainExplorerUrl: cert.blockchainExplorerUrl,
+        blockchainBlock: cert.blockchainBlock,
         templateImage: cert.templateImage,
       }));
       setCourseCertificates(transformed);
@@ -182,21 +188,6 @@ const CertificatesPage = () => {
     window.open(urls[platform], "_blank");
   };
 
-  const getGradeColor = (grade) => {
-    switch (grade?.toLowerCase()) {
-      case "outstanding":
-        return "text-purple-500 bg-purple-500/10 border-purple-500/30";
-      case "excellent":
-        return "text-green-500 bg-green-500/10 border-green-500/30";
-      case "very good":
-        return "text-blue-500 bg-blue-500/10 border-blue-500/30";
-      case "good":
-        return "text-cyan-500 bg-cyan-500/10 border-cyan-500/30";
-      default:
-        return "text-gray-500 bg-gray-500/10 border-gray-500/30";
-    }
-  };
-
   const getCompetencyGrade = (score) => {
     if (score >= 95)
       return {
@@ -252,6 +243,32 @@ const CertificatesPage = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
+  };
+
+  const formatHours = (totalHours) => {
+    if (!totalHours || totalHours === 0) return "N/A";
+
+    // Handle if totalHours is in seconds (large number)
+    let hours, minutes;
+    if (totalHours > 100) {
+      // Likely in seconds, convert to hours
+      hours = Math.floor(totalHours / 3600);
+      minutes = Math.round((totalHours % 3600) / 60);
+    } else {
+      // Already in hours
+      hours = Math.floor(totalHours);
+      minutes = Math.round((totalHours - hours) * 60);
+    }
+
+    if (hours > 0 && minutes > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (hours > 0) {
+      return `${hours}h`;
+    } else if (minutes > 0) {
+      return `${minutes}m`;
+    } else {
+      return "< 1m";
+    }
   };
 
   const passedAttempts = attempts.filter((a) => a.passed);
@@ -458,7 +475,7 @@ const CertificatesPage = () => {
                           onView={handleView}
                           onShare={handleShare}
                           onCopyLink={handleCopyLink}
-                          getGradeColor={getGradeColor}
+                          formatHours={formatHours}
                         />
                       ) : (
                         <CompetencyCertificateCard
@@ -506,7 +523,7 @@ const CertificatesPage = () => {
                     onView={handleView}
                     onShare={handleShare}
                     onCopyLink={handleCopyLink}
-                    getGradeColor={getGradeColor}
+                    formatHours={formatHours}
                   />
                 ))}
               </div>
@@ -757,120 +774,25 @@ const CertificatesPage = () => {
   );
 };
 
-// Component: Completion Certificate Card (Your existing design)
-// Component: Certificate of Completion Card
+// Component: Completion Certificate Card
 const CompletionCertificateCard = ({
   cert,
   user,
   onView,
   onShare,
   onCopyLink,
-  getGradeColor,
+  formatHours,
 }) => (
   <div className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-2xl hover:border-primary-400/50 transition-all duration-300 group">
-    <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-gray-900 to-black p-6 flex flex-col overflow-hidden">
-      <div className="absolute inset-0 opacity-5">
-        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern
-              id="grid"
-              width="40"
-              height="40"
-              patternUnits="userSpaceOnUse"
-            >
-              <path
-                d="M 40 0 L 0 0 0 40"
-                fill="none"
-                stroke="white"
-                strokeWidth="0.5"
-              />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-        </svg>
-      </div>
-
-      {/* Luxury corner ornaments */}
-      <div className="absolute top-2 left-2">
-        <div className="w-8 h-8 border-t-2 border-l-2 border-primary-400/60 relative">
-          <div className="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-        </div>
-      </div>
-      <div className="absolute top-2 right-2">
-        <div className="w-8 h-8 border-t-2 border-r-2 border-primary-400/60 relative">
-          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-        </div>
-      </div>
-      <div className="absolute bottom-2 left-2">
-        <div className="w-8 h-8 border-b-2 border-l-2 border-primary-400/60 relative">
-          <div className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-        </div>
-      </div>
-      <div className="absolute bottom-2 right-2">
-        <div className="w-8 h-8 border-b-2 border-r-2 border-primary-400/60 relative">
-          <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-400 rounded-full"></div>
-        </div>
-      </div>
-
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-400/5 rounded-full blur-3xl"></div>
-      <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-2xl"></div>
-
-      {/* Header Section */}
-      <div className="relative z-10 flex-shrink-0">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center mb-1">
-            <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-400 via-primary-500 to-primary-600 rounded-full flex items-center justify-center shadow-lg shadow-primary-500/50">
-                <Award className="w-5 h-5 text-black" strokeWidth={2.5} />
-              </div>
-              <div className="absolute inset-0 bg-primary-400 rounded-full blur-md opacity-40 animate-pulse"></div>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-center space-x-2 mb-1.5">
-              <div className="h-px w-6 bg-gradient-to-r from-transparent to-primary-400/50"></div>
-              <Star className="w-2.5 h-2.5 text-primary-400" />
-              <div className="h-px w-6 bg-gradient-to-l from-transparent to-primary-400/50"></div>
-            </div>
-            <p className="text-primary-400 text-[9px] font-bold tracking-[0.2em] uppercase mb-1.5">
-              Certificate of Completion
-            </p>
-            <div className="h-px w-16 bg-gradient-to-r from-transparent via-primary-400/30 to-transparent mx-auto"></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Course Title */}
-      <div className="relative z-10 flex-grow flex items-center justify-center py-2">
-        <h3 className="text-white font-bold text-[11px] leading-tight line-clamp-2 px-6 text-center">
-          {cert.courseTitle}
-        </h3>
-      </div>
-
-      {/* Footer Section */}
-      <div className="relative z-10 flex-shrink-0">
-        <div className="text-center space-y-1.5">
-          <div className="inline-flex flex-col items-center px-4 py-2 bg-gradient-to-br from-white/5 to-white/[0.02] backdrop-blur-xl rounded-lg border border-primary-400/20 shadow-xl">
-            <p className="text-white/50 text-[8px] tracking-wider uppercase mb-0.5">
-              Awarded to
-            </p>
-            <p className="text-white font-bold text-[11px] tracking-wide">
-              {user?.username || "Student"}
-            </p>
-          </div>
-
-          <div className="flex items-center justify-center space-x-1.5 text-[8px] text-white/30 tracking-wider">
-            <span className="font-semibold">LIZARD ACADEMY</span>
-            <span>•</span>
-            <span>{new Date(cert.completedDate).getFullYear()}</span>
-            <span>•</span>
-            <Lock className="w-2 h-2" />
-          </div>
-        </div>
-      </div>
-
-      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10 pointer-events-none"></div>
+    {/* Use IPFS image directly */}
+    <div className="relative aspect-video bg-gradient-to-br from-slate-900 via-gray-900 to-black overflow-hidden">
+      {cert.nftImageURI && (
+        <img
+          src={cert.nftImageURI}
+          alt="Certificate"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
     </div>
 
     {/* Certificate Info */}
@@ -894,13 +816,19 @@ const CompletionCertificateCard = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <div
-          className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getGradeColor(
-            cert.grade
-          )}`}
-        >
-          {cert.grade}
+      {/* Show lessons and hours instead of grade */}
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border-2 border-blue-500/30 rounded-lg">
+          <BookOpen className="w-4 h-4 text-blue-500" />
+          <span className="text-xs font-bold text-blue-500">
+            {cert.totalLessons || 0} Lessons
+          </span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1 bg-primary-500/10 border-2 border-primary-500/30 rounded-lg">
+          <Clock className="w-4 h-4 text-primary-500" />
+          <span className="text-xs font-bold text-primary-500">
+            {formatHours(cert.totalHours)}
+          </span>
         </div>
       </div>
 
@@ -915,7 +843,8 @@ const CompletionCertificateCard = ({
         <button
           onClick={async () => {
             try {
-              const response = await fetch(cert.templateImage);
+              const imageUrl = cert.nftImageURI || cert.templateImage;
+              const response = await fetch(imageUrl);
               const blob = await response.blob();
               const url = window.URL.createObjectURL(blob);
               const link = document.createElement("a");
@@ -948,16 +877,26 @@ const CompletionCertificateCard = ({
           <span className="font-mono">{cert.certificateNumber}</span>
         </div>
         <button
-          onClick={() => onCopyLink(cert.verificationUrl)}
+          onClick={() => {
+            if (cert.nftTokenId && cert.nftContractAddress) {
+              window.open(
+                `https://shannon-explorer.somnia.network/token/${cert.nftContractAddress}/instance/${cert.nftTokenId}`,
+                "_blank"
+              );
+            } else {
+              onCopyLink(cert.verificationUrl);
+            }
+          }}
           className="text-xs text-primary-400 hover:text-primary-500 font-semibold flex items-center space-x-1 hover:underline transition-all"
         >
           <ExternalLink className="w-3 h-3" />
-          <span>Verify on blockchain</span>
+          <span>View NFT on Chain</span>
         </button>
       </div>
     </div>
   </div>
 );
+
 // Component: Certificate of Competency Card
 const CompetencyCertificateCard = ({
   cert,
@@ -1121,6 +1060,7 @@ const CompetencyCertificateCard = ({
     </div>
   );
 };
+
 // Component: Eligible Certificate Card
 const EligibleCertificateCard = ({ attempt, getCompetencyGrade, navigate }) => {
   const grade = getCompetencyGrade(attempt.score);

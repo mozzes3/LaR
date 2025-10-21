@@ -540,12 +540,17 @@ const ProfessionalCertificationResultPage = () => {
             <div className="flex items-start gap-3">
               <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-1 flex items-center gap-2">
                   Congratulations on passing the assessment
+                  <span className="px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full text-[10px] font-bold border border-purple-500/30 flex items-center gap-1">
+                    <Trophy className="w-2.5 h-2.5" />
+                    NFT
+                  </span>
                 </p>
                 <p className="text-xs text-emerald-700 dark:text-emerald-300">
                   You've demonstrated professional-level competency. Claim your
-                  blockchain-verified certificate to showcase your achievement.
+                  blockchain-verified NFT certificate to showcase your
+                  achievement.
                 </p>
               </div>
             </div>

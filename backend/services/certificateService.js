@@ -579,6 +579,7 @@ const generateCertificate = async (userId, courseId) => {
       nftTokenId: blockchainResult.tokenId,
       nftContractAddress: blockchainResult.contractAddress,
       nftMetadataURI: nftMetadataURI,
+      nftTransactionHash: blockchainResult.transactionHash,
       nftImageURI: nftImageURI,
       nftMinted: !!blockchainResult.tokenId,
       nftMintedAt: blockchainResult.tokenId ? new Date() : null,

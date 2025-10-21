@@ -15,6 +15,7 @@ import {
   Sparkles,
   Eye,
   ArrowLeft,
+  Trophy,
 } from "lucide-react";
 import { professionalCertificationApi } from "@services/api";
 import toast from "react-hot-toast";
@@ -351,19 +352,25 @@ const ProfessionalCertificationDetailPage = () => {
               {/* Pricing Card */}
               <div className="relative overflow-hidden bg-gradient-to-br from-primary-500 to-purple-600 rounded-2xl p-8 text-white mb-6">
                 <div className="absolute top-4 right-4">
-                  <div className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-bold flex items-center space-x-1">
-                    <Sparkles className="w-3 h-3" />
-                    <span>EXCLUSIVE</span>
+                  <div className="absolute top-4 right-4 flex items-center gap-2">
+                    <div className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-bold flex items-center space-x-1 border border-white/30">
+                      <Shield className="w-3 h-3" />
+                      <span>NFT</span>
+                    </div>
+                    <div className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-bold flex items-center space-x-1 border border-white/30">
+                      <Award className="w-3 h-3" />
+                      <span>OFFICIAL</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="relative">
                   <Shield className="w-12 h-12 mb-4" />
-                  <h3 className="text-2xl font-bold mb-2">
+                  <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
                     Certificate of Competency
                   </h3>
                   <p className="text-white/80 mb-6">
-                    Blockchain-verified credential demonstrating
+                    Blockchain-verified NFT credential demonstrating
                     professional-level expertise
                   </p>
 
@@ -375,6 +382,12 @@ const ProfessionalCertificationDetailPage = () => {
                   </div>
 
                   <div className="space-y-3 mb-6">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="text-sm font-semibold">
+                        NFT Certificate
+                      </span>
+                    </div>
                     <div className="flex items-center space-x-2">
                       <CheckCircle className="w-5 h-5" />
                       <span className="text-sm">Lifetime valid</span>

@@ -675,7 +675,8 @@ const CheckoutPage = () => {
                     Privacy Policy
                   </Link>
                   , and understand that payment will be held in a smart contract
-                  escrow with automatic release conditions.
+                  escrow with automatic release conditions. Upon completion, I
+                  will receive a blockchain-verified NFT certificate.
                 </span>
               </label>
             </div>
@@ -846,6 +847,12 @@ const CheckoutPage = () => {
                   <li className="flex items-center space-x-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                     <span className="text-gray-700 dark:text-gray-300">
+                      Certificate of completion
+                    </span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    <span className="text-gray-700 dark:text-gray-300">
                       Instant course access
                     </span>
                   </li>
@@ -858,15 +865,16 @@ const CheckoutPage = () => {
                   <li className="flex items-center space-x-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                     <span className="text-gray-700 dark:text-gray-300">
-                      {course.escrowSettings.refundPeriodDays}-day refund window
+                      NFT Certificate upon completion
                     </span>
                   </li>
                   <li className="flex items-center space-x-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                     <span className="text-gray-700 dark:text-gray-300">
-                      Certificate of completion
+                      {course.escrowSettings.refundPeriodDays}-day refund window
                     </span>
                   </li>
+
                   <li className="flex items-center space-x-2">
                     <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                     <span className="text-gray-700 dark:text-gray-300">

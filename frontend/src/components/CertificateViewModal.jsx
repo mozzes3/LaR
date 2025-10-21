@@ -25,6 +25,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
     console.log("🔍 Available fields:", Object.keys(certificate));
     console.log("🔍 nftMinted:", certificate.nftMinted);
     console.log("🔍 nftTransactionHash:", certificate.nftTransactionHash);
+    console.log("🔍 blockchainHash:", certificate.blockchainHash);
 
     const imageUrl =
       certificate.nftImageURI ||
@@ -36,7 +37,8 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   }, [certificate]);
 
   // NFT transaction hash (both types use this now)
-  const nftTxHash = certificate.nftTransactionHash;
+  const nftTxHash =
+    certificate.nftTransactionHash || certificate.blockchainHash;
   const explorerUrl = nftTxHash
     ? `https://shannon-explorer.somnia.network/tx/${nftTxHash}`
     : null;
@@ -45,15 +47,26 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
   const formatHours = (totalHours) => {
     if (!totalHours) return "N/A";
 
-    const hours = Math.floor(totalHours);
-    const minutes = Math.round((totalHours - hours) * 60);
+    // Handle if totalHours is in seconds (large number)
+    let hours, minutes;
+    if (totalHours > 100) {
+      // Likely in seconds, convert to hours
+      hours = Math.floor(totalHours / 3600);
+      minutes = Math.round((totalHours % 3600) / 60);
+    } else {
+      // Already in hours
+      hours = Math.floor(totalHours);
+      minutes = Math.round((totalHours - hours) * 60);
+    }
 
     if (hours > 0 && minutes > 0) {
       return `${hours}h ${minutes}m`;
     } else if (hours > 0) {
       return `${hours}h`;
-    } else {
+    } else if (minutes > 0) {
       return `${minutes}m`;
+    } else {
+      return "< 1m";
     }
   };
 
@@ -244,7 +257,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
             )}
 
             {/* NFT Verification Section */}
-            {certificate.nftMinted && (
+            {(certificate.nftMinted || nftTxHash || certificate.nftTokenId) && (
               <div className="mt-6 p-4 bg-gradient-to-br from-primary-400/10 to-purple-500/10 border-2 border-primary-400/30 rounded-xl">
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -253,7 +266,7 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
                       NFT Certificate
                     </p>
                     <p className="text-xs text-gray-500">
-                      Soul-bound NFT minted on Somnia blockchain
+                      Certificate NFT minted on blockchain
                     </p>
                   </div>
                   <CheckCircle className="w-5 h-5 text-green-500" />
@@ -305,16 +318,15 @@ const CertificateViewModal = ({ certificate, onClose, onShare }) => {
             )}
 
             {/* If NFT not minted */}
-            {!certificate.nftMinted && (
-              <div className="mt-6 p-4 bg-yellow-500/10 border-2 border-yellow-500/30 rounded-xl">
-                <p className="text-sm text-yellow-600 dark:text-yellow-400 font-semibold">
-                  {certificate.studentWallet
-                    ? "NFT minting in progress..."
-                    : "Connect wallet to mint NFT certificate"}
-                </p>
-              </div>
-            )}
-
+            {!certificate.nftMinted &&
+              !nftTxHash &&
+              !certificate.nftTokenId && (
+                <div className="mt-6 p-4 bg-yellow-500/10 border-2 border-yellow-500/30 rounded-xl">
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400 font-semibold">
+                    Certificate not yet minted as NFT
+                  </p>
+                </div>
+              )}
             {/* Verification URL */}
             <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
               <div className="flex items-center justify-between">

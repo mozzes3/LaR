@@ -28,6 +28,9 @@ const certificateSchema = new mongoose.Schema(
 
     verificationUrl: { type: String, required: true },
     skills: [{ type: String }],
+    blockchainHash: String,
+    blockchainExplorerUrl: String,
+    blockchainBlock: Number,
 
     // NFT fields
     nftMinted: {
