@@ -168,7 +168,7 @@ const Footer = () => {
         <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 md:mb-0">
-              © {currentYear} Founder Academy. All rights reserved.
+              © {currentYear} Lizard Academy. All rights reserved.
             </p>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600 dark:text-gray-400">
