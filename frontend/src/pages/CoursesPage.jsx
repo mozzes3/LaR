@@ -308,39 +308,41 @@ const CoursesPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 relative overflow-hidden">
-      {/* MASSIVE GLOWING ORBS - BODY BACKGROUND ONLY */}
+      {/* MASSIVE Beaming Orbs Background - BODY LEVEL ONLY */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        {/* Light Mode - HUGE Visible Glowing Orbs */}
-        <div className="absolute top-[50px] left-[-20%] w-[2000px] h-[2000px] bg-gradient-to-br from-primary-300/35 via-primary-400/18 to-transparent rounded-full blur-3xl animate-float dark:opacity-0"></div>
-        <div className="absolute top-[400px] right-[-25%] w-[2200px] h-[2200px] bg-gradient-to-br from-purple-300/35 via-purple-400/18 to-transparent rounded-full blur-3xl animate-float-delay-1 dark:opacity-0"></div>
-        <div className="absolute top-[1000px] left-[-15%] w-[1900px] h-[1900px] bg-gradient-to-br from-blue-300/35 via-blue-400/18 to-transparent rounded-full blur-3xl animate-float-delay-2 dark:opacity-0"></div>
-        <div className="absolute top-[1600px] right-[-20%] w-[2100px] h-[2100px] bg-gradient-to-br from-pink-300/35 via-pink-400/18 to-transparent rounded-full blur-3xl animate-float-delay-3 dark:opacity-0"></div>
-        <div className="absolute top-[2200px] left-[-18%] w-[2000px] h-[2000px] bg-gradient-to-br from-cyan-300/35 via-cyan-400/18 to-transparent rounded-full blur-3xl animate-float dark:opacity-0"></div>
-        <div className="absolute top-[2800px] right-[-22%] w-[1900px] h-[1900px] bg-gradient-to-br from-orange-300/32 via-orange-400/16 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"></div>
+        {/* Light Mode - HUGE Glowing Orbs across entire body */}
+        <div className="absolute top-[100px] left-[-10%] w-[1400px] h-[1400px] bg-gradient-to-br from-primary-300/25 via-primary-400/12 to-transparent rounded-full blur-3xl animate-float dark:opacity-0"></div>
+        <div className="absolute top-[300px] right-[-15%] w-[1600px] h-[1600px] bg-gradient-to-br from-purple-300/25 via-purple-400/12 to-transparent rounded-full blur-3xl animate-float-delay-1 dark:opacity-0"></div>
+        <div className="absolute top-[900px] left-[-5%] w-[1300px] h-[1300px] bg-gradient-to-br from-blue-300/25 via-blue-400/12 to-transparent rounded-full blur-3xl animate-float-delay-2 dark:opacity-0"></div>
+        <div className="absolute top-[1500px] right-[-10%] w-[1500px] h-[1500px] bg-gradient-to-br from-pink-300/25 via-pink-400/12 to-transparent rounded-full blur-3xl animate-float-delay-3 dark:opacity-0"></div>
+        <div className="absolute top-[2100px] left-[-8%] w-[1400px] h-[1400px] bg-gradient-to-br from-cyan-300/25 via-cyan-400/12 to-transparent rounded-full blur-3xl animate-float dark:opacity-0"></div>
+        <div className="absolute top-[2700px] right-[-12%] w-[1300px] h-[1300px] bg-gradient-to-br from-orange-300/22 via-orange-400/10 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"></div>
         <div
-          className="absolute top-[3400px] left-[-15%] w-[2000px] h-[2000px] bg-gradient-to-br from-green-300/32 via-green-400/16 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"
+          className="absolute top-[3300px] left-[-5%] w-[1400px] h-[1400px] bg-gradient-to-br from-green-300/22 via-green-400/10 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"
           style={{ animationDelay: "1.5s" }}
         ></div>
-        <div className="absolute top-[700px] left-[40%] w-[1800px] h-[1800px] bg-gradient-to-br from-yellow-300/28 via-yellow-400/12 to-transparent rounded-full blur-3xl animate-float-delay-1 dark:opacity-0"></div>
-        <div className="absolute top-[2000px] left-[35%] w-[1900px] h-[1900px] bg-gradient-to-br from-indigo-300/28 via-indigo-400/12 to-transparent rounded-full blur-3xl animate-float-delay-3 dark:opacity-0"></div>
+        <div className="absolute top-[600px] left-[50%] w-[1200px] h-[1200px] bg-gradient-to-br from-yellow-300/18 via-yellow-400/8 to-transparent rounded-full blur-3xl animate-float-delay-1 dark:opacity-0"></div>
+        <div className="absolute top-[1900px] left-[45%] w-[1300px] h-[1300px] bg-gradient-to-br from-indigo-300/18 via-indigo-400/8 to-transparent rounded-full blur-3xl animate-float-delay-3 dark:opacity-0"></div>
 
-        {/* Dark Mode - HUGE Visible Glowing Orbs */}
-        <div className="absolute top-[50px] left-[-20%] w-[2000px] h-[2000px] bg-gradient-to-br from-primary-500/25 via-primary-600/12 to-transparent rounded-full blur-3xl animate-float opacity-0 dark:opacity-100"></div>
-        <div className="absolute top-[400px] right-[-25%] w-[2200px] h-[2200px] bg-gradient-to-br from-purple-500/25 via-purple-600/12 to-transparent rounded-full blur-3xl animate-float-delay-1 opacity-0 dark:opacity-100"></div>
-        <div className="absolute top-[1000px] left-[-15%] w-[1900px] h-[1900px] bg-gradient-to-br from-blue-500/25 via-blue-600/12 to-transparent rounded-full blur-3xl animate-float-delay-2 opacity-0 dark:opacity-100"></div>
-        <div className="absolute top-[1600px] right-[-20%] w-[2100px] h-[2100px] bg-gradient-to-br from-pink-500/25 via-pink-600/12 to-transparent rounded-full blur-3xl animate-float-delay-3 opacity-0 dark:opacity-100"></div>
-        <div className="absolute top-[2200px] left-[-18%] w-[2000px] h-[2000px] bg-gradient-to-br from-cyan-500/25 via-cyan-600/12 to-transparent rounded-full blur-3xl animate-float opacity-0 dark:opacity-100"></div>
-        <div className="absolute top-[2800px] right-[-22%] w-[1900px] h-[1900px] bg-gradient-to-br from-orange-500/22 via-orange-600/10 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"></div>
+        {/* Dark Mode - HUGE Glowing Orbs across entire body */}
+        <div className="absolute top-[100px] left-[-10%] w-[1400px] h-[1400px] bg-gradient-to-br from-primary-500/18 via-primary-600/9 to-transparent rounded-full blur-3xl animate-float opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[300px] right-[-15%] w-[1600px] h-[1600px] bg-gradient-to-br from-purple-500/18 via-purple-600/9 to-transparent rounded-full blur-3xl animate-float-delay-1 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[900px] left-[-5%] w-[1300px] h-[1300px] bg-gradient-to-br from-blue-500/18 via-blue-600/9 to-transparent rounded-full blur-3xl animate-float-delay-2 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[1500px] right-[-10%] w-[1500px] h-[1500px] bg-gradient-to-br from-pink-500/18 via-pink-600/9 to-transparent rounded-full blur-3xl animate-float-delay-3 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[2100px] left-[-8%] w-[1400px] h-[1400px] bg-gradient-to-br from-cyan-500/18 via-cyan-600/9 to-transparent rounded-full blur-3xl animate-float opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[2700px] right-[-12%] w-[1300px] h-[1300px] bg-gradient-to-br from-orange-500/15 via-orange-600/7 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"></div>
         <div
-          className="absolute top-[3400px] left-[-15%] w-[2000px] h-[2000px] bg-gradient-to-br from-green-500/22 via-green-600/10 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"
+          className="absolute top-[3300px] left-[-5%] w-[1400px] h-[1400px] bg-gradient-to-br from-green-500/15 via-green-600/7 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"
           style={{ animationDelay: "1.5s" }}
         ></div>
-        <div className="absolute top-[700px] left-[40%] w-[1800px] h-[1800px] bg-gradient-to-br from-yellow-500/20 via-yellow-600/9 to-transparent rounded-full blur-3xl animate-float-delay-1 opacity-0 dark:opacity-100"></div>
-        <div className="absolute top-[2000px] left-[35%] w-[1900px] h-[1900px] bg-gradient-to-br from-indigo-500/20 via-indigo-600/9 to-transparent rounded-full blur-3xl animate-float-delay-3 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[600px] left-[50%] w-[1200px] h-[1200px] bg-gradient-to-br from-yellow-500/14 via-yellow-600/6 to-transparent rounded-full blur-3xl animate-float-delay-1 opacity-0 dark:opacity-100"></div>
+        <div className="absolute top-[1900px] left-[45%] w-[1300px] h-[1300px] bg-gradient-to-br from-indigo-500/14 via-indigo-600/6 to-transparent rounded-full blur-3xl animate-float-delay-3 opacity-0 dark:opacity-100"></div>
 
-        {/* MASSIVE Center Spotlight */}
-        <div className="absolute top-[1800px] left-[50%] -translate-x-1/2 w-[2500px] h-[2500px] bg-gradient-radial from-white/35 via-white/12 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"></div>
-        <div className="absolute top-[1800px] left-[50%] -translate-x-1/2 w-[2500px] h-[2500px] bg-gradient-radial from-white/15 via-white/5 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"></div>
+        {/* Beaming Center Spotlight - Light Mode */}
+        <div className="absolute top-[1500px] left-[50%] -translate-x-1/2 w-[1800px] h-[1800px] bg-gradient-radial from-white/30 via-white/8 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"></div>
+
+        {/* Beaming Center Spotlight - Dark Mode */}
+        <div className="absolute top-[1500px] left-[50%] -translate-x-1/2 w-[1800px] h-[1800px] bg-gradient-radial from-white/10 via-white/3 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"></div>
 
         {/* Subtle mesh gradient overlay */}
         <div className="absolute inset-0 opacity-15 dark:opacity-10">
@@ -454,7 +456,36 @@ const CoursesPage = () => {
         </div>
       </section>
 
-      <div className="container-custom py-10">
+      <div className="container-custom py-10 relative">
+        {/* Big Soft Orbs Background for Container */}
+        <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+          {/* Light Mode - Soft Colorful Orbs */}
+          <div className="absolute top-[200px] left-[-10%] w-[1200px] h-[1200px] bg-gradient-to-br from-primary-300/20 via-primary-200/10 to-transparent rounded-full blur-3xl animate-float dark:opacity-0"></div>
+          <div className="absolute top-[600px] right-[-15%] w-[1400px] h-[1400px] bg-gradient-to-br from-purple-300/20 via-purple-200/10 to-transparent rounded-full blur-3xl animate-float-delay-1 dark:opacity-0"></div>
+          <div className="absolute top-[1200px] left-[-5%] w-[1300px] h-[1300px] bg-gradient-to-br from-blue-300/20 via-blue-200/10 to-transparent rounded-full blur-3xl animate-float-delay-2 dark:opacity-0"></div>
+          <div className="absolute top-[1800px] right-[-10%] w-[1200px] h-[1200px] bg-gradient-to-br from-pink-300/20 via-pink-200/10 to-transparent rounded-full blur-3xl animate-float-delay-3 dark:opacity-0"></div>
+          <div className="absolute top-[2400px] left-[10%] w-[1100px] h-[1100px] bg-gradient-to-br from-cyan-300/18 via-cyan-200/8 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"></div>
+          <div
+            className="absolute top-[3000px] right-[-8%] w-[1300px] h-[1300px] bg-gradient-to-br from-orange-300/18 via-orange-200/8 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"
+            style={{ animationDelay: "1.5s" }}
+          ></div>
+
+          {/* Dark Mode - Soft Ethereal Orbs */}
+          <div className="absolute top-[200px] left-[-10%] w-[1200px] h-[1200px] bg-gradient-to-br from-primary-500/15 via-primary-600/7 to-transparent rounded-full blur-3xl animate-float opacity-0 dark:opacity-100"></div>
+          <div className="absolute top-[600px] right-[-15%] w-[1400px] h-[1400px] bg-gradient-to-br from-purple-500/15 via-purple-600/7 to-transparent rounded-full blur-3xl animate-float-delay-1 opacity-0 dark:opacity-100"></div>
+          <div className="absolute top-[1200px] left-[-5%] w-[1300px] h-[1300px] bg-gradient-to-br from-blue-500/15 via-blue-600/7 to-transparent rounded-full blur-3xl animate-float-delay-2 opacity-0 dark:opacity-100"></div>
+          <div className="absolute top-[1800px] right-[-10%] w-[1200px] h-[1200px] bg-gradient-to-br from-pink-500/15 via-pink-600/7 to-transparent rounded-full blur-3xl animate-float-delay-3 opacity-0 dark:opacity-100"></div>
+          <div className="absolute top-[2400px] left-[10%] w-[1100px] h-[1100px] bg-gradient-to-br from-cyan-500/13 via-cyan-600/6 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"></div>
+          <div
+            className="absolute top-[3000px] right-[-8%] w-[1300px] h-[1300px] bg-gradient-to-br from-orange-500/13 via-orange-600/6 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"
+            style={{ animationDelay: "1.5s" }}
+          ></div>
+
+          {/* Center Soft Glow */}
+          <div className="absolute top-[1500px] left-[50%] -translate-x-1/2 w-[1600px] h-[1600px] bg-gradient-radial from-white/20 via-white/5 to-transparent rounded-full blur-3xl animate-pulse-slow dark:opacity-0"></div>
+          <div className="absolute top-[1500px] left-[50%] -translate-x-1/2 w-[1600px] h-[1600px] bg-gradient-radial from-white/8 via-white/2 to-transparent rounded-full blur-3xl animate-pulse-slow opacity-0 dark:opacity-100"></div>
+        </div>
+
         {viewMode === "browse" ? (
           /* Browse Mode - Featured & Categories */
           <>
