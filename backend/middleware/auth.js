@@ -6,7 +6,8 @@ const User = require("../models/User");
  */
 const authenticate = async (req, res, next) => {
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
+    // ✅ READ TOKEN FROM COOKIE INSTEAD OF HEADER
+    const token = req.cookies.token;
 
     if (!token) {
       return res
@@ -46,13 +47,12 @@ const authenticate = async (req, res, next) => {
     res.status(401).json({ error: "Authentication failed" });
   }
 };
-
 /**
  * Optional authentication - attach user if token exists, but don't fail
  */
 const optionalAuth = async (req, res, next) => {
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
+    const token = req.cookies.token;
 
     if (!token) {
       req.userId = null;

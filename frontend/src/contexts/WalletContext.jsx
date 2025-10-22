@@ -25,28 +25,22 @@ export const WalletProvider = ({ children }) => {
   const [signer, setSigner] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token"));
-  const [refreshToken, setRefreshToken] = useState(
-    localStorage.getItem("refreshToken")
-  );
 
-  // Auto-refresh token before expiration (every 10 minutes, token expires in 15)
+  // ✅ REMOVED: No more token state
+
+  // Auto-refresh token before expiration (every 10 minutes)
   useEffect(() => {
-    if (refreshToken) {
-      const interval = setInterval(() => {
-        refreshAccessToken();
-      }, 10 * 60 * 1000); // 10 minutes
+    const interval = setInterval(() => {
+      refreshAccessToken();
+    }, 10 * 60 * 1000);
 
-      return () => clearInterval(interval);
-    }
-  }, [refreshToken]);
+    return () => clearInterval(interval);
+  }, []);
 
-  // Check connection and sync wallet on mount
   useEffect(() => {
     initializeWallet();
   }, []);
 
-  // Listen for account and network changes
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", handleAccountsChanged);
@@ -66,12 +60,12 @@ export const WalletProvider = ({ children }) => {
     };
   }, [user]);
 
-  // Auto-login if token exists
+  // ✅ Auto-fetch user on mount (token in cookie)
   useEffect(() => {
-    if (token && !user) {
+    if (!user) {
       fetchUser();
     }
-  }, [token]);
+  }, []);
 
   const initializeWallet = async () => {
     if (!window.ethereum) return;
@@ -80,14 +74,14 @@ export const WalletProvider = ({ children }) => {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const accounts = await provider.listAccounts();
 
-      if (accounts.length > 0 && token) {
+      if (accounts.length > 0) {
         setProvider(provider);
         const signer = await provider.getSigner();
         setSigner(signer);
         const address = await signer.getAddress();
         setAccount(address);
 
-        // Verify the connected wallet matches the logged-in user
+        // Verify wallet matches user
         if (
           user &&
           user.walletAddress.toLowerCase() !== address.toLowerCase()
@@ -106,7 +100,6 @@ export const WalletProvider = ({ children }) => {
     console.log("Account changed:", accounts);
 
     if (accounts.length === 0) {
-      // User disconnected wallet from MetaMask
       disconnect();
       return;
     }
@@ -114,17 +107,14 @@ export const WalletProvider = ({ children }) => {
     const newAddress = accounts[0];
 
     if (user && user.walletAddress.toLowerCase() !== newAddress.toLowerCase()) {
-      // User switched to different wallet
       toast.error("Wallet changed. Please sign in with the new wallet.");
       disconnect();
     } else {
-      // Same wallet, just update
       setAccount(newAddress);
     }
   };
 
   const handleChainChanged = () => {
-    // Reload page on network change
     window.location.reload();
   };
 
@@ -135,21 +125,10 @@ export const WalletProvider = ({ children }) => {
 
   const refreshAccessToken = async () => {
     try {
-      const storedRefreshToken = localStorage.getItem("refreshToken");
-      if (!storedRefreshToken) return;
-
-      const { data } = await api.post("/auth/refresh", {
-        refreshToken: storedRefreshToken,
-      });
-
-      setToken(data.token);
-      localStorage.setItem("token", data.token);
-
-      // Update axios default header
-      api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+      // ✅ Just call refresh - new token set as cookie automatically
+      await api.post("/auth/refresh");
     } catch (error) {
       console.error("Token refresh failed:", error);
-      // If refresh fails, logout
       disconnect();
       toast.error("Session expired. Please reconnect your wallet.");
     }
@@ -159,13 +138,10 @@ export const WalletProvider = ({ children }) => {
     try {
       const { data } = await api.get("/auth/me");
       setUser(data.user);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // ✅ REMOVED: No localStorage storage
     } catch (error) {
       console.error("Error fetching user:", error);
-      if (error.response?.status === 401) {
-        // Try to refresh token
-        await refreshAccessToken();
-      }
+      // User not logged in - this is OK
     }
   };
 
@@ -178,7 +154,6 @@ export const WalletProvider = ({ children }) => {
     setIsConnecting(true);
 
     try {
-      // Request account access
       const provider = new ethers.BrowserProvider(window.ethereum);
       await provider.send("eth_requestAccounts", []);
 
@@ -189,7 +164,7 @@ export const WalletProvider = ({ children }) => {
       setSigner(signer);
       setAccount(address);
 
-      // Get nonce from backend
+      // Get nonce
       const { data: nonceData } = await api.post("/auth/nonce", {
         walletAddress: address,
       });
@@ -203,19 +178,10 @@ export const WalletProvider = ({ children }) => {
         signature,
       });
 
-      setToken(loginData.token);
-      setRefreshToken(loginData.refreshToken);
       setUser(loginData.user);
 
-      localStorage.setItem("token", loginData.token);
-      localStorage.setItem("refreshToken", loginData.refreshToken);
-      localStorage.setItem("user", JSON.stringify(loginData.user));
-      localStorage.setItem("connectedWallet", address.toLowerCase());
-
-      // Set default axios header
-      api.defaults.headers.common[
-        "Authorization"
-      ] = `Bearer ${loginData.token}`;
+      // ✅ REMOVED: No localStorage operations
+      // Tokens are now in httpOnly cookies
 
       toast.success(
         loginData.isNewUser ? "Welcome to Lizard Academy!" : "Welcome back!"
@@ -229,20 +195,20 @@ export const WalletProvider = ({ children }) => {
     }
   };
 
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback(async () => {
+    try {
+      // Call backend to clear cookies
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+
     setAccount(null);
     setProvider(null);
     setSigner(null);
     setUser(null);
-    setToken(null);
-    setRefreshToken(null);
 
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("connectedWallet");
-
-    delete api.defaults.headers.common["Authorization"];
+    // ✅ REMOVED: No localStorage to clear
 
     toast.success("Wallet disconnected");
   }, []);
@@ -253,12 +219,11 @@ export const WalletProvider = ({ children }) => {
     provider,
     signer,
     user,
-    token,
     isConnecting,
-    isConnected: !!account && !!token && !!user,
+    isConnected: !!account && !!user,
     connectWallet,
     disconnect,
-    refreshUser: fetchUser,
+    refreshAccessToken,
   };
 
   return (

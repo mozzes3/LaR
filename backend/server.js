@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const redis = require("redis");
+const cookieParser = require("cookie-parser");
 const connectDB = require("./config/database");
 const uploadRoutes = require("./routes/upload");
 const certificateRoutes = require("./routes/certificateRoutes");
@@ -35,6 +36,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
 app.use(express.json({ limit: "10mb" })); //
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 

@@ -106,24 +106,27 @@ const getNonce = async (req, res) => {
 /**
  * Verify wallet signature and login/register user
  */
+/**
+ * Verify signature and login
+ */
 const verifyAndLogin = async (req, res) => {
   try {
     const { walletAddress, signature } = req.body;
 
     if (!walletAddress || !signature) {
       return res.status(400).json({
-        error: "Wallet address and signature required",
+        error: "Wallet address and signature are required",
       });
     }
 
     const normalizedAddress = walletAddress.toLowerCase();
 
-    // Get stored nonce
+    // Get stored nonce data
     const storedData = await getNonceData(normalizedAddress);
 
     if (!storedData) {
       return res.status(400).json({
-        error: "Nonce not found or expired. Please request a new nonce.",
+        error: "No nonce found for this address. Please request a new nonce.",
       });
     }
 
@@ -154,10 +157,7 @@ const verifyAndLogin = async (req, res) => {
     let isNewUser = false;
 
     if (!user) {
-      // Create new user
       isNewUser = true;
-
-      // Generate unique username
       const randomSuffix = Math.floor(Math.random() * 10000);
       const username = `lizard${randomSuffix}`;
 
@@ -172,7 +172,7 @@ const verifyAndLogin = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // Generate JWT token - SHORT LIVED (15 minutes)
+    // Generate JWT tokens
     const accessToken = jwt.sign(
       {
         userId: user._id,
@@ -182,7 +182,6 @@ const verifyAndLogin = async (req, res) => {
       { expiresIn: "15m" }
     );
 
-    // Generate refresh token (7 days)
     const refreshToken = jwt.sign(
       {
         userId: user._id,
@@ -192,12 +191,27 @@ const verifyAndLogin = async (req, res) => {
       { expiresIn: "7d" }
     );
 
+    // ✅ SET COOKIES INSTEAD OF SENDING IN JSON
+    const isProduction = process.env.NODE_ENV === "production";
+
+    res.cookie("token", accessToken, {
+      httpOnly: true, // Cannot be accessed by JavaScript
+      secure: isProduction, // HTTPS only in production
+      sameSite: isProduction ? "none" : "lax", // Cross-site in production
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Send user data (NO TOKENS IN RESPONSE)
     res.json({
       success: true,
       isNewUser,
-      token: accessToken,
-      refreshToken,
-      expiresIn: 900, // 15 minutes in seconds
       user: {
         id: user._id,
         walletAddress: user.walletAddress,
@@ -221,12 +235,16 @@ const verifyAndLogin = async (req, res) => {
 /**
  * Refresh access token
  */
+/**
+ * Refresh access token
+ */
 const refreshAccessToken = async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    // ✅ READ REFRESH TOKEN FROM COOKIE
+    const refreshToken = req.cookies.refreshToken;
 
     if (!refreshToken) {
-      return res.status(400).json({ error: "Refresh token required" });
+      return res.status(401).json({ error: "No refresh token provided" });
     }
 
     // Verify refresh token
@@ -255,9 +273,18 @@ const refreshAccessToken = async (req, res) => {
       { expiresIn: "15m" }
     );
 
+    // ✅ SET NEW TOKEN AS COOKIE
+    const isProduction = process.env.NODE_ENV === "production";
+
+    res.cookie("token", accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      maxAge: 30 * 60 * 1000,
+    });
+
     res.json({
       success: true,
-      token: accessToken,
       expiresIn: 900,
     });
   } catch (error) {
@@ -265,7 +292,7 @@ const refreshAccessToken = async (req, res) => {
       return res.status(401).json({ error: "Refresh token expired" });
     }
     console.error("Refresh token error:", error);
-    res.status(401).json({ error: "Invalid refresh token" });
+    res.status(500).json({ error: "Failed to refresh token" });
   }
 };
 
@@ -311,8 +338,8 @@ const getMe = async (req, res) => {
  */
 const logout = async (req, res) => {
   try {
-    // In a stateless JWT system, logout is handled client-side
-    // But we can blacklist the token if needed (requires Redis)
+    res.clearCookie("token");
+    res.clearCookie("refreshToken");
 
     res.json({
       success: true,
