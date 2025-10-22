@@ -92,14 +92,14 @@ const publicLimiter = createLimiter({
 // Logged-in users reading data
 // ========================================
 const authLimiter = rateLimit({
-  windowMs: isDevelopment ? 1 * 60 * 1000 : 15 * 60 * 1000, // 1 min in dev, 15 min in prod
-  max: isDevelopment ? 100 : 5, // 100 requests in dev, 5 in prod
-  message: "Too many authentication attempts. Please try again later.",
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 minutes (normal browsing)
+  message: "Too many requests. Please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for /auth/me in development
-    if (isDevelopment && req.path === "/auth/me") {
+    // Skip rate limiting for /auth/me endpoint
+    if (req.path === "/auth/me") {
       return true;
     }
     return false;

@@ -27,6 +27,8 @@ export const WalletProvider = ({ children }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [user, setUser] = useState(null);
   const fetchingUser = useRef(false);
+  const lastRefreshAttempt = useRef(0);
+  const REFRESH_COOLDOWN = 30000;
 
   // Auto-refresh token before expiration (every 10 minutes)
   useEffect(() => {
@@ -138,7 +140,16 @@ export const WalletProvider = ({ children }) => {
   };
 
   const refreshAccessToken = async () => {
+    // Debounce: prevent multiple refresh attempts within cooldown period
+    const now = Date.now();
+    if (now - lastRefreshAttempt.current < REFRESH_COOLDOWN) {
+      console.log("⏳ Token refresh on cooldown");
+      return false;
+    }
+    lastRefreshAttempt.current = now;
+
     try {
+      const response = await api.post("/auth/refresh");
       await api.post("/auth/refresh");
     } catch (error) {
       console.error("Token refresh failed:", error);

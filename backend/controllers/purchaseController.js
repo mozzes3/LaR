@@ -113,7 +113,15 @@ const getPurchase = async (req, res) => {
       user: req.userId,
       course: courseId,
     })
-      .populate("course")
+      .populate({
+        path: "course",
+        select:
+          "title slug thumbnail instructor sections totalLessons totalDuration",
+        populate: {
+          path: "instructor",
+          select: "username avatar instructorVerified",
+        },
+      })
       .lean();
 
     if (!purchase) {

@@ -94,7 +94,6 @@ app.use(
   "/api/admin/professional-certifications",
   require("./routes/adminProfessionalCertifications")
 );
-
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err);
@@ -117,8 +116,6 @@ app.use((err, req, res, next) => {
     error: err.message || "Internal Server Error",
   });
 });
-
-app.use("/api/upload", require("./routes/upload"));
 
 // 404 handler
 app.use((req, res) => {

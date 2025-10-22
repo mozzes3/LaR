@@ -31,7 +31,7 @@ router.post("/refresh", authEndpointLimiter, authController.refreshAccessToken);
  * @desc    Get current user
  * @access  Private
  */
-router.get("/me", authenticate, authLimiter, authController.getMe);
+router.get("/me", authLimiter, authenticate, authController.getMe);
 
 /**
  * @route   POST /api/auth/logout
