@@ -7,136 +7,144 @@ const {
   isInstructor,
   optionalAuth,
 } = require("../middleware/auth");
+const {
+  publicLimiter,
+  browsingLimiter,
+  authLimiter,
+  writeLimiter,
+  expensiveLimiter,
+  videoLimiter,
+  searchLimiter,
+} = require("../middleware/rateLimits");
 
 const Course = require("../models/Course");
 const Purchase = require("../models/Purchase");
 const bunnyService = require("../services/bunnyService");
 const videoSessionService = require("../services/videoSessionService");
 
-const videoUrlLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 5, // 5 requests per minute per IP
-  message: "Too many video requests",
-  standardHeaders: true,
-  handler: (req, res) => {
-    console.log(`🚨 Rate limit hit by ${req.ip}`);
-    res.status(429).json({ error: "Too many requests" });
-  },
-});
-
 /**
  * @route   POST /api/courses/:slug/video-session
  * @desc    Create video session for entire course
  * @access  Private (Must own course or be instructor)
  */
-router.post("/:slug/video-session", authenticate, async (req, res) => {
-  try {
-    const { slug } = req.params;
-    const userId = req.userId;
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.headers["user-agent"] || "unknown";
+router.post(
+  "/:slug/video-session",
+  videoLimiter,
+  authenticate,
+  async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const userId = req.userId;
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.headers["user-agent"] || "unknown";
 
-    console.log(`🎬 Video session request: ${slug}, user: ${userId}`);
+      console.log(`🎬 Video session request: ${slug}, user: ${userId}`);
 
-    // Get course
-    const course = await Course.findOne({ slug }).select(
-      "_id instructor sections"
-    );
+      // Get course
+      const course = await Course.findOne({ slug }).select(
+        "_id instructor sections"
+      );
 
-    if (!course) {
-      return res.status(404).json({ error: "Course not found" });
+      if (!course) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+
+      // Create session
+      const session = await videoSessionService.createSession(
+        userId,
+        course._id,
+        ipAddress,
+        userAgent
+      );
+
+      res.json({
+        success: true,
+        sessionToken: session.sessionToken,
+        expiresAt: session.expiresAt,
+        expiresIn: session.expiresIn,
+      });
+    } catch (error) {
+      console.error("❌ Video session error:", error);
+
+      if (error.message.includes("Access denied")) {
+        return res.status(403).json({ error: error.message });
+      }
+
+      res.status(500).json({ error: "Failed to create video session" });
     }
-
-    // Create session
-    const session = await videoSessionService.createSession(
-      userId,
-      course._id,
-      ipAddress,
-      userAgent
-    );
-
-    res.json({
-      success: true,
-      sessionToken: session.sessionToken,
-      expiresAt: session.expiresAt,
-      expiresIn: session.expiresIn,
-    });
-  } catch (error) {
-    console.error("❌ Video session error:", error);
-
-    if (error.message.includes("Access denied")) {
-      return res.status(403).json({ error: error.message });
-    }
-
-    res.status(500).json({ error: "Failed to create video session" });
   }
-});
+);
 
 /**
  * @route   POST /api/courses/:slug/sync-video-durations
  * @desc    Sync video durations from Bunny
  * @access  Private (Instructor only)
  */
-router.post("/:slug/sync-video-durations", authenticate, async (req, res) => {
-  try {
-    const { slug } = req.params;
+router.post(
+  "/:slug/sync-video-durations",
+  videoLimiter,
+  authenticate,
+  async (req, res) => {
+    try {
+      const { slug } = req.params;
 
-    const course = await Course.findOne({ slug });
+      const course = await Course.findOne({ slug });
 
-    if (!course) {
-      return res.status(404).json({ error: "Course not found" });
-    }
+      if (!course) {
+        return res.status(404).json({ error: "Course not found" });
+      }
 
-    // Check if user is the instructor
-    if (course.instructor.toString() !== req.userId) {
-      return res.status(403).json({ error: "Not authorized" });
-    }
+      // Check if user is the instructor
+      if (course.instructor.toString() !== req.userId) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
 
-    console.log(`🔄 Syncing video durations for course: ${course.title}`);
+      console.log(`🔄 Syncing video durations for course: ${course.title}`);
 
-    let updatedCount = 0;
+      let updatedCount = 0;
 
-    // Loop through all sections and lessons
-    for (const section of course.sections) {
-      for (const lesson of section.lessons) {
-        if (lesson.videoId) {
-          try {
-            const videoInfo = await bunnyService.getVideoInfo(lesson.videoId);
+      // Loop through all sections and lessons
+      for (const section of course.sections) {
+        for (const lesson of section.lessons) {
+          if (lesson.videoId) {
+            try {
+              const videoInfo = await bunnyService.getVideoInfo(lesson.videoId);
 
-            if (videoInfo.duration > 0) {
-              lesson.duration = videoInfo.duration;
-              updatedCount++;
-              console.log(
-                `✅ Updated "${lesson.title}": ${videoInfo.duration}s`
+              if (videoInfo.duration > 0) {
+                lesson.duration = videoInfo.duration;
+                updatedCount++;
+                console.log(
+                  `✅ Updated "${lesson.title}": ${videoInfo.duration}s`
+                );
+              }
+            } catch (error) {
+              console.error(
+                `❌ Failed to get duration for ${lesson.title}:`,
+                error.message
               );
             }
-          } catch (error) {
-            console.error(
-              `❌ Failed to get duration for ${lesson.title}:`,
-              error.message
-            );
           }
         }
       }
+
+      await course.save();
+
+      console.log(`✅ Updated ${updatedCount} video durations`);
+
+      res.json({
+        success: true,
+        message: `Updated ${updatedCount} video durations`,
+        updatedCount,
+      });
+    } catch (error) {
+      console.error("Sync durations error:", error);
+      res.status(500).json({ error: "Failed to sync video durations" });
     }
-
-    await course.save();
-
-    console.log(`✅ Updated ${updatedCount} video durations`);
-
-    res.json({
-      success: true,
-      message: `Updated ${updatedCount} video durations`,
-      updatedCount,
-    });
-  } catch (error) {
-    console.error("Sync durations error:", error);
-    res.status(500).json({ error: "Failed to sync video durations" });
   }
-});
+);
 
 // PUBLIC: Get all courses
-router.get("/", optionalAuth, courseController.getCourses);
+router.get("/", searchLimiter, optionalAuth, courseController.getCourses);
 
 // INSTRUCTOR ROUTES - Put ALL specific routes BEFORE /:username
 /**
@@ -146,6 +154,7 @@ router.get("/", optionalAuth, courseController.getCourses);
  */
 router.get(
   "/instructor/my-courses",
+  authLimiter,
   authenticate,
   isInstructor,
   courseController.getInstructorCourses
@@ -158,6 +167,7 @@ router.get(
  */
 router.get(
   "/instructor/my-courses-stats",
+  authLimiter,
   authenticate,
   isInstructor,
   courseController.getInstructorCoursesWithStats
@@ -168,19 +178,37 @@ router.get(
  * @desc    Get courses by instructor username (MUST BE AFTER SPECIFIC ROUTES)
  * @access  Public
  */
-router.get("/instructor/:username", courseController.getCoursesByInstructor);
+router.get(
+  "/instructor/:username",
+  publicLimiter,
+  courseController.getCoursesByInstructor
+);
 
 // OTHER INSTRUCTOR ROUTES
-router.post("/", authenticate, isInstructor, courseController.createCourse);
+router.post(
+  "/",
+  writeLimiter,
+  authenticate,
+  isInstructor,
+  courseController.createCourse
+);
 router.post(
   "/:slug/publish",
+  writeLimiter,
   authenticate,
   isInstructor,
   courseController.publishCourse
 );
-router.put("/:slug", authenticate, isInstructor, courseController.updateCourse);
+router.put(
+  "/:slug",
+  writeLimiter,
+  authenticate,
+  isInstructor,
+  courseController.updateCourse
+);
 router.delete(
   "/:slug",
+  writeLimiter,
   authenticate,
   isInstructor,
   courseController.deleteCourse
@@ -188,6 +216,7 @@ router.delete(
 
 router.get(
   "/instructor/analytics/all",
+  expensiveLimiter,
   authenticate,
   isInstructor,
   courseController.getAllCoursesAnalytics
@@ -195,6 +224,7 @@ router.get(
 
 router.get(
   "/instructor/analytics/:courseId",
+  expensiveLimiter,
   authenticate,
   isInstructor,
   courseController.getCourseAnalytics
@@ -206,8 +236,8 @@ router.get(
  */
 router.get(
   "/:slug/lessons/:lessonId/video",
+  videoLimiter,
   authenticate,
-  videoUrlLimiter,
   async (req, res) => {
     try {
       const { slug, lessonId } = req.params;
@@ -295,6 +325,6 @@ router.get(
 // In backend/routes/courses.js - Add this BEFORE other routes
 
 // Dynamic route - KEEP THIS LAST
-router.get("/:slug", optionalAuth, courseController.getCourse);
+router.get("/:slug", browsingLimiter, optionalAuth, courseController.getCourse);
 
 module.exports = router;

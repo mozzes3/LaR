@@ -11,6 +11,8 @@ const getAllCertifications = async (req, res) => {
     const { page = 1, limit = 20, status, category, search } = req.query;
 
     const query = {};
+    const hasFilters = !!(status || category || search);
+
     if (status) query.status = status;
     if (category) query.category = category;
     if (search) {
@@ -24,9 +26,16 @@ const getAllCertifications = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .lean();
+      .lean(); // ✅ Add lean()
 
-    const total = await ProfessionalCertification.countDocuments(query);
+    // ✅ OPTIMIZATION
+    let total;
+    if (page === 1 && !hasFilters) {
+      total = await ProfessionalCertification.estimatedDocumentCount();
+      console.log("⚡ Using estimatedDocumentCount() for admin certifications");
+    } else {
+      total = await ProfessionalCertification.countDocuments(query);
+    }
 
     res.json({
       success: true,

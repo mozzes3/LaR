@@ -1,6 +1,10 @@
 const User = require("../models/User");
 const sharp = require("sharp");
 const path = require("path");
+const Course = require("../models/Course"); // ✅ ADD THIS if missing
+const Review = require("../models/Review");
+const Purchase = require("../models/Purchase"); // ✅ ADD THIS
+const Certificate = require("../models/Certificate"); // ✅ ADD THIS
 const fs = require("fs").promises;
 const { getLevelProgress } = require("../config/levels");
 /**
@@ -1475,6 +1479,225 @@ function formatTimeAgo(date) {
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
   return new Date(date).toLocaleDateString();
 }
+
+/**
+ * Get complete instructor profile - combines 3 API calls into 1
+ * Returns same structure as old separate calls
+ */
+const getInstructorProfileComplete = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    // Get instructor user data
+    const instructor = await User.findOne({ username, isInstructor: true })
+      .select(
+        "username displayName avatar bio instructorBio expertise socialLinks badges isInstructor instructorVerified"
+      )
+      .lean();
+
+    if (!instructor) {
+      return res.status(404).json({ error: "Instructor not found" });
+    }
+
+    // Get courses
+    const courses = await Course.find({
+      instructor: instructor._id,
+      status: "published",
+    })
+      .populate("instructor", "username avatar instructorVerified badges")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Calculate stats
+    const totalCourses = courses.length;
+    const totalStudents = courses.reduce(
+      (sum, course) => sum + (course.enrollmentCount || 0),
+      0
+    );
+    const avgRating =
+      courses.length > 0
+        ? courses.reduce(
+            (sum, course) => sum + (course.averageRating || 0),
+            0
+          ) / courses.length
+        : 0;
+
+    // Get total reviews count across all courses
+    const courseIds = courses.map((c) => c._id);
+    const totalReviews = await Review.countDocuments({
+      course: { $in: courseIds },
+    });
+
+    // ✅ Return structure that matches what frontend expects
+    res.json({
+      success: true,
+      instructor: {
+        ...instructor,
+        totalCourses,
+        totalStudents,
+        averageRating: Math.round(avgRating * 10) / 10,
+        totalReviews,
+        totalCoursesCreated: totalCourses, // Alias for compatibility
+      },
+      courses,
+    });
+  } catch (error) {
+    console.error("Get instructor profile error:", error);
+    res.status(500).json({ error: "Failed to load instructor profile" });
+  }
+};
+
+const getStudentDashboard = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    console.log("📊 Loading student dashboard for user:", userId);
+
+    // Get level calculation helper
+    const { getLevelProgress } = require("../config/levels");
+
+    // Get all data in parallel
+    const [purchases, user] = await Promise.all([
+      Purchase.find({ user: userId, status: "active" })
+        .populate({
+          path: "course",
+          select:
+            "title slug thumbnail sections price instructor totalDuration",
+          populate: {
+            path: "instructor",
+            select: "username displayName avatar",
+          },
+        })
+        .select(
+          "course progress completedLessons lastAccessedLesson isCompleted createdAt lastAccessedAt certificateId totalWatchTime"
+        ) // ✅ Add totalWatchTime
+        .sort({ lastAccessedAt: -1 })
+        .lean(),
+
+      User.findById(userId)
+        .select(
+          "username displayName avatar totalWatchTime certificatesEarned currentStreak tokensEarned totalXP level"
+        )
+        .lean(),
+    ]);
+
+    // ✅ Filter out deleted courses (CRITICAL)
+    const validPurchases = purchases.filter(
+      (p) => p.course !== null && p.course !== undefined
+    );
+
+    console.log(
+      `📊 Total purchases: ${purchases.length}, Valid: ${validPurchases.length}`
+    );
+
+    // Calculate stats
+    const totalCourses = validPurchases.length;
+    const completedCourses = validPurchases.filter((p) => p.isCompleted).length;
+    const inProgressCourses = validPurchases.filter(
+      (p) => !p.isCompleted && p.progress > 0
+    ).length;
+
+    // ✅ Calculate TOTAL watch time from ALL purchases (in seconds)
+    const totalWatchTime = validPurchases.reduce(
+      (sum, p) => sum + (p.totalWatchTime || 0),
+      0
+    );
+
+    console.log(
+      `⏱️ Total watch time calculated: ${totalWatchTime} seconds (${Math.floor(
+        totalWatchTime / 60
+      )} minutes)`
+    );
+
+    const avgProgress =
+      totalCourses > 0
+        ? Math.round(
+            validPurchases.reduce((sum, p) => sum + (p.progress || 0), 0) /
+              totalCourses
+          )
+        : 0;
+
+    // ✅ Calculate level progress using SAME logic as analytics
+    const levelProgress = getLevelProgress(user?.totalXP || 0);
+
+    // ✅ Count certificates - use user.certificatesEarned field
+    const certificatesEarned = user?.certificatesEarned || 0;
+
+    console.log(`🏆 Certificates earned: ${certificatesEarned}`);
+
+    // Transform purchases
+    const transformedPurchases = validPurchases.map((purchase) => {
+      let currentLessonTitle = "Start learning";
+      if (purchase.lastAccessedLesson && purchase.course.sections) {
+        for (const section of purchase.course.sections) {
+          const lesson = section.lessons?.find(
+            (l) => l._id.toString() === purchase.lastAccessedLesson.toString()
+          );
+          if (lesson) {
+            currentLessonTitle = lesson.title;
+            break;
+          }
+        }
+      }
+
+      return {
+        id: purchase._id,
+        courseId: purchase.course._id,
+        title: purchase.course.title,
+        slug: purchase.course.slug,
+        thumbnail: purchase.course.thumbnail,
+        instructor: purchase.course.instructor,
+        progress: purchase.progress || 0,
+        isCompleted: purchase.isCompleted || false,
+        totalLessons:
+          purchase.course.sections?.reduce(
+            (sum, section) => sum + (section.lessons?.length || 0),
+            0
+          ) || 0,
+        completedLessons: purchase.completedLessons?.length || 0,
+        currentLesson: currentLessonTitle,
+        lastAccessed: purchase.lastAccessedAt || purchase.createdAt,
+        totalDuration: purchase.course.totalDuration || 0,
+        certificateId: purchase.certificateId,
+      };
+    });
+
+    // ✅ Return structure matching OLD analytics API
+    res.json({
+      success: true,
+      user: {
+        username: user?.username || "",
+        displayName: user?.displayName || user?.username || "",
+        avatar: user?.avatar || "",
+      },
+      stats: {
+        totalCourses,
+        completedCourses,
+        inProgressCourses,
+        totalWatchTime, // ✅ In seconds (frontend will convert to minutes)
+        certificatesEarned, // ✅ From user model
+        currentStreak: user?.currentStreak || 0,
+        fdrEarned: user?.tokensEarned || 0,
+        level: levelProgress.currentLevel,
+        totalXP: user?.totalXP || 0,
+        levelProgress: {
+          currentLevel: levelProgress.currentLevel,
+          nextLevel: levelProgress.currentLevel + 1,
+          currentLevelXP: levelProgress.currentLevelXP,
+          nextLevelXP: levelProgress.nextLevelXP,
+          xpInCurrentLevel: levelProgress.xpInCurrentLevel,
+          xpNeededForNextLevel: levelProgress.xpNeededForNextLevel,
+          progressPercentage: levelProgress.progressPercentage,
+          isMaxLevel: levelProgress.isMaxLevel,
+        },
+      },
+      enrolledCourses: transformedPurchases,
+    });
+  } catch (error) {
+    console.error("Get student dashboard error:", error);
+    res.status(500).json({ error: "Failed to load dashboard data" });
+  }
+};
 module.exports = {
   getProfile,
   updateProfile,
@@ -1493,4 +1716,6 @@ module.exports = {
   addPaymentWallet,
   removePaymentWallet,
   setPrimaryWallet,
+  getInstructorProfileComplete,
+  getStudentDashboard,
 };

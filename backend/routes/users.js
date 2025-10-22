@@ -1,6 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
+const {
+  publicLimiter,
+  browsingLimiter,
+  authLimiter,
+  writeLimiter,
+  expensiveLimiter,
+  uploadLimiter,
+} = require("../middleware/rateLimits");
 const userController = require("../controllers/userController");
 const { authenticate } = require("../middleware/auth");
 
@@ -20,15 +28,27 @@ const upload = multer({
 });
 
 // Payment wallet management (instructor only)
-router.get("/payment-wallets", authenticate, userController.getPaymentWallets);
-router.post("/payment-wallets", authenticate, userController.addPaymentWallet);
+router.get(
+  "/payment-wallets",
+  authLimiter,
+  authenticate,
+  userController.getPaymentWallets
+);
+router.post(
+  "/payment-wallets",
+  writeLimiter,
+  authenticate,
+  userController.addPaymentWallet
+);
 router.delete(
   "/payment-wallets/:walletId",
+  writeLimiter,
   authenticate,
   userController.removePaymentWallet
 );
 router.post(
   "/payment-wallets/set-primary",
+  writeLimiter,
   authenticate,
   userController.setPrimaryWallet
 );
@@ -38,7 +58,12 @@ router.post(
  * @desc    Get student's learning analytics
  * @access  Private
  */
-router.get("/analytics", authenticate, userController.getStudentAnalytics);
+router.get(
+  "/analytics",
+  expensiveLimiter,
+  authenticate,
+  userController.getStudentAnalytics
+);
 
 /**
  * @route   GET /api/users/dashboard/stats
@@ -47,23 +72,29 @@ router.get("/analytics", authenticate, userController.getStudentAnalytics);
  */
 router.get(
   "/dashboard/stats",
+  authLimiter,
   authenticate,
   userController.getUserDashboardStats
 ); // ← ADD THIS
-
+router.get(
+  "/dashboard/complete",
+  authLimiter,
+  authenticate,
+  userController.getStudentDashboard
+);
 /**
  * @route   GET /api/users/stats/me
  * @desc    Get own stats
  * @access  Private
  */
-router.get("/stats/me", authenticate, userController.getStats);
+router.get("/stats/me", authLimiter, authenticate, userController.getStats);
 
 /**
  * @route   GET /api/users/:username
  * @desc    Get user profile
  * @access  Public
  */
-router.get("/:username", userController.getProfile);
+router.get("/:username", browsingLimiter, userController.getProfile);
 
 /**
  * @route   GET /api/users/instructor/:username/stats
@@ -72,6 +103,7 @@ router.get("/:username", userController.getProfile);
  */
 router.get(
   "/instructor/:username/stats",
+  publicLimiter,
   userController.getInstructorPublicStats
 );
 
@@ -80,7 +112,12 @@ router.get(
  * @desc    Update own profile
  * @access  Private
  */
-router.put("/profile", authenticate, userController.updateProfile);
+router.put(
+  "/profile",
+  writeLimiter,
+  authenticate,
+  userController.updateProfile
+);
 
 /**
  * @route   POST /api/users/avatar
@@ -89,6 +126,7 @@ router.put("/profile", authenticate, userController.updateProfile);
  */
 router.post(
   "/avatar",
+  uploadLimiter,
   authenticate,
   upload.single("avatar"),
   userController.uploadAvatar
@@ -101,18 +139,21 @@ router.post(
  */
 router.get(
   "/instructor/dashboard-stats",
+  expensiveLimiter,
   authenticate,
   userController.getInstructorDashboardStats
 );
 
 router.get(
   "/instructor/earnings-history",
+  expensiveLimiter,
   authenticate,
   userController.getInstructorEarningsHistory
 );
 
 router.get(
   "/instructor/earnings-transactions",
+  expensiveLimiter,
   authenticate,
   userController.getInstructorEarningsTransactions
 );
@@ -124,12 +165,14 @@ router.get(
  */
 router.get(
   "/instructor/recent-activity",
+  authLimiter,
   authenticate,
   userController.getInstructorRecentActivity
 );
 
 router.get(
   "/instructor/students/:studentId",
+  authLimiter,
   authenticate,
   userController.getStudentDetails
 );
@@ -141,8 +184,15 @@ router.get(
  */
 router.get(
   "/instructor/all-students",
+  expensiveLimiter,
   authenticate,
   userController.getAllStudents
+);
+
+router.get(
+  "/instructor/:username/complete",
+  browsingLimiter,
+  userController.getInstructorProfileComplete
 );
 
 module.exports = router;

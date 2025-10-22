@@ -1,6 +1,7 @@
 // backend/routes/adminProfessionalCertifications.js
 const express = require("express");
 const router = express.Router();
+const { adminLimiter, expensiveLimiter } = require("../middleware/rateLimits");
 const { authenticate, isAdmin } = require("../middleware/auth");
 const { hasPermission } = require("../middleware/permission");
 const adminProfCertController = require("../controllers/adminProfessionalCertificationController");
@@ -10,7 +11,11 @@ router.use(authenticate);
 router.use(isAdmin);
 
 // ===== DASHBOARD =====
-router.get("/dashboard/stats", adminProfCertController.getDashboardStats);
+router.get(
+  "/dashboard/stats",
+  expensiveLimiter,
+  adminProfCertController.getDashboardStats
+);
 
 // ===== CERTIFICATIONS MANAGEMENT =====
 
@@ -19,14 +24,18 @@ router.get("/dashboard/stats", adminProfCertController.getDashboardStats);
  * @desc    Get all certifications (admin)
  * @access  Admin
  */
-router.get("/", adminProfCertController.getAllCertifications);
+router.get("/", adminLimiter, adminProfCertController.getAllCertifications);
 
 /**
  * @route   GET /api/admin/professional-certifications/:id
  * @desc    Get certification details
  * @access  Admin
  */
-router.get("/:id", adminProfCertController.getCertificationDetails);
+router.get(
+  "/:id",
+  adminLimiter,
+  adminProfCertController.getCertificationDetails
+);
 
 /**
  * @route   POST /api/admin/professional-certifications
@@ -35,6 +44,7 @@ router.get("/:id", adminProfCertController.getCertificationDetails);
  */
 router.post(
   "/",
+  adminLimiter,
   hasPermission("certifications", "create"),
   adminProfCertController.createCertification
 );
@@ -46,6 +56,7 @@ router.post(
  */
 router.put(
   "/:id",
+  adminLimiter,
   hasPermission("certifications", "update"),
   adminProfCertController.updateCertification
 );
@@ -57,6 +68,7 @@ router.put(
  */
 router.delete(
   "/:id",
+  adminLimiter,
   hasPermission("certifications", "delete"),
   adminProfCertController.deleteCertification
 );
@@ -68,6 +80,7 @@ router.delete(
  */
 router.put(
   "/:id/status",
+  adminLimiter,
   hasPermission("certifications", "update"),
   adminProfCertController.updateStatus
 );
@@ -79,7 +92,11 @@ router.put(
  * @desc    Get all attempts for a certification
  * @access  Admin
  */
-router.get("/:id/attempts", adminProfCertController.getCertificationAttempts);
+router.get(
+  "/:id/attempts",
+  expensiveLimiter,
+  adminProfCertController.getCertificationAttempts
+);
 
 // ===== CERTIFICATES =====
 
@@ -88,7 +105,11 @@ router.get("/:id/attempts", adminProfCertController.getCertificationAttempts);
  * @desc    Get all issued certificates
  * @access  Admin
  */
-router.get("/certificates/all", adminProfCertController.getAllCertificates);
+router.get(
+  "/certificates/all",
+  expensiveLimiter,
+  adminProfCertController.getAllCertificates
+);
 
 /**
  * @route   POST /api/admin/professional-certifications/certificates/:id/revoke
@@ -97,6 +118,7 @@ router.get("/certificates/all", adminProfCertController.getAllCertificates);
  */
 router.post(
   "/certificates/:id/revoke",
+  adminLimiter,
   hasPermission("certifications", "delete"),
   adminProfCertController.revokeCertificate
 );

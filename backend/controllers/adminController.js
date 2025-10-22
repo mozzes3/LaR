@@ -115,14 +115,18 @@ const getAllUsers = async (req, res) => {
     } = req.query;
 
     const query = {};
+    const hasFilters = !!(
+      search ||
+      role ||
+      isInstructor !== undefined ||
+      isBanned !== undefined ||
+      isActive !== undefined
+    );
 
-    if (search) {
-      query.$or = [
-        { username: { $regex: search, $options: "i" } },
-        { displayName: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
-        { walletAddress: { $regex: search, $options: "i" } },
-      ];
+    // ✅ TEXT SEARCH for users
+    if (search && search.trim()) {
+      query.$text = { $search: search.trim() };
+      console.log("🔍 User search using TEXT INDEX:", search.trim());
     }
 
     if (role) query.role = role;
@@ -131,26 +135,35 @@ const getAllUsers = async (req, res) => {
     if (isBanned !== undefined) query.isBanned = isBanned === "true";
     if (isActive !== undefined) query.isActive = isActive === "true";
 
-    console.log("🔍 Admin getAllUsers query:", query);
-    console.log("📄 Pagination:", { page, limit });
+    let sortQuery = search
+      ? { score: { $meta: "textScore" } }
+      : { createdAt: -1 };
 
-    // First, check total users in database
-    const totalUsersInDB = await User.countDocuments({});
-    console.log("👥 Total users in database:", totalUsersInDB);
-
-    const users = await User.find(query)
+    let queryBuilder = User.find(query)
       .select(
         "username displayName email avatar isInstructor instructorVerified badges isActive isBanned createdAt roleRef"
-      ) // ✅ ADD badges
+      )
       .populate("roleRef", "name displayName")
-      .sort({ createdAt: -1 })
+      .sort(sortQuery)
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
-    const total = await User.countDocuments(query);
+    if (search) {
+      queryBuilder = queryBuilder.select({ score: { $meta: "textScore" } });
+    }
+
+    const users = await queryBuilder.lean();
+
+    // Smart count
+    let total;
+    if (page === 1 && !hasFilters) {
+      total = await User.estimatedDocumentCount();
+    } else {
+      total = await User.countDocuments(query);
+    }
 
     console.log("✅ Found users:", users.length);
-    console.log("📊 Total matching query:", total);
+    console.log("📊 Total:", total);
 
     res.json({
       success: true,
@@ -431,22 +444,40 @@ const getAllCoursesAdmin = async (req, res) => {
     const { page = 1, limit = 20, status, category, search } = req.query;
 
     const query = {};
+    const hasFilters = !!(status || category || search);
+
     if (status) query.status = status;
     if (category) query.category = category;
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { subtitle: { $regex: search, $options: "i" } },
-      ];
+
+    // ✅ TEXT SEARCH instead of regex
+    if (search && search.trim()) {
+      query.$text = { $search: search.trim() };
+      console.log("🔍 Admin using TEXT SEARCH:", search.trim());
     }
 
-    const courses = await Course.find(query)
+    let sortQuery = search
+      ? { score: { $meta: "textScore" } }
+      : { createdAt: -1 };
+
+    let queryBuilder = Course.find(query)
       .populate("instructor", "username displayName avatar")
-      .sort({ createdAt: -1 })
+      .sort(sortQuery)
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
-    const total = await Course.countDocuments(query);
+    if (search) {
+      queryBuilder = queryBuilder.select({ score: { $meta: "textScore" } });
+    }
+
+    const courses = await queryBuilder.lean();
+
+    // Smart count
+    let total;
+    if (page === 1 && !hasFilters) {
+      total = await Course.estimatedDocumentCount();
+    } else {
+      total = await Course.countDocuments(query);
+    }
 
     res.json({
       success: true,
@@ -529,6 +560,8 @@ const getAllReviewsAdmin = async (req, res) => {
     const { page = 1, limit = 20, status, courseId } = req.query;
 
     const query = {};
+    const hasFilters = !!(status || courseId);
+
     if (status) query.status = status;
     if (courseId) query.course = courseId;
 
@@ -537,9 +570,17 @@ const getAllReviewsAdmin = async (req, res) => {
       .populate("course", "title slug")
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean(); // ✅ Add lean()
 
-    const total = await Review.countDocuments(query);
+    // ✅ OPTIMIZATION
+    let total;
+    if (page === 1 && !hasFilters) {
+      total = await Review.estimatedDocumentCount();
+      console.log("⚡ Using estimatedDocumentCount() for reviews");
+    } else {
+      total = await Review.countDocuments(query);
+    }
 
     res.json({
       success: true,
@@ -628,15 +669,24 @@ const getAllApplications = async (req, res) => {
     const { page = 1, limit = 20, status } = req.query;
 
     const query = status ? { status } : {};
+    const hasFilters = !!status;
 
     const applications = await InstructorApplication.find(query)
       .populate("user", "username walletAddress avatar email")
       .populate("reviewedBy", "username")
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean(); // ✅ Add lean()
 
-    const total = await InstructorApplication.countDocuments(query);
+    // ✅ OPTIMIZATION
+    let total;
+    if (page === 1 && !hasFilters) {
+      total = await InstructorApplication.estimatedDocumentCount();
+      console.log("⚡ Using estimatedDocumentCount() for applications");
+    } else {
+      total = await InstructorApplication.countDocuments(query);
+    }
 
     res.json({
       success: true,
@@ -762,6 +812,8 @@ const getAllPurchases = async (req, res) => {
     const { page = 1, limit = 20, status, search } = req.query;
 
     const query = {};
+    const hasFilters = !!(status || search);
+
     if (status) query.status = status;
 
     const purchases = await Purchase.find(query)
@@ -769,9 +821,17 @@ const getAllPurchases = async (req, res) => {
       .populate("course", "title slug thumbnail price")
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean(); // ✅ Add lean()
 
-    const total = await Purchase.countDocuments(query);
+    // ✅ OPTIMIZATION
+    let total;
+    if (page === 1 && !hasFilters) {
+      total = await Purchase.estimatedDocumentCount();
+      console.log("⚡ Using estimatedDocumentCount() for purchases");
+    } else {
+      total = await Purchase.countDocuments(query);
+    }
 
     res.json({
       success: true,

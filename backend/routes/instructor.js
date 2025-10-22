@@ -1,31 +1,46 @@
 const express = require("express");
 const router = express.Router();
+const {
+  authLimiter,
+  writeLimiter,
+  adminLimiter,
+} = require("../middleware/rateLimits");
 const instructorController = require("../controllers/instructorController");
 const { authenticate, isAdmin } = require("../middleware/auth");
 
 // User routes
-router.post("/apply", authenticate, instructorController.applyInstructor);
+// User routes
+router.post(
+  "/apply",
+  writeLimiter,
+  authenticate,
+  instructorController.applyInstructor
+);
 router.get(
   "/my-application",
+  authLimiter,
   authenticate,
   instructorController.getMyApplication
 );
 
-// Admin routes
+// Admin routes (higher limits)
 router.get(
   "/applications",
+  adminLimiter,
   authenticate,
   isAdmin,
   instructorController.getAllApplications
 );
 router.post(
   "/applications/:id/approve",
+  adminLimiter,
   authenticate,
   isAdmin,
   instructorController.approveApplication
 );
 router.post(
   "/applications/:id/reject",
+  adminLimiter,
   authenticate,
   isAdmin,
   instructorController.rejectApplication

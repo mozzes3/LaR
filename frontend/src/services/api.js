@@ -327,6 +327,9 @@ export const userApi = {
     api.delete(`/users/payment-wallets/${walletId}`),
   setPrimaryWallet: (walletId) =>
     api.post("/users/payment-wallets/set-primary", { walletId }),
+  getInstructorProfileComplete: (username) =>
+    api.get(`/users/instructor/${username}/complete`),
+  getStudentDashboard: () => api.get("/users/dashboard/complete"),
 };
 
 // Instructor endpoints

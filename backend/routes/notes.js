@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { authLimiter, writeLimiter } = require("../middleware/rateLimits");
 const { authenticate } = require("../middleware/auth");
 const Note = require("../models/Note");
 const Purchase = require("../models/Purchase");
@@ -9,41 +10,46 @@ const Purchase = require("../models/Purchase");
  * @desc    Get user's notes for a specific lesson
  * @access  Private
  */
-router.get("/:courseId/:lessonId", authenticate, async (req, res) => {
-  try {
-    const { courseId, lessonId } = req.params;
-    const userId = req.userId;
+router.get(
+  "/:courseId/:lessonId",
+  authLimiter,
+  authenticate,
+  async (req, res) => {
+    try {
+      const { courseId, lessonId } = req.params;
+      const userId = req.userId;
 
-    // Verify user has purchased the course
-    const purchase = await Purchase.findOne({
-      user: userId,
-      course: courseId,
-      status: "active",
-    });
+      // Verify user has purchased the course
+      const purchase = await Purchase.findOne({
+        user: userId,
+        course: courseId,
+        status: "active",
+      });
 
-    if (!purchase) {
-      return res.status(403).json({ error: "Access denied" });
+      if (!purchase) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const notes = await Note.find({
+        user: userId,
+        course: courseId,
+        lesson: lessonId,
+      }).sort({ createdAt: -1 });
+
+      res.json({ success: true, notes });
+    } catch (error) {
+      console.error("Get notes error:", error);
+      res.status(500).json({ error: "Failed to get notes" });
     }
-
-    const notes = await Note.find({
-      user: userId,
-      course: courseId,
-      lesson: lessonId,
-    }).sort({ createdAt: -1 });
-
-    res.json({ success: true, notes });
-  } catch (error) {
-    console.error("Get notes error:", error);
-    res.status(500).json({ error: "Failed to get notes" });
   }
-});
+);
 
 /**
  * @route   POST /api/notes
  * @desc    Create a new note
  * @access  Private
  */
-router.post("/", authenticate, async (req, res) => {
+router.post("/", writeLimiter, authenticate, async (req, res) => {
   try {
     const { courseId, lessonId, content, timestamp } = req.body;
     const userId = req.userId;
@@ -83,7 +89,7 @@ router.post("/", authenticate, async (req, res) => {
  * @desc    Update a note
  * @access  Private
  */
-router.put("/:noteId", authenticate, async (req, res) => {
+router.put("/:noteId", writeLimiter, authenticate, async (req, res) => {
   try {
     const { noteId } = req.params;
     const { content } = req.body;
@@ -118,7 +124,7 @@ router.put("/:noteId", authenticate, async (req, res) => {
  * @desc    Delete a note
  * @access  Private
  */
-router.delete("/:noteId", authenticate, async (req, res) => {
+router.delete("/:noteId", authLimiter, authenticate, async (req, res) => {
   try {
     const { noteId } = req.params;
     const userId = req.userId;

@@ -1,29 +1,51 @@
 const express = require("express");
 const router = express.Router();
+const {
+  authLimiter,
+  writeLimiter,
+  criticalLimiter,
+} = require("../middleware/rateLimits"); // ✅ ADD THIS
 const enrollmentController = require("../controllers/enrollmentController");
 const { authenticate } = require("../middleware/auth"); // ✅ CORRECT
 
 // Enroll in course
-router.post("/enroll", authenticateToken, enrollmentController.enrollCourse);
+router.post(
+  "/enroll",
+  writeLimiter,
+  authenticate,
+  enrollmentController.enrollCourse
+);
 
 // Update progress
 router.post(
   "/progress",
-  authenticateToken,
+  authLimiter,
+  authenticate,
   enrollmentController.updateProgress
 );
 
 // Complete course (auto-generates certificate)
 router.post(
   "/:courseId/complete",
-  authenticateToken,
+  criticalLimiter,
+  authenticate,
   enrollmentController.completeCourse
 );
 
 // Get my enrollments
-router.get("/my", authenticateToken, enrollmentController.getMyEnrollments);
+router.get(
+  "/my",
+  authLimiter,
+  authenticateToken,
+  enrollmentController.getMyEnrollments
+);
 
 // Get single enrollment
-router.get("/:courseId", authenticateToken, enrollmentController.getEnrollment);
+router.get(
+  "/:courseId",
+  authLimiter,
+  authenticateToken,
+  enrollmentController.getEnrollment
+);
 
 module.exports = router;

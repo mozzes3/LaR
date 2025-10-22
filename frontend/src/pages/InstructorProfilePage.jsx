@@ -43,11 +43,12 @@ const InstructorProfilePage = () => {
       try {
         setLoading(true);
 
-        // Load instructor profile
-        const profileResponse = await userApi.getProfile(username);
-        const instructorData = profileResponse.data.user;
+        // ✅ Single API call instead of 3
+        const response = await userApi.getInstructorProfileComplete(username);
+        const instructorData = response.data.instructor;
 
         console.log("👨‍🏫 Instructor data:", instructorData);
+        console.log("📚 Courses:", response.data.courses);
 
         if (!instructorData.isInstructor) {
           toast.error("This user is not an instructor");
@@ -55,33 +56,20 @@ const InstructorProfilePage = () => {
           return;
         }
 
-        // Load instructor's courses and stats in parallel for performance
-        const [coursesResponse, statsResponse] = await Promise.all([
-          courseApi.getByInstructor(instructorData.username),
-          userApi.getInstructorStats(instructorData.username),
-        ]);
-
-        console.log("📚 Instructor courses:", coursesResponse.data.courses);
-        console.log("📊 Instructor stats:", statsResponse.data.stats);
-
-        setCourses(coursesResponse.data.courses || []);
-
-        // Set instructor with REAL calculated stats from backend
-        setInstructor({
-          ...instructorData,
-          ...statsResponse.data.stats, // Overwrite with accurate stats
-          badges: instructorData.badges || [], // Ensure badges are included
-        });
-
+        setCourses(response.data.courses || []);
+        setInstructor(instructorData);
         setLoading(false);
       } catch (error) {
         console.error("Error loading instructor profile:", error);
         toast.error("Failed to load instructor profile");
         setLoading(false);
+        navigate("/courses");
       }
     };
 
-    loadInstructorProfile();
+    if (username) {
+      loadInstructorProfile();
+    }
   }, [username, navigate]);
 
   const getBadgeIcon = (badge) => {

@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { browsingLimiter } = require("../middleware/rateLimits");
 const categoryController = require("../controllers/categoryController");
 
 /**
@@ -7,13 +8,17 @@ const categoryController = require("../controllers/categoryController");
  * @desc    Get all categories with subcategories
  * @access  Public
  */
-router.get("/", categoryController.getCategories);
+router.get("/", browsingLimiter, categoryController.getCategories);
 
 /**
  * @route   GET /api/categories/:category/subcategories
  * @desc    Get subcategories for a category
  * @access  Public
  */
-router.get("/:category/subcategories", categoryController.getSubcategories);
+router.get(
+  "/:category/subcategories",
+  browsingLimiter,
+  categoryController.getSubcategories
+);
 
 module.exports = router;

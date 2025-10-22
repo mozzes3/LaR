@@ -1,6 +1,7 @@
 // backend/routes/nft.js
 const express = require("express");
 const router = express.Router();
+const { authLimiter, criticalLimiter } = require("../middleware/rateLimits");
 const { ethers } = require("ethers");
 
 const CONTRACT_ADDRESS = "0x9094CFF8A9980b817fE5fa04fd3c9b44663d3e23";
@@ -10,7 +11,7 @@ const ABI = [
   "function tokenURI(uint256 tokenId) external view returns (string)",
 ];
 
-router.get("/:tokenId", async (req, res) => {
+router.get("/:tokenId", authLimiter, async (req, res) => {
   try {
     const { tokenId } = req.params;
 

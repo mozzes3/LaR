@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { browsingLimiter, authLimiter } = require("../middleware/rateLimits");
 const { getLevelProgress, getLevelMilestones } = require("../config/levels");
 const { authenticate } = require("../middleware/auth");
 
@@ -8,7 +9,7 @@ const { authenticate } = require("../middleware/auth");
  * @desc    Get user's level progress
  * @access  Private
  */
-router.get("/progress", authenticate, async (req, res) => {
+router.get("/progress", authLimiter, authenticate, async (req, res) => {
   try {
     const User = require("../models/User");
     const user = await User.findById(req.userId);
@@ -34,7 +35,7 @@ router.get("/progress", authenticate, async (req, res) => {
  * @desc    Get level milestones
  * @access  Public
  */
-router.get("/milestones", (req, res) => {
+router.get("/milestones", browsingLimiter, (req, res) => {
   try {
     const milestones = getLevelMilestones();
 

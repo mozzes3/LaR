@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
+const { authLimiter, uploadLimiter } = require("../middleware/rateLimits");
 const bunnyService = require("../services/bunnyService");
 const { authenticate, isInstructor, isAdmin } = require("../middleware/auth");
 
@@ -63,6 +64,7 @@ const documentUpload = multer({
  */
 router.post(
   "/avatar",
+  uploadLimiter,
   authenticate,
   imageUpload.single("avatar"),
   async (req, res) => {
@@ -111,6 +113,7 @@ router.post(
 
 router.post(
   "/certification-thumbnail",
+  uploadLimiter,
   authenticate,
   isAdmin,
   imageUpload.single("thumbnail"),
@@ -213,6 +216,7 @@ router.post(
  */
 router.post(
   "/thumbnail",
+  uploadLimiter,
   authenticate,
   isInstructor,
   imageUpload.single("thumbnail"),
@@ -264,6 +268,7 @@ router.post(
  */
 router.post(
   "/video",
+  uploadLimiter,
   authenticate,
   isInstructor,
   videoUpload.single("video"),
@@ -328,25 +333,30 @@ router.post(
  * @desc    Get signed video URL for playback
  * @access  Private
  */
-router.get("/video/:videoId/url", authenticate, async (req, res) => {
-  try {
-    const { videoId } = req.params;
+router.get(
+  "/video/:videoId/url",
+  authLimiter,
+  authenticate,
+  async (req, res) => {
+    try {
+      const { videoId } = req.params;
 
-    // TODO: Check if user has access to this video (purchased course)
-    // For now, generate URL for any authenticated user
+      // TODO: Check if user has access to this video (purchased course)
+      // For now, generate URL for any authenticated user
 
-    const videoUrl = bunnyService.generateVideoUrl(videoId);
+      const videoUrl = bunnyService.generateVideoUrl(videoId);
 
-    res.json({
-      success: true,
-      url: videoUrl,
-      expiresIn: bunnyService.tokenExpiry,
-    });
-  } catch (error) {
-    console.error("Get video URL error:", error);
-    res.status(500).json({ error: "Failed to generate video URL" });
+      res.json({
+        success: true,
+        url: videoUrl,
+        expiresIn: bunnyService.tokenExpiry,
+      });
+    } catch (error) {
+      console.error("Get video URL error:", error);
+      res.status(500).json({ error: "Failed to generate video URL" });
+    }
   }
-});
+);
 
 /**
  * @route   GET /api/upload/video/:videoId/info
@@ -355,6 +365,7 @@ router.get("/video/:videoId/url", authenticate, async (req, res) => {
  */
 router.get(
   "/video/:videoId/info",
+  authLimiter,
   authenticate,
   isInstructor,
   async (req, res) => {
@@ -379,7 +390,7 @@ router.get(
  * @desc    Delete thumbnail from CDN
  * @access  Private (Instructor only)
  */
-router.delete("/thumbnail", authenticate, async (req, res) => {
+router.delete("/thumbnail", authLimiter, authenticate, async (req, res) => {
   try {
     const { url } = req.body;
 
@@ -408,6 +419,7 @@ router.delete("/thumbnail", authenticate, async (req, res) => {
  */
 router.post(
   "/resource",
+  uploadLimiter,
   authenticate,
   isInstructor,
   documentUpload.single("resource"),
@@ -448,26 +460,32 @@ router.post(
  * @desc    Delete resource from CDN
  * @access  Private (Instructor only)
  */
-router.delete("/resource", authenticate, isInstructor, async (req, res) => {
-  try {
-    const { url } = req.body;
+router.delete(
+  "/resource",
+  authLimiter,
+  authenticate,
+  isInstructor,
+  async (req, res) => {
+    try {
+      const { url } = req.body;
 
-    if (!url) {
-      return res.status(400).json({ error: "Resource URL is required" });
+      if (!url) {
+        return res.status(400).json({ error: "Resource URL is required" });
+      }
+
+      console.log("🗑️ Deleting resource:", url);
+
+      await bunnyService.deleteFile("resources", url);
+
+      res.json({
+        success: true,
+        message: "Resource deleted successfully",
+      });
+    } catch (error) {
+      console.error("Delete resource error:", error);
+      res.status(500).json({ error: "Failed to delete resource" });
     }
-
-    console.log("🗑️ Deleting resource:", url);
-
-    await bunnyService.deleteFile("resources", url);
-
-    res.json({
-      success: true,
-      message: "Resource deleted successfully",
-    });
-  } catch (error) {
-    console.error("Delete resource error:", error);
-    res.status(500).json({ error: "Failed to delete resource" });
   }
-});
+);
 
 module.exports = router;

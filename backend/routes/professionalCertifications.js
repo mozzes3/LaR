@@ -1,45 +1,82 @@
 const express = require("express");
 const router = express.Router();
+const {
+  publicLimiter,
+  browsingLimiter,
+  authLimiter,
+  criticalLimiter,
+} = require("../middleware/rateLimits");
 const { authenticate, optionalAuth } = require("../middleware/auth");
 const profCertController = require("../controllers/professionalCertificationController");
 
-// Public routes
-router.get("/", profCertController.getAllCertifications);
-router.get("/:slug", optionalAuth, profCertController.getCertificationDetails);
+// Public browsing
+router.get("/", browsingLimiter, profCertController.getAllCertifications);
+router.get(
+  "/:slug",
+  browsingLimiter,
+  optionalAuth,
+  profCertController.getCertificationDetails
+);
 
-// Protected routes
-router.post("/start-test", authenticate, profCertController.startTestAttempt);
-router.post("/submit-test", authenticate, profCertController.submitTestAttempt);
+// ⚠️ CRITICAL: Test operations (expensive, prevent cheating)
+router.post(
+  "/start-test",
+  criticalLimiter,
+  authenticate,
+  profCertController.startTestAttempt
+);
+router.post(
+  "/submit-test",
+  criticalLimiter,
+  authenticate,
+  profCertController.submitTestAttempt
+);
+router.post(
+  "/reset-attempts",
+  criticalLimiter,
+  authenticate,
+  profCertController.resetAttempts
+);
+
+// Reading attempts
 router.get(
   "/attempts/my-attempts",
+  authLimiter,
   authenticate,
   profCertController.getMyAttempts
 );
 router.get(
   "/attempts/:attemptId",
+  authLimiter,
   authenticate,
   profCertController.getAttemptDetails
 );
-router.post("/reset-attempts", authenticate, profCertController.resetAttempts);
 
-// Certificate routes
-router.post("/certificates/purchase", authenticate, (req, res, next) => {
-  console.log("✅ Certificate purchase route hit");
-  profCertController.purchaseCertificate(req, res, next);
-});
+// Certificate operations
 router.get(
   "/certificates/eligible",
+  authLimiter,
   authenticate,
   profCertController.getEligibleCertificates
 );
 router.get(
   "/certificates/my-certificates",
+  authLimiter,
   authenticate,
   profCertController.getMyCertificates
 );
 router.get(
   "/certificates/verify/:certificateNumber",
+  publicLimiter,
   profCertController.verifyCertificate
+);
+
+// ⚠️ CRITICAL: Purchase certificate (payment)
+router.post(
+  "/certificates/purchase",
+  criticalLimiter,
+  authenticate,
+  profCertController.purchaseCertificate
 );
 
 module.exports = router;

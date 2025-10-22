@@ -58,6 +58,8 @@ const createCourse = async (req, res) => {
 };
 
 // Get all courses (public browse)
+// Get all courses (public browse)
+// Get all courses (public browse)
 const getCourses = async (req, res) => {
   try {
     const {
@@ -69,7 +71,7 @@ const getCourses = async (req, res) => {
       rating,
       sort = "newest",
       page = 1,
-      limit = 100,
+      limit = 12,
     } = req.query;
 
     console.log("📋 Course filters:", {
@@ -80,16 +82,29 @@ const getCourses = async (req, res) => {
       maxPrice,
       rating,
       sort,
+      page,
     });
 
     // Build filter query
     let query = { status: "published" };
+    let sortQuery = {};
 
-    // Search filter
+    // Check if we have any filters applied
+    const hasFilters = !!(
+      search ||
+      category ||
+      level ||
+      minPrice ||
+      maxPrice ||
+      rating
+    );
+
+    // ✅ TEXT SEARCH (100x faster than regex)
     if (search && search.trim()) {
-      // ✅ Sanitize input
-      const sanitized = validator.escape(search.trim());
-      query.$or = [{ title: { $regex: sanitized, $options: "i" } }];
+      query.$text = { $search: search.trim() };
+      // Sort by text relevance score when searching
+      sortQuery.score = { $meta: "textScore" };
+      console.log("🔍 Using TEXT SEARCH:", search.trim());
     }
 
     // Category filter
@@ -120,39 +135,59 @@ const getCourses = async (req, res) => {
 
     console.log("🔍 MongoDB query:", JSON.stringify(query, null, 2));
 
-    // Sort options
-    let sortQuery = {};
-    switch (sort) {
-      case "newest":
-        sortQuery = { createdAt: -1 };
-        break;
-      case "popular":
-        sortQuery = { enrollmentCount: -1 };
-        break;
-      case "rating":
-        sortQuery = { averageRating: -1 };
-        break;
-      case "price-low":
-        sortQuery = { "price.usd": 1 };
-        break;
-      case "price-high":
-        sortQuery = { "price.usd": -1 };
-        break;
-      default:
-        sortQuery = { createdAt: -1 };
+    // Sort options (if not searching by text relevance)
+    if (!search) {
+      switch (sort) {
+        case "newest":
+          sortQuery = { createdAt: -1 };
+          break;
+        case "popular":
+          sortQuery = { enrollmentCount: -1 };
+          break;
+        case "rating":
+          sortQuery = { averageRating: -1 };
+          break;
+        case "price-low":
+          sortQuery = { "price.usd": 1 };
+          break;
+        case "price-high":
+          sortQuery = { "price.usd": -1 };
+          break;
+        default:
+          sortQuery = { createdAt: -1 };
+      }
     }
 
-    const courses = await Course.find(query)
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // ✅ Build query with projection for text score
+    let queryBuilder = Course.find(query)
       .populate(
         "instructor",
         "username displayName avatar instructorVerified expertise badges"
-      ) // ADD displayName here
+      )
       .sort(sortQuery)
       .limit(Number(limit))
-      .skip((Number(page) - 1) * Number(limit))
-      .lean();
+      .skip(skip);
 
-    const total = await Course.countDocuments(query);
+    // Add text score projection if searching
+    if (search) {
+      queryBuilder = queryBuilder.select({ score: { $meta: "textScore" } });
+    }
+
+    const courses = await queryBuilder.lean();
+
+    // ✅ Smart count strategy
+    let total;
+    if (page === 1 && !hasFilters) {
+      total = await Course.estimatedDocumentCount();
+      console.log("⚡ Using estimatedDocumentCount() - O(1) operation");
+    } else {
+      total = await Course.countDocuments(query);
+      console.log("🔍 Using countDocuments() - filtered query");
+    }
+
+    console.log(`📊 Found ${courses.length} courses, total: ${total}`);
 
     res.json({
       success: true,

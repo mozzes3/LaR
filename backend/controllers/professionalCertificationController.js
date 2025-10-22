@@ -47,26 +47,42 @@ const getAllCertifications = async (req, res) => {
     const { category, level, search, page = 1, limit = 12 } = req.query;
 
     const query = { status: "published" };
+    const hasFilters = !!(category || level || search);
 
     if (category) query.category = category;
     if (level) query.level = level;
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
+
+    // ✅ TEXT SEARCH
+    if (search && search.trim()) {
+      query.$text = { $search: search.trim() };
+      console.log("🔍 Certification search using TEXT INDEX:", search.trim());
     }
 
-    const certifications = await ProfessionalCertification.find(query)
-      .select("-questions") // SECURITY: Never expose questions in list
-      .sort({ publishedAt: -1 })
+    let sortQuery = search
+      ? { score: { $meta: "textScore" } }
+      : { publishedAt: -1 };
+
+    let queryBuilder = ProfessionalCertification.find(query)
+      .select("-questions") // SECURITY: Never expose questions
+      .sort(sortQuery)
       .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .lean();
+      .skip((page - 1) * limit);
 
-    const total = await ProfessionalCertification.countDocuments(query);
+    if (search) {
+      queryBuilder = queryBuilder.select({ score: { $meta: "textScore" } });
+    }
 
-    // For each cert, check if user has attempts (if authenticated)
+    const certifications = await queryBuilder.lean();
+
+    // Smart count
+    let total;
+    if (page === 1 && !hasFilters) {
+      total = await ProfessionalCertification.estimatedDocumentCount();
+    } else {
+      total = await ProfessionalCertification.countDocuments(query);
+    }
+
+    // Check user attempts if authenticated
     if (req.userId) {
       for (let cert of certifications) {
         const attempts = await CertificationAttempt.countDocuments({
@@ -94,7 +110,6 @@ const getAllCertifications = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch certifications" });
   }
 };
-
 /**
  * Get single certification details
  * PUBLIC - But questions hidden

@@ -73,56 +73,34 @@ const DashboardPage = () => {
       try {
         setLoading(true);
 
-        // Load enrolled courses
-        const coursesResponse = await purchaseApi.getMyPurchases();
+        // ✅ Single API call
+        const response = await userApi.getStudentDashboard();
 
-        // Use SAME API as Analytics page
-        const analyticsResponse = await userApi.getStudentAnalytics();
-        const apiStats = analyticsResponse.data.analytics.stats;
+        console.log("📊 Dashboard data:", response.data);
+        console.log("📊 Stats from API:", response.data.stats);
 
-        console.log("📊 Dashboard stats from API:", apiStats);
-        console.log("🔍 Full analytics:", analyticsResponse.data.analytics);
-
-        // Transform courses with proper lesson title lookup
-        const transformedCourses = coursesResponse.data.purchases
-          .filter((purchase) => purchase.course)
-          .map((purchase) => {
-            // Get the actual last accessed lesson title
-            let currentLessonTitle = "Start learning";
-
-            if (purchase.lastAccessedLesson && purchase.course.sections) {
-              // Search through all sections to find the lesson
-              for (const section of purchase.course.sections) {
-                const lesson = section.lessons.find(
-                  (l) =>
-                    l._id.toString() === purchase.lastAccessedLesson.toString()
-                );
-                if (lesson) {
-                  currentLessonTitle = lesson.title;
-                  break;
-                }
-              }
-            }
-
+        // Transform courses (backend already does most of the work)
+        const transformedCourses = response.data.enrolledCourses.map(
+          (purchase) => {
             return {
-              id: purchase.course._id,
-              slug: purchase.course.slug,
-              title: purchase.course.title,
-              instructor: purchase.course.instructor?.username || "Unknown",
+              id: purchase.courseId,
+              slug: purchase.slug,
+              title: purchase.title,
+              instructor: purchase.instructor?.username || "Unknown",
               instructorAvatar:
-                purchase.course.instructor?.avatar ||
-                `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.course._id}`,
-              thumbnail: purchase.course.thumbnail,
+                purchase.instructor?.avatar ||
+                `https://api.dicebear.com/7.x/avataaars/svg?seed=${purchase.courseId}`,
+              thumbnail: purchase.thumbnail,
               progress: purchase.progress || 0,
-              currentLesson: currentLessonTitle,
-              totalLessons: purchase.course.totalLessons || 0,
-              completedLessons: purchase.completedLessons?.length || 0,
-              lastWatched: formatLastWatched(purchase.lastAccessedAt),
-              lastAccessedAt: purchase.lastAccessedAt,
-              rating: purchase.course.averageRating || 0,
+              currentLesson: purchase.currentLesson,
+              totalLessons: purchase.totalLessons,
+              completedLessons: purchase.completedLessons,
+              lastWatched: formatLastWatched(purchase.lastAccessed),
+              lastAccessedAt: purchase.lastAccessed,
+              rating: 0,
               status: purchase.isCompleted ? "completed" : "in-progress",
               timeLeft: calculateTimeLeft(
-                purchase.course.totalDuration,
+                purchase.totalDuration,
                 purchase.progress
               ),
               certificateUrl: purchase.certificateId
@@ -130,15 +108,18 @@ const DashboardPage = () => {
                 : null,
               certificateId: purchase.certificateId,
             };
-          });
+          }
+        );
 
         setEnrolledCourses(transformedCourses);
 
-        // Set user stats from API - SAME AS ANALYTICS
+        // ✅ Set user stats - SAME structure as old analytics API
+        const apiStats = response.data.stats;
+
         setUser({
           username: walletUser?.username || "User",
           avatar:
-            walletUser?.avatar ||
+            response.data.user.avatar ||
             `https://api.dicebear.com/7.x/avataaars/svg?seed=${walletUser?.username}`,
           totalCourses: apiStats.totalCourses,
           completedCourses: apiStats.completedCourses,
@@ -148,14 +129,15 @@ const DashboardPage = () => {
           currentStreak: apiStats.currentStreak,
           fdrEarned: apiStats.fdrEarned,
           level: apiStats.level,
-          xp: apiStats.totalXP || 0, // ← Use totalXP from analytics
+          xp: apiStats.totalXP || 0, // ✅ Use totalXP
           nextLevelXp: 5000,
-          levelProgress: apiStats.levelProgress,
+          levelProgress: apiStats.levelProgress, // ✅ Full levelProgress object
         });
 
         setLoading(false);
       } catch (error) {
         console.error("Error loading dashboard:", error);
+        toast.error("Failed to load dashboard");
         setEnrolledCourses([]);
         setLoading(false);
       }
