@@ -78,21 +78,14 @@ const InstructorDashboard = () => {
 
       try {
         setLoading(true);
+        const response = await userApi.getInstructorDashboardComplete(
+          selectedPeriod
+        );
 
-        // Load instructor stats
-        const statsResponse = await userApi.getInstructorDashboardStats();
-        console.log("📊 Instructor stats:", statsResponse.data.stats);
-        setInstructorStats(statsResponse.data.stats);
-
-        // Load courses with stats
-        const coursesResponse = await courseApi.getInstructorCoursesWithStats();
-        console.log("📚 Instructor courses:", coursesResponse.data.courses);
-        setCourses(coursesResponse.data.courses);
-
-        // Load recent activity
-        const activityResponse = await userApi.getInstructorRecentActivity(5);
-        setRecentActivity(activityResponse.data.activities);
-        await loadEarningsData(selectedPeriod);
+        setInstructorStats(response.data.stats);
+        setCourses(response.data.courses);
+        setRecentActivity(response.data.activities);
+        setEarningsData(response.data.data);
         setLoading(false);
       } catch (error) {
         console.error("Error loading dashboard:", error);
@@ -102,7 +95,7 @@ const InstructorDashboard = () => {
     };
 
     loadDashboardData();
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, selectedPeriod]);
 
   useEffect(() => {
     if (instructorStats) {

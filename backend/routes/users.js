@@ -10,6 +10,8 @@ const {
   uploadLimiter,
 } = require("../middleware/rateLimits");
 const userController = require("../controllers/userController");
+
+const { enforcePaginationLimits } = require("../middleware/paginationLimits");
 const { authenticate } = require("../middleware/auth");
 
 // Multer config for avatar upload (memory storage)
@@ -184,11 +186,17 @@ router.get(
  */
 router.get(
   "/instructor/all-students",
+  enforcePaginationLimits,
   expensiveLimiter,
   authenticate,
   userController.getAllStudents
 );
-
+router.get(
+  "/instructor/dashboard/complete",
+  authLimiter,
+  authenticate,
+  userController.getInstructorDashboardComplete
+);
 router.get(
   "/instructor/:username/complete",
   browsingLimiter,

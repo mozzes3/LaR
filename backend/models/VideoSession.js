@@ -45,7 +45,7 @@ const videoSessionSchema = new mongoose.Schema(
     createdAt: {
       type: Date,
       default: Date.now,
-      expires: 10800, // ✅ Auto-delete after 24 hours
+      expires: 86400, // ✅ Auto-delete after 24 hours
     },
   },
   { timestamps: true }

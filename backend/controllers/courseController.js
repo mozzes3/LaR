@@ -59,7 +59,6 @@ const createCourse = async (req, res) => {
 
 // Get all courses (public browse)
 // Get all courses (public browse)
-// Get all courses (public browse)
 const getCourses = async (req, res) => {
   try {
     const {
@@ -71,7 +70,7 @@ const getCourses = async (req, res) => {
       rating,
       sort = "newest",
       page = 1,
-      limit = 12,
+      limit = 12, // ✅ Already changed from 100
     } = req.query;
 
     console.log("📋 Course filters:", {
@@ -87,7 +86,6 @@ const getCourses = async (req, res) => {
 
     // Build filter query
     let query = { status: "published" };
-    let sortQuery = {};
 
     // Check if we have any filters applied
     const hasFilters = !!(
@@ -99,12 +97,13 @@ const getCourses = async (req, res) => {
       rating
     );
 
-    // ✅ TEXT SEARCH (100x faster than regex)
+    // Search filter
     if (search && search.trim()) {
-      query.$text = { $search: search.trim() };
-      // Sort by text relevance score when searching
-      sortQuery.score = { $meta: "textScore" };
-      console.log("🔍 Using TEXT SEARCH:", search.trim());
+      const sanitized = validator.escape(search.trim());
+      query.$or = [
+        { title: { $regex: sanitized, $options: "i" } },
+        { subtitle: { $regex: sanitized, $options: "i" } },
+      ];
     }
 
     // Category filter
@@ -135,54 +134,51 @@ const getCourses = async (req, res) => {
 
     console.log("🔍 MongoDB query:", JSON.stringify(query, null, 2));
 
-    // Sort options (if not searching by text relevance)
-    if (!search) {
-      switch (sort) {
-        case "newest":
-          sortQuery = { createdAt: -1 };
-          break;
-        case "popular":
-          sortQuery = { enrollmentCount: -1 };
-          break;
-        case "rating":
-          sortQuery = { averageRating: -1 };
-          break;
-        case "price-low":
-          sortQuery = { "price.usd": 1 };
-          break;
-        case "price-high":
-          sortQuery = { "price.usd": -1 };
-          break;
-        default:
-          sortQuery = { createdAt: -1 };
-      }
+    // Sort options
+    let sortQuery = {};
+    switch (sort) {
+      case "newest":
+        sortQuery = { createdAt: -1 };
+        break;
+      case "popular":
+        sortQuery = { enrollmentCount: -1 };
+        break;
+      case "rating":
+        sortQuery = { averageRating: -1 };
+        break;
+      case "price-low":
+        sortQuery = { "price.usd": 1 };
+        break;
+      case "price-high":
+        sortQuery = { "price.usd": -1 };
+        break;
+      default:
+        sortQuery = { createdAt: -1 };
     }
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    // ✅ Build query with projection for text score
-    let queryBuilder = Course.find(query)
+    // ✅ OPTIMIZATION: Get courses
+    const courses = await Course.find(query)
       .populate(
         "instructor",
         "username displayName avatar instructorVerified expertise badges"
       )
+
       .sort(sortQuery)
       .limit(Number(limit))
-      .skip(skip);
+      .skip(skip)
+      .lean(); // ✅ Use lean() for better performance
 
-    // Add text score projection if searching
-    if (search) {
-      queryBuilder = queryBuilder.select({ score: { $meta: "textScore" } });
-    }
-
-    const courses = await queryBuilder.lean();
-
-    // ✅ Smart count strategy
+    // ✅ CRITICAL OPTIMIZATION: Smart count strategy
     let total;
+
     if (page === 1 && !hasFilters) {
+      // ✅ First page with no filters: Use super-fast estimated count
       total = await Course.estimatedDocumentCount();
       console.log("⚡ Using estimatedDocumentCount() - O(1) operation");
     } else {
+      // ✅ Filtered or paginated: Use accurate count
       total = await Course.countDocuments(query);
       console.log("🔍 Using countDocuments() - filtered query");
     }
@@ -214,10 +210,15 @@ const getCourse = async (req, res) => {
     console.log("1. Slug received:", slug);
     console.log("2. User ID:", req.userId);
 
-    const course = await Course.findOne({ slug }).populate(
-      "instructor",
-      "username displayName avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks badges"
-    );
+    // ✅ DON'T use .lean() here because we need Mongoose methods later
+    const course = await Course.findOne({ slug })
+      .populate(
+        "instructor",
+        "username displayName avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks badges"
+      )
+      .select(
+        "title subtitle description category subcategory level price requirements whatYouWillLearn targetAudience tags thumbnail sections averageRating totalRatings enrollmentCount instructor status createdAt"
+      ); // ✅ Add select to limit fields
 
     console.log("3. Course found:", course ? "YES" : "NO");
 
@@ -254,6 +255,7 @@ const getCourse = async (req, res) => {
       }
     }
 
+    // ✅ NOW convert to plain object (this is where .toObject() is used)
     const courseData = course.toObject();
 
     // ✅ NEW: Fetch durations from Bunny if missing
@@ -262,7 +264,6 @@ const getCourse = async (req, res) => {
 
     for (const section of courseData.sections) {
       for (const lesson of section.lessons) {
-        // If duration is 0 or missing, fetch from Bunny
         if ((!lesson.duration || lesson.duration === 0) && lesson.videoId) {
           try {
             console.log(
@@ -292,12 +293,8 @@ const getCourse = async (req, res) => {
               `❌ Failed to get duration for "${lesson.title}":`,
               error.message
             );
-            lesson.duration = 0; // Fallback to 0
+            lesson.duration = 0;
           }
-        } else {
-          console.log(
-            `📹 Lesson "${lesson.title}" duration: ${lesson.duration || 0}s`
-          );
         }
       }
     }
@@ -308,12 +305,10 @@ const getCourse = async (req, res) => {
       console.log("💾 Saved updated durations to database");
     }
 
-    // Calculate total lessons correctly
+    // Calculate total lessons
     const totalLessons = courseData.sections.reduce((total, section) => {
       return total + (section.lessons?.length || 0);
     }, 0);
-
-    console.log(`📊 Total lessons calculated: ${totalLessons}`);
 
     // Calculate total duration
     const totalDuration = courseData.sections.reduce((total, section) => {
@@ -322,8 +317,6 @@ const getCourse = async (req, res) => {
       }, 0);
       return total + sectionDuration;
     }, 0);
-
-    console.log(`⏱️ Total duration calculated: ${totalDuration}s`);
 
     // Hide lesson videos if not purchased (except previews)
     const isInstructor =
@@ -353,10 +346,6 @@ const getCourse = async (req, res) => {
     });
 
     console.log("11. Response sent successfully");
-    console.log(`    - Total Lessons: ${totalLessons}`);
-    console.log(`    - Total Duration: ${totalDuration}s`);
-    console.log(`    - Has Purchased: ${hasPurchased}`);
-    console.log(`    - Is Instructor: ${isInstructor}`);
     console.log("=== getCourse END ===");
   } catch (error) {
     console.error("ERROR in getCourse:", error);

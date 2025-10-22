@@ -377,33 +377,49 @@ const getInstructorDashboardStats = async (req, res) => {
     const instructorId = req.userId;
 
     // Verify user is an instructor
-    const instructor = await User.findById(instructorId);
+    const instructor = await User.findById(instructorId)
+      .select("isInstructor") // ✅ Only get what we need
+      .lean();
+
     if (!instructor || !instructor.isInstructor) {
       return res.status(403).json({ error: "Not authorized as instructor" });
     }
 
-    // Get all instructor's courses
+    // Get all instructor's courses with only needed fields
     const Course = require("../models/Course");
     const Purchase = require("../models/Purchase");
     const Review = require("../models/Review");
 
-    const courses = await Course.find({ instructor: instructorId });
+    const courses = await Course.find({ instructor: instructorId })
+      .select("_id status averageRating totalRatings") // ✅ Only fields we need
+      .lean(); // ✅ Plain objects for better performance
+
     const courseIds = courses.map((c) => c._id);
 
-    // Get all purchases for instructor's courses
-    const purchases = await Purchase.find({
-      course: { $in: courseIds },
-      status: "active",
-    }).populate("course", "price");
+    // ✅ OPTIMIZATION: Get purchases and reviews in parallel
+    const [purchases, totalReviews] = await Promise.all([
+      Purchase.find({
+        course: { $in: courseIds },
+        status: "active",
+      })
+        .populate("course", "price") // Only need price
+        .select("user course createdAt") // ✅ Only fields we need
+        .lean(),
 
-    // Calculate earnings
+      Review.countDocuments({
+        course: { $in: courseIds },
+      }),
+    ]);
+
+    // Calculate earnings (existing logic - unchanged)
     let totalEarnings = 0;
     let pendingEarnings = 0;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
     purchases.forEach((purchase) => {
       const amount = purchase.course?.price?.usd || 0;
       totalEarnings += amount;
-      // Simulate escrow period (purchases within last 30 days are pending)
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
       if (purchase.createdAt > thirtyDaysAgo) {
         pendingEarnings += amount;
       }
@@ -411,10 +427,10 @@ const getInstructorDashboardStats = async (req, res) => {
 
     const availableToWithdraw = totalEarnings - pendingEarnings;
 
-    // Get total students (unique users who purchased)
+    // Get total students (unique users)
     const totalStudents = new Set(purchases.map((p) => p.user.toString())).size;
 
-    // Get average rating across all courses
+    // Calculate average rating (existing logic - unchanged)
     let totalWeightedRating = 0;
     let totalRatingsCount = 0;
 
@@ -428,10 +444,10 @@ const getInstructorDashboardStats = async (req, res) => {
     const averageRating =
       totalRatingsCount > 0 ? totalWeightedRating / totalRatingsCount : 0;
 
-    // Get total reviews
-    const totalReviews = await Review.countDocuments({
-      course: { $in: courseIds },
-    });
+    // Count published courses
+    const publishedCourses = courses.filter(
+      (c) => c.status === "published"
+    ).length;
 
     res.json({
       success: true,
@@ -441,8 +457,7 @@ const getInstructorDashboardStats = async (req, res) => {
         availableToWithdraw: Math.round(availableToWithdraw * 100) / 100,
         totalStudents,
         totalCourses: courses.length,
-        publishedCourses: courses.filter((c) => c.status === "published")
-          .length,
+        publishedCourses,
         averageRating: Math.round(averageRating * 10) / 10,
         totalReviews,
       },
@@ -1698,6 +1713,239 @@ const getStudentDashboard = async (req, res) => {
     res.status(500).json({ error: "Failed to load dashboard data" });
   }
 };
+
+const getInstructorDashboardComplete = async (req, res) => {
+  try {
+    const instructorId = req.userId;
+    const { period = "30days" } = req.query;
+
+    const instructor = await User.findById(instructorId);
+    if (!instructor || !instructor.isInstructor) {
+      return res.status(403).json({ error: "Not authorized as instructor" });
+    }
+
+    const Course = require("../models/Course");
+    const Purchase = require("../models/Purchase");
+    const Review = require("../models/Review");
+
+    const courses = await Course.find({ instructor: instructorId });
+    const courseIds = courses.map((c) => c._id);
+
+    // Get all purchases
+    const purchases = await Purchase.find({
+      course: { $in: courseIds },
+      status: "active",
+    }).populate("course", "price");
+
+    // Calculate earnings (exact same as getInstructorDashboardStats)
+    let totalEarnings = 0;
+    let pendingEarnings = 0;
+    purchases.forEach((purchase) => {
+      const amount = purchase.course?.price?.usd || 0;
+      totalEarnings += amount;
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      if (purchase.createdAt > thirtyDaysAgo) {
+        pendingEarnings += amount;
+      }
+    });
+    const availableToWithdraw = totalEarnings - pendingEarnings;
+    const totalStudents = new Set(purchases.map((p) => p.user.toString())).size;
+
+    // Average rating
+    let totalWeightedRating = 0;
+    let totalRatingsCount = 0;
+    courses.forEach((course) => {
+      if (course.averageRating && course.totalRatings) {
+        totalWeightedRating += course.averageRating * course.totalRatings;
+        totalRatingsCount += course.totalRatings;
+      }
+    });
+    const averageRating =
+      totalRatingsCount > 0 ? totalWeightedRating / totalRatingsCount : 0;
+    const totalReviews = await Review.countDocuments({
+      course: { $in: courseIds },
+    });
+
+    // Get courses with stats (exact same as getInstructorCoursesWithStats)
+    const coursesWithStats = await Promise.all(
+      courses.map(async (course) => {
+        const coursePurchases = await Purchase.find({
+          course: course._id,
+          status: "active",
+        });
+        const students = coursePurchases.length;
+        const revenue = students * (course.price?.usd || 0);
+        const completedCount = coursePurchases.filter(
+          (p) => p.isCompleted
+        ).length;
+        const completionRate =
+          students > 0 ? Math.round((completedCount / students) * 100) : 0;
+        const courseReviews = await Review.countDocuments({
+          course: course._id,
+        });
+
+        return {
+          _id: course._id,
+          title: course.title,
+          slug: course.slug,
+          thumbnail: course.thumbnail,
+          price: course.price,
+          status: course.status,
+          averageRating: course.averageRating,
+          updatedAt: course.updatedAt,
+          students,
+          revenue: Math.round(revenue),
+          completionRate,
+          reviews: courseReviews,
+        };
+      })
+    );
+
+    // Get recent activity (exact same as getInstructorRecentActivity)
+    const limit = 5;
+    const recentPurchases = await Purchase.find({
+      course: { $in: courseIds },
+      status: "active",
+    })
+      .populate("user", "username")
+      .populate("course", "title price")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const recentReviews = await Review.find({
+      course: { $in: courseIds },
+    })
+      .populate("user", "username")
+      .populate("course", "title")
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const recentCompletions = await Purchase.find({
+      course: { $in: courseIds },
+      isCompleted: true,
+    })
+      .populate("user", "username")
+      .populate("course", "title")
+      .sort({ completedAt: -1 })
+      .limit(limit)
+      .lean();
+
+    // Format time helper
+    const formatTime = (date) => {
+      const now = new Date();
+      const diff = now - new Date(date);
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(hours / 24);
+
+      if (hours < 1) return "Just now";
+      if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""}`;
+      if (days < 7) return `${days} day${days > 1 ? "s" : ""}`;
+      return new Date(date).toLocaleDateString();
+    };
+
+    const activities = [
+      ...recentPurchases.map((p) => ({
+        type: "purchase",
+        student: p.user?.username || "Unknown",
+        course: p.course?.title || "Unknown Course",
+        amount: p.course?.price?.usd || 0,
+        time: p.createdAt,
+        _timeRaw: p.createdAt,
+      })),
+      ...recentReviews.map((r) => ({
+        type: "review",
+        student: r.user?.username || "Unknown",
+        course: r.course?.title || "Unknown Course",
+        rating: r.rating,
+        time: r.createdAt,
+        _timeRaw: r.createdAt,
+      })),
+      ...recentCompletions.map((c) => ({
+        type: "completion",
+        student: c.user?.username || "Unknown",
+        course: c.course?.title || "Unknown Course",
+        time: c.completedAt || c.updatedAt,
+        _timeRaw: c.completedAt || c.updatedAt,
+      })),
+    ]
+      .sort((a, b) => new Date(b._timeRaw) - new Date(a._timeRaw))
+      .slice(0, limit)
+      .map((a) => {
+        const now = new Date();
+        const diff = now - new Date(a._timeRaw);
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const days = Math.floor(hours / 24);
+
+        let timeStr;
+        if (hours < 1) timeStr = "Just now";
+        else if (hours < 24) timeStr = `${hours} hour${hours > 1 ? "s" : ""}`;
+        else if (days < 7) timeStr = `${days} day${days > 1 ? "s" : ""}`;
+        else timeStr = new Date(a._timeRaw).toLocaleDateString();
+
+        const { _timeRaw, ...rest } = a;
+        return { ...rest, time: timeStr };
+      });
+    // Earnings chart data
+    let daysBack = 30;
+    if (period === "7days") daysBack = 7;
+    else if (period === "90days") daysBack = 90;
+
+    const earningsMap = new Map();
+    const now = new Date();
+
+    // Generate last N days INCLUDING today
+    for (let i = daysBack - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      const dateStr = date.toISOString().split("T")[0];
+      earningsMap.set(dateStr, { date: dateStr, earnings: 0 });
+    }
+
+    // Add today explicitly to ensure it's included
+    const todayStr = now.toISOString().split("T")[0];
+    if (!earningsMap.has(todayStr)) {
+      earningsMap.set(todayStr, { date: todayStr, earnings: 0 });
+    }
+
+    purchases.forEach((purchase) => {
+      const purchaseDate = new Date(purchase.createdAt);
+      const dateStr = purchaseDate.toISOString().split("T")[0];
+      if (earningsMap.has(dateStr)) {
+        earningsMap.get(dateStr).earnings += purchase.course?.price?.usd || 0;
+      }
+    });
+
+    const earningsData = Array.from(earningsMap.values()).sort(
+      (a, b) => new Date(a.date) - new Date(b.date)
+    );
+    res.json({
+      success: true,
+      stats: {
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+        pendingEarnings: Math.round(pendingEarnings * 100) / 100,
+        availableToWithdraw: Math.round(availableToWithdraw * 100) / 100,
+        totalStudents,
+        totalCourses: courses.length,
+        publishedCourses: courses.filter((c) => c.status === "published")
+          .length,
+        averageRating: Math.round(averageRating * 10) / 10,
+        totalReviews,
+      },
+      courses: coursesWithStats.sort(
+        (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
+      ),
+      activities,
+      data: earningsData,
+    });
+  } catch (error) {
+    console.error("Get instructor dashboard complete error:", error);
+    res.status(500).json({ error: "Failed to load dashboard" });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -1717,5 +1965,6 @@ module.exports = {
   removePaymentWallet,
   setPrimaryWallet,
   getInstructorProfileComplete,
+  getInstructorDashboardComplete,
   getStudentDashboard,
 };

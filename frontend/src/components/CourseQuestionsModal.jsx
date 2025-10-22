@@ -14,6 +14,9 @@ import toast from "react-hot-toast";
 import { questionApi } from "@services/api";
 import { useWallet } from "@contexts/WalletContext";
 
+const questionsCache = new Map();
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+
 const CourseQuestionsModal = ({ course, onClose, hasPurchased = true }) => {
   const { user: currentUser } = useWallet();
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,19 +58,33 @@ const CourseQuestionsModal = ({ course, onClose, hasPurchased = true }) => {
   // Load questions
   useEffect(() => {
     const loadQuestions = async () => {
+      const courseId = course._id || course.id;
+      const cacheKey = courseId;
+
+      // Check cache first
+      const cached = questionsCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        console.log("✅ Using cached questions");
+        setQuestions(cached.data);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        console.log(
-          "🔄 Loading questions for course:",
-          course._id || course.id
-        );
+        console.log("🔄 Fetching fresh questions for course:", courseId);
 
-        const response = await questionApi.getCourseQuestions(
-          course._id || course.id
-        );
+        const response = await questionApi.getCourseQuestions(courseId);
+        const questions = response.data.questions;
 
-        console.log("✅ Questions loaded:", response.data.questions);
-        setQuestions(response.data.questions);
+        // Cache the results
+        questionsCache.set(cacheKey, {
+          data: questions,
+          timestamp: Date.now(),
+        });
+
+        console.log("✅ Questions loaded and cached:", questions.length);
+        setQuestions(questions);
       } catch (error) {
         console.error("❌ Error loading questions:", error);
         toast.error("Failed to load questions");
@@ -80,7 +97,6 @@ const CourseQuestionsModal = ({ course, onClose, hasPurchased = true }) => {
       loadQuestions();
     }
   }, [course]);
-
   // Debug logging
   console.log("🔍 Modal Debug:", {
     userId: currentUser?._id,

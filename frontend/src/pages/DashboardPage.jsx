@@ -110,8 +110,16 @@ const DashboardPage = () => {
             };
           }
         );
+        const sortedCourses = transformedCourses.sort((a, b) => {
+          const aCompleted = a.progress >= 100;
+          const bCompleted = b.progress >= 100;
 
-        setEnrolledCourses(transformedCourses);
+          if (aCompleted && !bCompleted) return 1; // a completed, b not → a goes last
+          if (!aCompleted && bCompleted) return -1; // a not completed, b completed → a goes first
+          return 0; // both same status, keep original order
+        });
+
+        setEnrolledCourses(sortedCourses);
 
         // ✅ Set user stats - SAME structure as old analytics API
         const apiStats = response.data.stats;

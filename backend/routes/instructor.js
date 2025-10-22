@@ -5,19 +5,23 @@ const {
   writeLimiter,
   adminLimiter,
 } = require("../middleware/rateLimits");
+const { enforcePaginationLimits } = require("../middleware/paginationLimits");
 const instructorController = require("../controllers/instructorController");
+
 const { authenticate, isAdmin } = require("../middleware/auth");
 
 // User routes
 // User routes
 router.post(
   "/apply",
+  enforcePaginationLimits,
   writeLimiter,
   authenticate,
   instructorController.applyInstructor
 );
 router.get(
   "/my-application",
+  enforcePaginationLimits,
   authLimiter,
   authenticate,
   instructorController.getMyApplication

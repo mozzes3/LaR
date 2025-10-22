@@ -58,6 +58,7 @@ const CourseLearningPage = () => {
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completedCertificateId, setCompletedCertificateId] = useState(null);
   const [notes, setNotes] = useState([]);
+  const [videoSessionToken, setVideoSessionToken] = useState(null);
   const [noteContent, setNoteContent] = useState("");
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -100,6 +101,27 @@ const CourseLearningPage = () => {
   }, [course, currentLessonIndex, user]);
 
   useEffect(() => {
+    const createSession = async () => {
+      if (!courseSlug) return;
+
+      try {
+        console.log("🎬 Creating video session for:", courseSlug);
+        const sessionResponse = await courseApi.createVideoSession(courseSlug);
+        setVideoSessionToken(sessionResponse.data.sessionToken);
+        console.log(
+          "✅ Video session created:",
+          sessionResponse.data.sessionToken
+        );
+      } catch (error) {
+        console.error("❌ Failed to create video session:", error);
+        toast.error("Failed to initialize video player");
+      }
+    };
+
+    createSession();
+  }, [courseSlug]);
+
+  useEffect(() => {
     const loadCourseData = async () => {
       console.log("🚀 Starting loadCourseData...");
       console.log("👤 User:", user);
@@ -140,7 +162,7 @@ const CourseLearningPage = () => {
 
         const transformedCourse = {
           id: courseData._id,
-          slug: courseData.slug,
+          slug: courseData.slug || courseSlug,
           title: courseData.title,
           instructor: {
             username: courseData.instructor?.username || "Unknown",
@@ -518,7 +540,7 @@ const CourseLearningPage = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => navigate(`/courses/${course.slug}`)}
+                onClick={() => navigate(`/dashboard`)}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -568,7 +590,7 @@ const CourseLearningPage = () => {
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 w-full">
           <VideoPlayer
-            courseSlug={course.slug}
+            courseSlug={courseSlug}
             courseId={course.id} // ADD THIS LINE
             lessonId={currentLessonData.id}
             lessonTitle={currentLessonData.title}

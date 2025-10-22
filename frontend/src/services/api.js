@@ -2,6 +2,11 @@ import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+const categoryCache = {
+  data: null,
+  timestamp: null,
+  TTL: 5 * 60 * 1000, // 5 minutes
+};
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -330,6 +335,8 @@ export const userApi = {
   getInstructorProfileComplete: (username) =>
     api.get(`/users/instructor/${username}/complete`),
   getStudentDashboard: () => api.get("/users/dashboard/complete"),
+  getInstructorDashboardComplete: () =>
+    api.get("/users/instructor/dashboard/complete"),
 };
 
 // Instructor endpoints
@@ -344,9 +351,23 @@ export const instructorApi = {
 };
 
 export const categoryApi = {
-  getAll: () => api.get("/categories"),
-  getSubcategories: (category) =>
-    api.get(`/categories/${encodeURIComponent(category)}/subcategories`),
+  getAll: async () => {
+    // Return cached data if fresh
+    if (
+      categoryCache.data &&
+      Date.now() - categoryCache.timestamp < categoryCache.TTL
+    ) {
+      console.log("✅ Using cached categories");
+      return { data: { categories: categoryCache.data } };
+    }
+
+    // Fetch and cache
+    console.log("🔄 Fetching fresh categories");
+    const response = await api.get("/categories");
+    categoryCache.data = response.data.categories;
+    categoryCache.timestamp = Date.now();
+    return response;
+  },
 };
 
 // frontend/src/services/api.js - ADD THESE TO YOUR EXISTING API FILE

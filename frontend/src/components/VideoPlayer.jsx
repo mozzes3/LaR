@@ -18,23 +18,16 @@ const VideoPlayer = ({ courseSlug, courseId, lessonId, lessonTitle }) => {
     try {
       console.log(`🔐 Initializing video session for course: ${courseId}`);
 
-      // Check for cached session
-      let session = videoSessionManager.getSession(courseId);
+      // Always create fresh session (more reliable, prevents stale cache issues)
+      videoSessionManager.clearSession(courseId);
 
-      if (!session) {
-        // Create new session
-        console.log(`📡 Creating new video session...`);
-        const response = await courseApi.createVideoSession(courseSlug);
+      console.log(`📡 Creating new video session...`);
+      const response = await courseApi.createVideoSession(courseSlug);
 
-        session = videoSessionManager.storeSession(courseId, {
-          sessionToken: response.data.sessionToken,
-          expiresAt: response.data.expiresAt,
-        });
-
-        toast.success("Video session created");
-      } else {
-        console.log(`✅ Using cached session (expires: ${session.expiresAt})`);
-      }
+      const session = videoSessionManager.storeSession(courseId, {
+        sessionToken: response.data.sessionToken,
+        expiresAt: response.data.expiresAt,
+      });
 
       setSessionToken(session.sessionToken);
       setSessionExpiresAt(new Date(session.expiresAt));
@@ -60,6 +53,7 @@ const VideoPlayer = ({ courseSlug, courseId, lessonId, lessonTitle }) => {
         setError(null);
 
         console.log(`🎬 Loading video for lesson: ${lessonId}`);
+        console.log(`🎬 Fetching video with token:`, token);
 
         const response = await courseApi.getLessonVideoWithSession(
           courseSlug,
@@ -68,19 +62,20 @@ const VideoPlayer = ({ courseSlug, courseId, lessonId, lessonTitle }) => {
         );
 
         console.log(`✅ Video URL loaded`);
-
         setCurrentVideoUrl(response.data.videoUrl);
         setVideoLoading(false);
       } catch (error) {
         console.error("❌ Error loading video:", error);
+        setError("Failed to load video");
+        toast.error("Failed to load video");
+        setVideoLoading(false);
 
-        // If session invalid/expired, try to refresh
-        if (error.response?.status === 401) {
-          console.log(`🔄 Session invalid, refreshing...`);
-          videoSessionManager.clearSession(courseId);
-
+        // Only retry once to avoid infinite loop
+        if (!error._retried) {
           try {
             const newToken = await initializeSession();
+            const retryError = new Error();
+            retryError._retried = true; // Mark to prevent infinite retry
             await loadVideoUrl(newToken);
             return;
           } catch (refreshError) {

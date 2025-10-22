@@ -33,6 +33,7 @@ import toast from "react-hot-toast";
 
 const CourseDetailPage = () => {
   const { slug } = useParams();
+  console.log("📍 URL slug from params:", slug);
   const navigate = useNavigate();
   const { isConnected, user } = useWallet();
   const [course, setCourse] = useState(null);
@@ -156,6 +157,7 @@ const CourseDetailPage = () => {
         const courseData = {
           ...response.data.course,
           id: response.data.course._id,
+          slug: response.data.course.slug,
           students: response.data.course.enrollmentCount || 0,
           duration: formatDuration(response.data.course.totalDuration || 0),
           lessons: response.data.course.totalLessons || 0,
@@ -333,11 +335,15 @@ const CourseDetailPage = () => {
   };
 
   const handleEnroll = () => {
+    console.log("🛒 handleEnroll called, course:", course);
+    console.log("🛒 course.slug:", course?.slug);
+    console.log("🛒 slug from params:", slug);
+
     if (!isConnected) {
       toast.error("Please connect your wallet to enroll");
       return;
     }
-    navigate(`/checkout/${course.slug}`, {
+    navigate(`/checkout/${slug}`, {
       state: { paymentMethod: selectedPayment },
     });
   };
@@ -354,7 +360,7 @@ const CourseDetailPage = () => {
       setShowVideoPreview(true);
 
       // Create video session first
-      const sessionResponse = await courseApi.createVideoSession(course.slug);
+      const sessionResponse = await courseApi.createVideoSession(slug);
       const sessionToken = sessionResponse.data.sessionToken;
 
       // Get video URL with session token
