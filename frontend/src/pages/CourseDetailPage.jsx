@@ -365,7 +365,7 @@ const CourseDetailPage = () => {
 
       // Get video URL with session token
       const videoResponse = await courseApi.getLessonVideoWithSession(
-        course.slug,
+        slug,
         lesson._id,
         sessionToken
       );

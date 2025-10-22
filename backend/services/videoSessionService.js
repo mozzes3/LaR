@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const VideoSession = require("../models/VideoSession");
+const VideoSession = require("../models/VideoSession.js");
 const Course = require("../models/Course");
 const Purchase = require("../models/Purchase");
 

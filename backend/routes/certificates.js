@@ -12,11 +12,15 @@ const {
   verifyCertificate,
   generateCertificateManual,
   getCertificateImageToken,
+  getAllMyCertificates, // ✅ ADD THIS
 } = require("../controllers/certificateController");
 const { authenticate } = require("../middleware/auth");
 
 // Get user's certificates (protected)
 router.get("/my", authLimiter, authenticate, getUserCertificates);
+
+// ✅ MUST BE BEFORE /:id
+router.get("/all", authLimiter, authenticate, getAllMyCertificates);
 
 // Get certificate image token (protected)
 router.get(

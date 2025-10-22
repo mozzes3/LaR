@@ -97,22 +97,6 @@ const InstructorDashboard = () => {
     loadDashboardData();
   }, [currentUser, navigate, selectedPeriod]);
 
-  useEffect(() => {
-    if (instructorStats) {
-      loadEarningsData(selectedPeriod);
-    }
-  }, [selectedPeriod]);
-
-  const loadEarningsData = async (period) => {
-    try {
-      const response = await userApi.getInstructorEarningsHistory(period);
-      setEarningsData(response.data.data);
-    } catch (error) {
-      console.error("Error loading earnings data:", error);
-      setEarningsData([]);
-    }
-  };
-
   const stats = instructorStats
     ? [
         {

@@ -1,8 +1,9 @@
 // backend/controllers/certificateController.js
 const { generateCertificate } = require("../services/certificateService");
-const Certificate = require("../models/Certificate");
 const crypto = require("crypto");
-
+const Certificate = require("../models/Certificate");
+const ProfessionalCertificate = require("../models/ProfessionalCertificate");
+const CertificationAttempt = require("../models/CertificationAttempt");
 // Get certificate image token
 const getCertificateImageToken = async (req, res) => {
   try {
@@ -171,10 +172,58 @@ const generateCertificateManual = async (req, res) => {
   }
 };
 
+/**
+ * Get all certificates (course + professional) in one call
+ * Returns same structure as separate endpoints
+ */
+// Get all certificates in one call
+const getAllMyCertificates = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    // Course certificates - EXACT SAME query as getUserCertificates
+    const courseCertificates = await Certificate.find({ userId: userId })
+      .populate("courseId", "title thumbnail slug")
+      .sort({ completedDate: -1 })
+      .lean();
+
+    // Professional certificates - EXACT SAME query as the original endpoint
+    const professionalCertificates = await ProfessionalCertificate.find({
+      userId: userId,
+    })
+      .populate("certificationId", "title slug category thumbnail")
+      .sort({ issuedDate: -1 })
+      .lean();
+
+    // Attempts - EXACT SAME query as the original endpoint
+    const attempts = await CertificationAttempt.find({ user: userId })
+      .populate("certification", "title slug category thumbnail")
+      .sort({ completedAt: -1 })
+      .lean();
+
+    // Return in EXACT SAME format as original separate endpoints
+    res.json({
+      success: true,
+      courseCertificates: {
+        certificates: courseCertificates,
+      },
+      professionalCertificates: {
+        certificates: professionalCertificates,
+      },
+      attempts: {
+        attempts: attempts,
+      },
+    });
+  } catch (error) {
+    console.error("Get all certificates error:", error);
+    res.status(500).json({ error: "Failed to get certificates" });
+  }
+};
 module.exports = {
   getCertificateImageToken,
   getUserCertificates,
   getCertificate,
   verifyCertificate,
   generateCertificateManual,
+  getAllMyCertificates,
 };

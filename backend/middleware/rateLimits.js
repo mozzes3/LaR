@@ -188,6 +188,19 @@ const searchLimiter = createLimiter({
   message: "Too many search requests",
 });
 
+// Add after other limiters
+const previewLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 10, // 10 requests per 5 minutes
+  message: "Too many preview requests, please try again later",
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip limiting for instructors and purchasers
+    return false; // Apply to everyone for previews
+  },
+});
+
 module.exports = {
   browsingLimiter,
   publicLimiter,
@@ -201,4 +214,5 @@ module.exports = {
   adminLimiter,
   searchLimiter,
   redisClient,
+  previewLimiter,
 };

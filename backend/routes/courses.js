@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const rateLimit = require("express-rate-limit");
 const courseController = require("../controllers/courseController");
+const previewCacheService = require("../services/previewCacheService");
 const {
   authenticate,
   isInstructor,
@@ -15,6 +16,7 @@ const {
   expensiveLimiter,
   videoLimiter,
   searchLimiter,
+  previewLimiter,
 } = require("../middleware/rateLimits");
 
 const Course = require("../models/Course");
@@ -266,6 +268,7 @@ router.get(
         course._id,
         ipAddress
       );
+
       // Find lesson
       let lesson = null;
       for (const section of course.sections) {
@@ -288,6 +291,20 @@ router.get(
           .json({ error: "Video not found for this lesson" });
       }
 
+      // ✅ NEW: Check cache for preview videos (doesn't affect non-preview)
+      if (lesson.isPreview) {
+        const cachedUrl = previewCacheService.get(course._id, lessonId);
+        if (cachedUrl) {
+          console.log(`✅ Using cached preview URL`);
+          return res.json({
+            success: true,
+            videoUrl: cachedUrl,
+            expiresIn: 300,
+            expiresAt: new Date(Date.now() + 300 * 1000),
+          });
+        }
+      }
+
       // Verify video is in session (security check)
       if (!session.videoIds.includes(lesson.videoId)) {
         return res.status(403).json({ error: "Video not in session" });
@@ -297,15 +314,22 @@ router.get(
       const videoTokenExpiry = 30 * 60; // 30 minutes in seconds
       const signedUrl = bunnyService.generateVideoUrl(
         lesson.videoId,
-        videoTokenExpiry // ← Now only 30 minutes
+        videoTokenExpiry
       );
+
+      // ✅ NEW: Cache preview video URLs (doesn't affect non-preview)
+      if (lesson.isPreview) {
+        previewCacheService.set(course._id, lessonId, signedUrl);
+        console.log(`💾 Cached preview URL for 5 minutes`);
+      }
+
       console.log(`✅ Video URL generated, expires in ${videoTokenExpiry}s`);
 
       res.json({
         success: true,
         videoUrl: signedUrl,
-        expiresIn: videoTokenExpiry, // ← Change this
-        expiresAt: new Date(Date.now() + videoTokenExpiry * 1000), // ← Add this
+        expiresIn: videoTokenExpiry,
+        expiresAt: new Date(Date.now() + videoTokenExpiry * 1000),
       });
     } catch (error) {
       console.error("❌ Get video URL error:", error);
@@ -319,6 +343,17 @@ router.get(
 
       res.status(500).json({ error: "Failed to get video URL" });
     }
+  }
+);
+
+router.get(
+  "/:slug/lessons/:lessonId/preview",
+  previewLimiter,
+  authenticate,
+  async (req, res, next) => {
+    // Forward to main video route
+    req.url = req.url.replace("/preview", "/video");
+    next("route");
   }
 );
 

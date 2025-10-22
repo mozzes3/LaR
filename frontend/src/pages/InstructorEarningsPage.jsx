@@ -41,13 +41,11 @@ const InstructorEarningsPage = () => {
       try {
         setLoading(true);
 
-        const [statsResponse, earningsResponse] = await Promise.all([
-          userApi.getInstructorDashboardStats(),
-          userApi.getInstructorEarningsTransactions(),
-        ]);
+        // ✅ Single API call instead of 2
+        const response = await userApi.getInstructorEarningsComplete();
 
-        setStats(statsResponse.data.stats);
-        setEarnings(earningsResponse.data.transactions);
+        setStats(response.data.stats);
+        setEarnings(response.data.transactions);
         setLoading(false);
       } catch (error) {
         console.error("Error loading earnings:", error);

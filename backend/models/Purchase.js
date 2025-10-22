@@ -118,6 +118,7 @@ purchaseSchema.index({ course: 1, isCompleted: 1 });
 purchaseSchema.index({ course: 1, createdAt: -1 }); // ✅ ADD THIS
 purchaseSchema.index({ lastAccessedAt: -1 }); // ✅ ADD THIS
 purchaseSchema.index({ status: 1, createdAt: -1 }); // ✅ ADD THIS
+purchaseSchema.index({ course: 1, status: 1 });
 
 // Mark lesson as completed
 purchaseSchema.methods.completeLesson = function (lessonId) {

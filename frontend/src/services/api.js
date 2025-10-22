@@ -160,7 +160,7 @@ export const certificateApi = {
   // Verify certificate (public)
   verifyCertificate: (certificateNumber) =>
     api.get(`/certificates/verify/${certificateNumber}`),
-
+  getAllMyCertificates: () => api.get("/certificates/all"),
   // Generate certificate manually (for testing)
   generateCertificate: (courseId) =>
     api.post("/certificates/generate", { courseId }),
@@ -337,6 +337,9 @@ export const userApi = {
   getStudentDashboard: () => api.get("/users/dashboard/complete"),
   getInstructorDashboardComplete: () =>
     api.get("/users/instructor/dashboard/complete"),
+  getProfileComplete: (username) => api.get(`/users/${username}/complete`),
+  getInstructorEarningsComplete: () =>
+    api.get("/users/instructor/earnings-complete"),
 };
 
 // Instructor endpoints

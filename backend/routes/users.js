@@ -92,6 +92,31 @@ router.get(
 router.get("/stats/me", authLimiter, authenticate, userController.getStats);
 
 /**
+ * @route   GET /api/users/:username/complete
+ * @desc    Get complete profile data in single call
+ * @access  Public (auth optional)
+ */
+router.get(
+  "/:username/complete",
+  authLimiter,
+  async (req, res, next) => {
+    // Optional auth - attach userId if token exists
+    const token = req.headers.authorization?.split(" ")[1];
+    if (token) {
+      try {
+        const jwt = require("jsonwebtoken");
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.userId = decoded.userId;
+      } catch (err) {
+        // Token invalid/expired - continue as public
+      }
+    }
+    next();
+  },
+  userController.getProfileComplete
+);
+
+/**
  * @route   GET /api/users/:username
  * @desc    Get user profile
  * @access  Public
@@ -203,4 +228,15 @@ router.get(
   userController.getInstructorProfileComplete
 );
 
+/**
+ * @route   GET /api/users/instructor/earnings/complete
+ * @desc    Get instructor earnings stats + transactions in one call
+ * @access  Private (Instructor only)
+ */
+router.get(
+  "/instructor/earnings-complete",
+  expensiveLimiter,
+  authenticate,
+  userController.getInstructorEarningsComplete
+);
 module.exports = router;

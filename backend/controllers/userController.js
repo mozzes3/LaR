@@ -255,10 +255,18 @@ const getUserDashboardStats = async (req, res) => {
     }
 
     // Get all purchases for detailed stats
-    const Purchase = require("../models/Purchase");
-    const purchases = await Purchase.find({ user: userId })
-      .populate("course", "totalDuration")
+    const purchases = await Purchase.find({
+      course: { $in: courseIds },
+      status: "active",
+    })
+      .populate("course", "price title")
+      .populate("user", "username displayName avatar")
       .lean();
+
+    // Filter out any purchases with missing user or course data
+    const validPurchases = purchases.filter(
+      (p) => p.user && p.user.username && p.course && p.course.title
+    );
 
     // Calculate total watch time (in minutes)
     let totalWatchTimeMinutes = 0;
@@ -1946,6 +1954,367 @@ const getInstructorDashboardComplete = async (req, res) => {
   }
 };
 
+/**
+ * Get complete profile data (profile + stats + courses + certificates)
+ * Optimized for UserProfilePage - single API call
+ */
+/**
+ * Get complete profile data (profile + stats + courses + certificates)
+ * Optimized for UserProfilePage - single API call
+ */
+/**
+ * Get complete profile data (profile + stats + courses + certificates)
+ * Optimized for UserProfilePage - single API call
+ */
+/**
+ * Get complete profile data (profile + stats + courses + certificates)
+ * Optimized for UserProfilePage - single API call
+ */
+const getProfileComplete = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const requestingUserId = req.userId;
+
+    const User = require("../models/User");
+    const Purchase = require("../models/Purchase");
+    const Certificate = require("../models/Certificate");
+    const ProfessionalCertificate = require("../models/ProfessionalCertificate");
+    const { getLevelProgress } = require("../config/levels");
+
+    // Get user profile
+    const user = await User.findOne({ username })
+      .select("-password -refreshToken")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const isOwnProfile =
+      requestingUserId && requestingUserId.toString() === user._id.toString();
+
+    // Base response
+    const response = {
+      success: true,
+      profile: {
+        _id: user._id,
+        username: user.username,
+        displayName: user.displayName || user.username,
+        avatar: user.avatar,
+        bio: user.bio,
+        isInstructor: user.isInstructor,
+        instructorVerified: user.instructorVerified,
+        badges: user.badges || [],
+        socialLinks: user.socialLinks || {},
+        createdAt: user.createdAt,
+        expertise: user.expertise || [],
+        instructorBio: user.instructorBio,
+        level: user.level || 1,
+        totalXP: user.totalXP || 0,
+        coursesEnrolled: user.coursesEnrolled || 0,
+        coursesCompleted: user.coursesCompleted || 0,
+        certificatesEarned: user.certificatesEarned || 0,
+      },
+      isOwnProfile,
+    };
+
+    // If own profile, load full data
+    if (isOwnProfile) {
+      // Get purchases with populated course data
+      const purchases = await Purchase.find({
+        user: user._id,
+        status: "active",
+      })
+        .populate({
+          path: "course",
+          select:
+            "title slug thumbnail category totalLessons totalDuration instructor",
+          populate: {
+            path: "instructor",
+            select: "username avatar",
+          },
+        })
+        .lean();
+
+      // Filter valid purchases
+      const validPurchases = purchases.filter((p) => p.course !== null);
+
+      // Calculate stats
+      const totalCourses = validPurchases.length;
+      const completedCourses = validPurchases.filter(
+        (p) => p.isCompleted
+      ).length;
+      const inProgressCourses = totalCourses - completedCourses;
+      const totalWatchTime = validPurchases.reduce(
+        (sum, p) => sum + (p.totalWatchTime || 0),
+        0
+      );
+      const levelProgress = getLevelProgress(user.totalXP || 0);
+
+      // Update profile with actual counts
+      response.profile.coursesEnrolled = totalCourses;
+      response.profile.coursesCompleted = completedCourses;
+
+      // Transform courses to match UserProfilePage expectations
+      const enrolledCourses = validPurchases.map((purchase) => ({
+        _id: purchase._id,
+        course: {
+          _id: purchase.course._id,
+          slug: purchase.course.slug,
+          title: purchase.course.title,
+          thumbnail: purchase.course.thumbnail,
+          instructor: {
+            username: purchase.course.instructor?.username || "Unknown",
+            avatar: purchase.course.instructor?.avatar || "",
+          },
+          totalLessons: purchase.course.totalLessons || 0,
+          totalDuration: purchase.course.totalDuration || 0,
+        },
+        progress: purchase.progress || 0,
+        currentLesson: purchase.currentLesson,
+        totalLessons: purchase.course.totalLessons || 0,
+        completedLessons: purchase.completedLessons?.length || 0,
+        lastAccessedAt: purchase.lastAccessedAt || purchase.createdAt,
+        certificateId: purchase.certificateId,
+        isCompleted: purchase.isCompleted,
+        totalWatchTime: purchase.totalWatchTime || 0, // ADD THIS for Total Time calculation
+      }));
+
+      // Get certificates in parallel
+      const [courseCerts, profCerts] = await Promise.all([
+        Certificate.find({ userId: user._id }).lean(),
+        ProfessionalCertificate.find({ userId: user._id }).lean(),
+      ]);
+
+      // Update certificatesEarned count
+      response.profile.certificatesEarned =
+        courseCerts.length + profCerts.length;
+
+      // Transform course certificates with studentName
+      const courseCertificates = courseCerts.map((cert) => ({
+        _id: cert._id,
+        id: cert._id,
+        type: "completion",
+        studentName: cert.studentName, // ADD THIS - for certificate display
+        courseTitle: cert.courseTitle,
+        instructor: cert.instructor,
+        instructorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cert.instructor}`,
+        completedDate: cert.completedDate,
+        certificateNumber: cert.certificateNumber,
+        finalScore: cert.finalScore,
+        totalHours: cert.totalHours,
+        totalLessons: cert.totalLessons,
+        verificationUrl: cert.verificationUrl,
+        nftImageURI: cert.nftImageURI,
+        nftTransactionHash: cert.nftTransactionHash,
+        nftTokenId: cert.nftTokenId,
+        nftContractAddress: cert.nftContractAddress,
+        nftMinted: cert.nftMinted || false,
+        blockchainHash: cert.blockchainHash,
+        blockchainExplorerUrl: cert.blockchainExplorerUrl,
+        blockchainBlock: cert.blockchainBlock,
+        templateImage: cert.templateImage,
+      }));
+
+      // Transform professional certificates
+      const professionalCertificates = profCerts.map((cert) => ({
+        _id: cert._id,
+        id: cert._id,
+        type: "competency",
+        studentName: cert.studentName, // ADD THIS - for certificate display
+        title: cert.certificationTitle,
+        category: cert.category,
+        subcategories: cert.subcategories || [],
+        level: cert.level,
+        score: cert.score,
+        grade: cert.grade,
+        correctAnswers: cert.correctAnswers,
+        totalQuestions: cert.totalQuestions,
+        attemptNumber: cert.attemptNumber,
+        completedDate: cert.completedDate,
+        issuedDate: cert.issuedDate,
+        expiryDate: cert.expiryDate,
+        certificateNumber: cert.certificateNumber,
+        verificationUrl: cert.verificationUrl,
+        verificationCode: cert.verificationCode,
+        status: cert.status || "active",
+        nftImageURI: cert.nftImageURI,
+        blockchainHash: cert.blockchainHash,
+        blockchainExplorerUrl: cert.blockchainExplorerUrl,
+      }));
+
+      // Add stats
+      response.stats = {
+        totalCourses,
+        completedCourses,
+        inProgressCourses,
+        totalWatchTime,
+        certificatesEarned: courseCerts.length + profCerts.length,
+        currentStreak: user.currentStreak || 0,
+        fdrEarned: user.tokensEarned || 0,
+        level: levelProgress.currentLevel,
+        totalXP: user.totalXP || 0,
+        levelProgress: {
+          currentLevel: levelProgress.currentLevel,
+          nextLevel: levelProgress.currentLevel + 1,
+          currentLevelXP: levelProgress.currentLevelXP,
+          nextLevelXP: levelProgress.nextLevelXP,
+          xpInCurrentLevel: levelProgress.xpInCurrentLevel,
+          xpNeededForNextLevel: levelProgress.xpNeededForNextLevel,
+          progressPercentage: levelProgress.progressPercentage,
+          isMaxLevel: levelProgress.isMaxLevel,
+        },
+      };
+      response.enrolledCourses = enrolledCourses;
+      response.certificates = [
+        ...professionalCertificates,
+        ...courseCertificates,
+      ];
+    } else {
+      // Public profile - limited data
+      response.stats = {
+        level: user.level || 1,
+        totalXP: user.totalXP || 0,
+        certificatesEarned: user.certificatesEarned || 0,
+      };
+      response.enrolledCourses = [];
+      response.certificates = [];
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error("Get profile complete error:", error);
+    res.status(500).json({ error: "Failed to load profile" });
+  }
+};
+
+/**
+ * Get instructor earnings complete (stats + transactions combined)
+ * Optimized for InstructorEarningsPage - single API call
+ */
+/**
+ * Get instructor earnings complete (stats + transactions combined)
+ * Optimized for InstructorEarningsPage - single API call
+ */
+const getInstructorEarningsComplete = async (req, res) => {
+  try {
+    const instructorId = req.userId;
+
+    const instructor = await User.findById(instructorId);
+    if (!instructor || !instructor.isInstructor) {
+      return res.status(403).json({ error: "Not authorized as instructor" });
+    }
+
+    const Course = require("../models/Course");
+    const Purchase = require("../models/Purchase");
+    const Review = require("../models/Review");
+
+    const courses = await Course.find({ instructor: instructorId })
+      .select("_id status averageRating totalRatings")
+      .lean();
+
+    const courseIds = courses.map((c) => c._id);
+
+    // Get all purchases with full details
+    const purchases = await Purchase.find({
+      course: { $in: courseIds },
+      status: "active",
+    })
+      .populate("course", "title thumbnail price")
+      .populate("user", "username displayName avatar")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // === CALCULATE STATS ===
+    let totalEarnings = 0;
+    let pendingEarnings = 0;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    purchases.forEach((purchase) => {
+      if (purchase.course && purchase.course.price) {
+        const amount = purchase.course.price.usd || 0;
+        totalEarnings += amount;
+
+        if (purchase.createdAt > thirtyDaysAgo) {
+          pendingEarnings += amount;
+        }
+      }
+    });
+
+    const availableToWithdraw = totalEarnings - pendingEarnings;
+    const totalStudents = new Set(
+      purchases.filter((p) => p.user).map((p) => p.user._id.toString())
+    ).size;
+
+    // Calculate average rating
+    let totalWeightedRating = 0;
+    let totalRatingsCount = 0;
+
+    courses.forEach((course) => {
+      if (course.averageRating && course.totalRatings) {
+        totalWeightedRating += course.averageRating * course.totalRatings;
+        totalRatingsCount += course.totalRatings;
+      }
+    });
+
+    const averageRating =
+      totalRatingsCount > 0 ? totalWeightedRating / totalRatingsCount : 0;
+
+    const totalReviews = await Review.countDocuments({
+      course: { $in: courseIds },
+    });
+
+    const publishedCourses = courses.filter(
+      (c) => c.status === "published"
+    ).length;
+
+    // === BUILD TRANSACTIONS - MATCH OLD STRUCTURE ===
+    const transactions = purchases
+      .filter((purchase) => purchase.user && purchase.course) // Filter out invalid data
+      .map((purchase) => {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const isInEscrow = purchase.createdAt > thirtyDaysAgo;
+
+        const amount = purchase.course?.price?.usd || 0;
+        const instructorRevenue = amount * 0.8;
+        const platformFee = amount * 0.2;
+
+        return {
+          id: purchase._id,
+          courseName: purchase.course?.title || "Unknown Course",
+          courseThumbnail: purchase.course?.thumbnail || "",
+          studentName:
+            purchase.user?.username ||
+            purchase.user?.displayName ||
+            "Unknown Student",
+          amount: instructorRevenue,
+          platformFee: platformFee,
+          date: purchase.createdAt,
+          status: isInEscrow ? "escrow" : "released",
+          transactionHash: purchase.transactionHash || null,
+        };
+      });
+
+    res.json({
+      success: true,
+      stats: {
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+        pendingEarnings: Math.round(pendingEarnings * 100) / 100,
+        availableToWithdraw: Math.round(availableToWithdraw * 100) / 100,
+        totalStudents,
+        totalCourses: courses.length,
+        publishedCourses,
+        averageRating: Math.round(averageRating * 10) / 10,
+        totalReviews,
+      },
+      transactions,
+    });
+  } catch (error) {
+    console.error("Get instructor earnings complete error:", error);
+    res.status(500).json({ error: "Failed to get earnings data" });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -1966,5 +2335,7 @@ module.exports = {
   setPrimaryWallet,
   getInstructorProfileComplete,
   getInstructorDashboardComplete,
+  getProfileComplete,
   getStudentDashboard,
+  getInstructorEarningsComplete,
 };

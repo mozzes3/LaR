@@ -46,67 +46,18 @@ const UserProfilePage = () => {
       try {
         setLoading(true);
 
-        // Load user profile
-        const profileResponse = await userApi.getProfile(username);
-        setProfile(profileResponse.data.user);
+        // Single API call - gets everything
+        const response = await userApi.getProfileComplete(username);
+        const data = response.data;
 
-        // If viewing own profile, load additional data
-        if (isOwnProfile) {
-          // ✅ USE SAME API AS DASHBOARD - getStudentAnalytics()
-          try {
-            const analyticsResponse = await userApi.getStudentAnalytics();
-            const apiStats = analyticsResponse.data.analytics.stats;
+        console.log("📊 Profile complete data:", data);
 
-            console.log("📊 UserProfile stats from API:", apiStats);
+        setProfile(data.profile);
 
-            // Set stats using analytics data (same as Dashboard)
-            setStats({
-              level: apiStats.level,
-              totalXP: apiStats.totalXP || 0, // ← Use totalXP
-              totalCourses: apiStats.totalCourses,
-              completedCourses: apiStats.completedCourses,
-              certificatesEarned: apiStats.certificatesEarned,
-              currentStreak: apiStats.currentStreak,
-              fdrEarned: apiStats.fdrEarned,
-              levelProgress: apiStats.levelProgress,
-            });
-          } catch (error) {
-            console.error("Error loading stats:", error);
-            setStats(null);
-          }
-
-          // Load enrolled courses
-          const coursesResponse = await purchaseApi.getMyPurchases();
-          setEnrolledCourses(coursesResponse.data.purchases);
-
-          // Load certificates
-          try {
-            const [certsResponse, profCertsResponse] = await Promise.all([
-              certificateApi.getMyCertificates(),
-              professionalCertificationApi.getMyCertificates(),
-            ]);
-
-            // Transform and combine both types
-            const completionCerts = (certsResponse.data.certificates || []).map(
-              (cert) => ({
-                ...cert,
-                type: "completion",
-              })
-            );
-
-            const competencyCerts = (
-              profCertsResponse.data.certificates || []
-            ).map((cert) => ({
-              ...cert,
-              type: "competency",
-            }));
-
-            // Competency certificates first, then completion
-            setCertificates([...competencyCerts, ...completionCerts]);
-          } catch (error) {
-            console.error("Error loading certificates:", error);
-            setCertificates([]);
-          }
+        if (data.isOwnProfile) {
+          setStats(data.stats);
+          setEnrolledCourses(data.enrolledCourses);
+          setCertificates(data.certificates);
         }
 
         setLoading(false);
@@ -120,7 +71,7 @@ const UserProfilePage = () => {
     if (username) {
       loadProfile();
     }
-  }, [username, isOwnProfile]);
+  }, [username]);
   const currentLevel = stats?.level || profile?.level || 1;
   const currentXP = stats?.totalXP || profile?.totalXP || 0;
   // Format time helper

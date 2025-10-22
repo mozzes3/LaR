@@ -5,7 +5,7 @@ const {
   publicLimiter,
   authLimiter,
   criticalLimiter,
-} = require("../middleware/rateLimits"); // ✅ ADD THIS
+} = require("../middleware/rateLimits");
 const certificateController = require("../controllers/certificateController");
 const { authenticate } = require("../middleware/auth");
 
@@ -15,6 +15,14 @@ router.get(
   authLimiter,
   authenticate,
   certificateController.getUserCertificates
+);
+
+// ✅ ADD THIS - MUST BE BEFORE /:id
+router.get(
+  "/all",
+  authLimiter,
+  authenticate,
+  certificateController.getAllMyCertificates
 );
 
 // Get certificate image token (protected)

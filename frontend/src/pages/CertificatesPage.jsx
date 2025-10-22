@@ -66,13 +66,30 @@ const CertificatesPage = () => {
   }, [attemptFilter, categoryFilter, attempts]);
 
   const loadCertificates = async () => {
-    await Promise.all([loadCourseCertificates(), loadProfessionalData()]);
+    try {
+      // ✅ Single API call gets all data
+      const response = await certificateApi.getAllMyCertificates();
+
+      // Pass data to existing transformation functions
+      await loadCourseCertificates(response.data.courseCertificates);
+      await loadProfessionalData(
+        response.data.professionalCertificates,
+        response.data.attempts
+      );
+    } catch (error) {
+      console.error("Error loading certificates:", error);
+      // Fallback to original separate calls if /all endpoint fails
+      await Promise.all([loadCourseCertificates(), loadProfessionalData()]);
+    }
   };
 
-  const loadCourseCertificates = async () => {
+  const loadCourseCertificates = async (preloadedData = null) => {
     try {
-      const response = await certificateApi.getMyCertificates();
-      const transformed = (response.data.certificates || []).map((cert) => ({
+      // Use preloaded data if provided, otherwise fetch
+      const data =
+        preloadedData || (await certificateApi.getMyCertificates()).data;
+
+      const transformed = (data.certificates || []).map((cert) => ({
         id: cert._id,
         type: "completion",
         courseTitle: cert.courseTitle,
@@ -84,7 +101,6 @@ const CertificatesPage = () => {
         totalHours: cert.totalHours,
         totalLessons: cert.totalLessons,
         verificationUrl: cert.verificationUrl,
-        // NFT & Blockchain fields
         nftImageURI: cert.nftImageURI,
         nftTransactionHash: cert.nftTransactionHash,
         nftTokenId: cert.nftTokenId,
@@ -103,13 +119,18 @@ const CertificatesPage = () => {
     }
   };
 
-  const loadProfessionalData = async () => {
+  const loadProfessionalData = async (
+    preloadedCerts = null,
+    preloadedAttempts = null
+  ) => {
     setLoadingProfessional(true);
 
     // Load Professional Certificates
     try {
-      const response = await professionalCertificationApi.getMyCertificates();
-      setProfessionalCertificates(response.data.certificates || []);
+      const data =
+        preloadedCerts ||
+        (await professionalCertificationApi.getMyCertificates()).data;
+      setProfessionalCertificates(data.certificates || []);
     } catch (error) {
       console.error("Error loading Certificate of Competency:", error);
     } finally {
@@ -118,10 +139,12 @@ const CertificatesPage = () => {
 
     // Load Professional Attempts
     try {
-      const response = await professionalCertificationApi.getMyAttempts();
-      setAttempts(response.data.attempts || []);
+      const data =
+        preloadedAttempts ||
+        (await professionalCertificationApi.getMyAttempts()).data;
+      setAttempts(data.attempts || []);
       const uniqueCategories = [
-        ...new Set(response.data.attempts.map((a) => a.certification.category)),
+        ...new Set(data.attempts.map((a) => a.certification.category)),
       ];
       setCategories(uniqueCategories);
     } catch (error) {
