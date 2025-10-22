@@ -1,5 +1,9 @@
 import axios from "axios";
 
+if (import.meta.env.PROD && window.location.protocol === "http:") {
+  window.location.href = window.location.href.replace("http:", "https:");
+}
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const categoryCache = {
@@ -7,6 +11,7 @@ const categoryCache = {
   timestamp: null,
   TTL: 5 * 60 * 1000, // 5 minutes
 };
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -15,41 +20,75 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor - attach token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve();
     }
-    return config;
-  },
+  });
+  failedQueue = [];
+};
+
+api.interceptors.request.use(
+  (config) => config,
   (error) => Promise.reject(error)
 );
 
-// Response interceptor - handle token expiration
-// Response interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
+    // Auth endpoints - don't try to refresh
+    const skipRefreshUrls = [
+      "/auth/me",
+      "/auth/refresh",
+      "/auth/nonce",
+      "/auth/verify",
+    ];
+    const isAuthEndpoint = skipRefreshUrls.some((url) =>
+      originalRequest.url?.includes(url)
+    );
+
+    if (isAuthEndpoint && error.response?.status === 401) {
+      return Promise.reject(error);
+    }
+
+    // Rate limiting
+    if (error.response?.status === 429) {
+      return Promise.reject(error);
+    }
+
+    // Token refresh for protected routes
     if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(() => api(originalRequest))
+          .catch((err) => Promise.reject(err));
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
-        // Call refresh endpoint - new token set as cookie automatically
         await axios.post(
           `${API_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );
-
-        // Retry original request
+        processQueue(null);
+        isRefreshing = false;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - redirect to login
-        window.location.href = "/";
+        processQueue(refreshError);
+        isRefreshing = false;
         return Promise.reject(refreshError);
       }
     }
@@ -68,18 +107,6 @@ export const questionApi = {
   updateReply: (questionId, replyId, text) =>
     api.put(`/questions/${questionId}/reply/${replyId}`, { text }),
 };
-// Response interceptor for error handling
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem("token");
-      window.location.href = "/";
-    }
-    return Promise.reject(error);
-  }
-);
 
 export const adminApi = {
   // Dashboard

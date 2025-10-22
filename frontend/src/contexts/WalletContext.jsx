@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { ethers } from "ethers";
 import toast from "react-hot-toast";
@@ -25,22 +26,42 @@ export const WalletProvider = ({ children }) => {
   const [signer, setSigner] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [user, setUser] = useState(null);
-
-  // ✅ REMOVED: No more token state
+  const fetchingUser = useRef(false);
 
   // Auto-refresh token before expiration (every 10 minutes)
   useEffect(() => {
     const interval = setInterval(() => {
-      refreshAccessToken();
+      if (user) {
+        refreshAccessToken();
+      }
     }, 10 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
+  // Initialize wallet and fetch user ONCE on mount
   useEffect(() => {
-    initializeWallet();
+    const initialize = async () => {
+      if (fetchingUser.current) return;
+      fetchingUser.current = true;
+
+      try {
+        // Try to fetch user first (check if already logged in)
+        await fetchUser();
+      } catch (error) {
+        console.error("No active session");
+      }
+
+      // Initialize wallet connection
+      await initializeWallet();
+
+      fetchingUser.current = false;
+    };
+
+    initialize();
   }, []);
 
+  // Handle wallet events
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", handleAccountsChanged);
@@ -59,13 +80,6 @@ export const WalletProvider = ({ children }) => {
       }
     };
   }, [user]);
-
-  // ✅ Auto-fetch user on mount (token in cookie)
-  useEffect(() => {
-    if (!user) {
-      fetchUser();
-    }
-  }, []);
 
   const initializeWallet = async () => {
     if (!window.ethereum) return;
@@ -125,7 +139,6 @@ export const WalletProvider = ({ children }) => {
 
   const refreshAccessToken = async () => {
     try {
-      // ✅ Just call refresh - new token set as cookie automatically
       await api.post("/auth/refresh");
     } catch (error) {
       console.error("Token refresh failed:", error);
@@ -136,12 +149,16 @@ export const WalletProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const { data } = await api.get("/auth/me");
-      setUser(data.user);
-      // ✅ REMOVED: No localStorage storage
+      const response = await api.get("/auth/me", {
+        validateStatus: (status) => status < 500, // Accept any status < 500
+      });
+
+      // Only set user if response is successful
+      if (response.status === 200 && response.data?.user) {
+        setUser(response.data.user);
+      }
     } catch (error) {
-      console.error("Error fetching user:", error);
-      // User not logged in - this is OK
+      // Silently fail - user not logged in
     }
   };
 
@@ -180,16 +197,18 @@ export const WalletProvider = ({ children }) => {
 
       setUser(loginData.user);
 
-      // ✅ REMOVED: No localStorage operations
-      // Tokens are now in httpOnly cookies
-
       toast.success(
         loginData.isNewUser ? "Welcome to Lizard Academy!" : "Welcome back!"
       );
     } catch (error) {
       console.error("Wallet connection error:", error);
       disconnect();
-      toast.error(error.response?.data?.error || "Failed to connect wallet");
+
+      if (error.response?.status === 429) {
+        toast.error("Too many requests. Please wait a moment and try again.");
+      } else {
+        toast.error(error.response?.data?.error || "Failed to connect wallet");
+      }
     } finally {
       setIsConnecting(false);
     }
@@ -197,10 +216,15 @@ export const WalletProvider = ({ children }) => {
 
   const disconnect = useCallback(async () => {
     try {
-      // Call backend to clear cookies
-      await api.post("/auth/logout");
+      // Only call logout if user is logged in
+      if (user) {
+        await api.post("/auth/logout");
+      }
     } catch (error) {
-      console.error("Logout error:", error);
+      // Silently fail - user might already be logged out
+      if (error.response?.status !== 401) {
+        console.error("Logout error:", error);
+      }
     }
 
     setAccount(null);
@@ -208,10 +232,8 @@ export const WalletProvider = ({ children }) => {
     setSigner(null);
     setUser(null);
 
-    // ✅ REMOVED: No localStorage to clear
-
     toast.success("Wallet disconnected");
-  }, []);
+  }, [user]);
 
   const value = {
     account,

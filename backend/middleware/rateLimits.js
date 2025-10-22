@@ -2,6 +2,7 @@ const rateLimit = require("express-rate-limit");
 const { RedisStore } = require("rate-limit-redis");
 const redis = require("redis");
 
+const isDevelopment = process.env.NODE_ENV !== "production";
 // Create Redis client
 let redisClient;
 let useRedis = false;
@@ -90,13 +91,20 @@ const publicLimiter = createLimiter({
 // TIER 3: AUTHENTICATED READ (Generous)
 // Logged-in users reading data
 // ========================================
-const authLimiter = createLimiter({
-  windowMs: 1 * 60 * 1000,
-  max: 120, // 120 requests per minute = 2 req/sec
-  prefix: "rl:auth:",
-  message: "Too many requests, please slow down",
+const authLimiter = rateLimit({
+  windowMs: isDevelopment ? 1 * 60 * 1000 : 15 * 60 * 1000, // 1 min in dev, 15 min in prod
+  max: isDevelopment ? 100 : 5, // 100 requests in dev, 5 in prod
+  message: "Too many authentication attempts. Please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for /auth/me in development
+    if (isDevelopment && req.path === "/auth/me") {
+      return true;
+    }
+    return false;
+  },
 });
-
 // ========================================
 // TIER 4: WRITE OPERATIONS (Moderate)
 // Creating/updating content

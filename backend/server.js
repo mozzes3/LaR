@@ -13,7 +13,19 @@ const categoryRoutes = require("./routes/categories");
 const { sanitizeInput } = require("./middleware/sanitize");
 const nftRoutes = require("./routes/nft");
 const app = express();
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Vite needs unsafe-inline in dev
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https://api.anthropic.com"], // If using Claude API
+      },
+    },
+  })
+);
 // Connect to MongoDB
 connectDB();
 app.use(sanitizeInput);
