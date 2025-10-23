@@ -12,6 +12,19 @@ const levelRoutes = require("./routes/levels");
 const categoryRoutes = require("./routes/categories");
 const { sanitizeInput } = require("./middleware/sanitize");
 const nftRoutes = require("./routes/nft");
+
+// NEW imports
+const paymentRoutes = require("./modules/payment/routes");
+const adminPaymentRoutes = require("./modules/payment/routes/admin");
+// Payment automation
+const {
+  getEscrowAutomationService,
+} = require("./modules/payment/services/automationService");
+
+// ... in your server startup
+const automationService = getEscrowAutomationService();
+automationService.start();
+
 const app = express();
 app.use(
   helmet({

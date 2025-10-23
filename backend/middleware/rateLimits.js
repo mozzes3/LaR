@@ -209,6 +209,12 @@ const previewLimiter = rateLimit({
   },
 });
 
+const readLimiter = createLimiter({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute = 1.6 req/sec
+  prefix: "rl:browse:",
+  message: "Slow down! Too many page loads.",
+});
 module.exports = {
   browsingLimiter,
   publicLimiter,
@@ -223,4 +229,5 @@ module.exports = {
   searchLimiter,
   redisClient,
   previewLimiter,
+  readLimiter,
 };
