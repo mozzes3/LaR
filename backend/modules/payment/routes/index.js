@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const paymentController = require("../controllers/paymentController");
-const { protect } = require("../../../middleware/auth");
+const { authenticate } = require("../../../middleware/auth");
+const testController = require("../controllers/testController");
 const {
   authLimiter,
   criticalLimiter,
@@ -18,6 +19,8 @@ console.log(
   typeof paymentController.getPaymentTokens
 );
 
+router.get("/test", testController.testConnection);
+router.get("/test-contract", testController.testContract);
 /**
  * PUBLIC ROUTES
  */
@@ -42,7 +45,7 @@ router.get(
 // Rate limit: 20 requests per minute (auth level)
 router.post(
   "/calculate",
-  protect,
+  authenticate,
   authLimiter,
   paymentController.calculatePayment
 );
@@ -51,7 +54,7 @@ router.post(
 // Rate limit: 5 requests per 5 minutes
 router.post(
   "/purchase",
-  protect,
+  authenticate,
   criticalLimiter,
   paymentController.processPurchase
 );
@@ -60,7 +63,7 @@ router.post(
 // Rate limit: 5 requests per 5 minutes
 router.post(
   "/refund",
-  protect,
+  authenticate,
   criticalLimiter,
   paymentController.requestRefund
 );

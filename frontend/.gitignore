@@ -20,6 +20,9 @@ out/
 .nuxt/
 .vite/
 
+#AWS
+   .aws/
+   ~/.aws/
 # Logs
 logs/
 *.log

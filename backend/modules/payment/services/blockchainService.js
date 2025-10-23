@@ -473,6 +473,8 @@ function getPaymentService() {
   return paymentServiceInstance;
 }
 
+// Add this method to your blockchainService class/module
+
 module.exports = {
   PaymentBlockchainService,
   getPaymentService,

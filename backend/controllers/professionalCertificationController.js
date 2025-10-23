@@ -757,6 +757,10 @@ const purchaseCertificate = async (req, res) => {
     console.log("🔍 Generated certificateNumber:", certificateNumber);
     console.log("🔍 Generated verificationCode:", verificationCode);
     console.log("🔍 Type of verificationCode:", typeof verificationCode);
+    const grade = calculateGrade(
+      attempt.score,
+      attempt.certification.passingScore
+    );
     // Generate certificate image
     const studentName = attempt.user.displayName || attempt.user.username;
     const certificationData = {
@@ -767,7 +771,7 @@ const purchaseCertificate = async (req, res) => {
       subcategories: attempt.certification.subcategories,
       level: attempt.certification.level,
       score: attempt.score,
-      grade: attempt.grade,
+      grade: grade,
       correctAnswers: attempt.correctAnswers,
       totalQuestions: attempt.totalQuestions,
       completedDate: attempt.completedAt,
@@ -834,7 +838,7 @@ const purchaseCertificate = async (req, res) => {
       certificateNumber,
       certificateUrl,
       templateImage: certificateUrl,
-      grade: calculateGrade(attempt.score, attempt.certification.passingScore),
+      grade: grade,
       score: attempt.score,
       totalQuestions: attempt.totalQuestions,
       correctAnswers: attempt.correctAnswers,

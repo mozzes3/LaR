@@ -29,7 +29,7 @@ class IPFSService {
       const formData = new FormData();
       formData.append("file", imageBuffer, {
         filename: fileName,
-        contentType: "image/png",
+        contentType: fileName.endsWith(".webp") ? "image/webp" : "image/png",
       });
 
       const pinataMetadata = JSON.stringify({

@@ -870,7 +870,7 @@ const CompletionCertificateCard = ({
               const url = window.URL.createObjectURL(blob);
               const link = document.createElement("a");
               link.href = url;
-              link.download = `${cert.certificateNumber}.png`;
+              link.download = `${cert.certificateNumber}.webp`;
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
@@ -1031,7 +1031,7 @@ const CompetencyCertificateCard = ({
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement("a");
                     link.href = url;
-                    link.download = `${cert.certificateNumber}.png`;
+                    link.download = `${cert.certificateNumber}.webp`;
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);

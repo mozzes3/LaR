@@ -1,5 +1,6 @@
 // backend/services/certificateService.js
 const { createCanvas, loadImage, registerFont } = require("canvas");
+const sharp = require("sharp");
 const path = require("path");
 const crypto = require("crypto");
 const axios = require("axios");
@@ -422,7 +423,7 @@ const generateCertificate = async (userId, courseId) => {
     });
 
     // Upload to Bunny.net CERTIFICATES zone
-    const filename = `${certificateNumber}.png`;
+    const filename = `${certificateNumber}.webp`;
     const storageZone = process.env.BUNNY_ZONE_CERTIFICATES;
     const storagePassword = process.env.BUNNY_STORAGE_PASSWORD_CERTIFICATES;
     const uploadUrl = `https://storage.bunnycdn.com/${storageZone}/${filename}`;
@@ -430,7 +431,7 @@ const generateCertificate = async (userId, courseId) => {
     await axios.put(uploadUrl, certificateImageBuffer, {
       headers: {
         AccessKey: storagePassword,
-        "Content-Type": "image/png",
+        "Content-Type": "image/webp",
       },
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
@@ -464,7 +465,7 @@ const generateCertificate = async (userId, courseId) => {
         const ipfsService = getIPFSService();
         const ipfsImage = await ipfsService.uploadImage(
           certificateImageBuffer,
-          `${certificateNumber}.png`
+          `${certificateNumber}.webp`
         );
         console.log(`✅ Image uploaded to IPFS: ${ipfsImage.url}`);
 

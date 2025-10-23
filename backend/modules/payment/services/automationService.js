@@ -1,8 +1,8 @@
 const cron = require("node-cron");
-const Purchase = require("../models/PurchaseNew");
-const Course = require("../models/Course");
+const Purchase = require("../models/Purchase");
+const Course = require("../../../models/Course");
 const PaymentToken = require("../models/PaymentToken");
-const { getPaymentService } = require("./paymentBlockchainService");
+const { getPaymentService } = require("./blockchainService");
 const { ethers } = require("ethers");
 
 /**

@@ -107,6 +107,8 @@ app.use(
   "/api/admin/professional-certifications",
   require("./routes/adminProfessionalCertifications")
 );
+app.use("/api/payment", require("./modules/payment/routes"));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err);

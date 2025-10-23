@@ -5,7 +5,8 @@ const ProfessionalCertification = require("../models/ProfessionalCertification")
 const User = require("../models/User");
 const crypto = require("crypto");
 const axios = require("axios");
-const { createCanvas, loadImage } = require("canvas");
+const { createCanvas, loadImage, registerFont } = require("canvas");
+const fs = require("fs");
 const path = require("path");
 
 /**
@@ -22,9 +23,29 @@ const generateCertificateNumber = () => {
   return `LA-COC-${year}-${random}`;
 };
 
-/**
- * Create PREMIUM professional certificate image (16:9 - 1920x1080)
- */
+const fontsPath = path.join(__dirname, "../assets/fonts");
+const robotoPath = path.join(fontsPath, "Roboto-Regular.ttf");
+const cormorantLightPath = path.join(fontsPath, "CormorantGaramond-Light.ttf");
+const cormorantBoldPath = path.join(fontsPath, "CormorantGaramond-Bold.ttf");
+
+if (fs.existsSync(robotoPath)) {
+  registerFont(robotoPath, {
+    family: "MyRoboto",
+  });
+}
+
+if (fs.existsSync(cormorantLightPath)) {
+  registerFont(cormorantLightPath, {
+    family: "MyCormorantLight",
+  });
+}
+
+if (fs.existsSync(cormorantBoldPath)) {
+  registerFont(cormorantBoldPath, {
+    family: "MyCormorantBold",
+  });
+}
+
 const createProfessionalCertificateImage = async (data) => {
   const {
     certificateNumber,
@@ -47,292 +68,102 @@ const createProfessionalCertificateImage = async (data) => {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  // ===== PREMIUM BACKGROUND =====
-  const bgGradient = ctx.createLinearGradient(0, 0, width, height);
-  bgGradient.addColorStop(0, "#0a0a0a");
-  bgGradient.addColorStop(0.3, "#1a1a2e");
-  bgGradient.addColorStop(0.7, "#16213e");
-  bgGradient.addColorStop(1, "#0a0a0a");
-  ctx.fillStyle = bgGradient;
-  ctx.fillRect(0, 0, width, height);
-
-  // Subtle grid pattern overlay
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.02)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i < width; i += 40) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, height);
-    ctx.stroke();
-  }
-  for (let i = 0; i < height; i += 40) {
-    ctx.beginPath();
-    ctx.moveTo(0, i);
-    ctx.lineTo(width, i);
-    ctx.stroke();
+  // Load template
+  const templatePath = path.join(
+    __dirname,
+    "../../frontend/src/assets/templates/professional-certificate.png"
+  );
+  try {
+    const templateImage = await loadImage(templatePath);
+    ctx.drawImage(templateImage, 0, 0, width, height);
+    console.log("✅ Template image loaded");
+  } catch (error) {
+    console.error("❌ Failed to load template:", error.message);
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#1a1a2e");
+    gradient.addColorStop(1, "#0a0a0a");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
   }
 
-  // ===== PREMIUM BORDER FRAME =====
-  const borderGradient = ctx.createLinearGradient(0, 0, width, height);
-  borderGradient.addColorStop(0, "#3b82f6");
-  borderGradient.addColorStop(0.3, "#8b5cf6");
-  borderGradient.addColorStop(0.7, "#3b82f6");
-  borderGradient.addColorStop(1, "#8b5cf6");
-
-  ctx.strokeStyle = borderGradient;
-  ctx.lineWidth = 10;
-  ctx.strokeRect(40, 40, width - 80, height - 80);
-
-  // Inner accent border
-  ctx.strokeStyle = "rgba(59, 130, 246, 0.3)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(60, 60, width - 120, height - 120);
-
-  // Corner decorative elements
-  const drawPremiumCorner = (x, y, rotation) => {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(rotation);
-
-    ctx.strokeStyle = "#3b82f6";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(-40, 0);
-    ctx.lineTo(0, 0);
-    ctx.lineTo(0, 40);
-    ctx.stroke();
-
-    ctx.fillStyle = "#8b5cf6";
-    ctx.beginPath();
-    ctx.arc(0, 0, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-  };
-
-  drawPremiumCorner(100, 100, 0);
-  drawPremiumCorner(width - 100, 100, Math.PI / 2);
-  drawPremiumCorner(width - 100, height - 100, Math.PI);
-  drawPremiumCorner(100, height - 100, (Math.PI * 3) / 2);
-
-  // ===== HEADER BADGE =====
-  const headerY = 120;
-  const badgeWidth = 480;
-  const badgeHeight = 60;
-  const badgeX = width / 2 - badgeWidth / 2;
-
-  ctx.save();
-  const headerGradient = ctx.createLinearGradient(
-    badgeX,
-    headerY,
-    badgeX + badgeWidth,
-    headerY
-  );
-  headerGradient.addColorStop(0, "#3b82f6");
-  headerGradient.addColorStop(0.5, "#8b5cf6");
-  headerGradient.addColorStop(1, "#3b82f6");
-  ctx.fillStyle = headerGradient;
-
-  ctx.beginPath();
-  ctx.roundRect(badgeX, headerY, badgeWidth, badgeHeight, 10);
-  ctx.fill();
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 24px Arial";
   ctx.textAlign = "center";
-  ctx.fillText("CERTIFICATE OF COMPETENCY", width / 2, headerY + 40);
-  ctx.restore();
+  ctx.textBaseline = "middle";
 
-  // Decorative circles
-  ctx.fillStyle = "rgba(59, 130, 246, 0.15)";
-  ctx.beginPath();
-  ctx.arc(200, 250, 100, 0, Math.PI * 2);
-  ctx.fill();
+  // ===== STUDENT NAME - Using Roboto =====
+  ctx.fillStyle = "#111d60";
+  ctx.font = "45px MyRoboto";
+  ctx.fillText(studentName.toUpperCase(), width / 2, 541);
 
-  ctx.fillStyle = "rgba(139, 92, 246, 0.15)";
-  ctx.beginPath();
-  ctx.arc(width - 200, height - 250, 120, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ===== MAIN TITLE =====
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 52px Arial";
-  ctx.textAlign = "center";
-  ctx.shadowColor = "rgba(59, 130, 246, 0.5)";
-  ctx.shadowBlur = 20;
-  ctx.fillText("Professional Certification", width / 2, 240);
-  ctx.shadowBlur = 0;
-
-  // ===== RECIPIENT SECTION =====
-  ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-  ctx.font = "26px Arial";
-  ctx.fillText("This is to certify that", width / 2, 320);
-
-  // Student name with premium glow
-  ctx.save();
-  ctx.shadowColor = "#3b82f6";
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 76px Arial";
-  ctx.fillText(studentName, width / 2, 420);
-  ctx.restore();
-
-  // ===== ACHIEVEMENT TEXT =====
-  ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-  ctx.font = "24px Arial";
-  ctx.fillText(
-    "has successfully demonstrated professional-level competency in",
-    width / 2,
-    490
-  );
-
-  // Certification title
-  ctx.fillStyle = "#3b82f6";
-  ctx.font = "bold 42px Arial";
+  // ===== CERTIFICATION TITLE - Using CormorantLight =====
+  ctx.fillStyle = "#111d60";
+  ctx.font = "45px MyCormorantLight";
 
   const maxWidth = 1400;
-  const words = certificationTitle.split(" ");
-  let line = "";
-  let lines = [];
-
-  for (let word of words) {
-    const testLine = line + word + " ";
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > maxWidth && line !== "") {
-      lines.push(line.trim());
-      line = word + " ";
-    } else {
-      line = testLine;
-    }
-  }
-  lines.push(line.trim());
-
-  const titleStartY = 560;
-  lines.forEach((line, index) => {
-    ctx.fillText(line, width / 2, titleStartY + index * 50);
+  const titleLines = wrapText(ctx, certificationTitle, maxWidth);
+  titleLines.forEach((line, index) => {
+    ctx.fillText(line, width / 2, 703 + index * 50);
   });
 
-  // Category and subcategories
-  const detailsY = titleStartY + lines.length * 50 + 40;
-  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-  ctx.font = "italic 24px Arial";
-  const categoryText = `${category}${
-    subcategories && subcategories.length > 0
-      ? " • " + subcategories.join(" | ")
-      : ""
-  }`;
-  ctx.fillText(categoryText, width / 2, detailsY);
+  // ===== CATEGORY - Using Roboto =====
+  ctx.fillStyle = "#111d60";
+  ctx.font = "35px MyRoboto";
+  ctx.fillText(category.toUpperCase(), width / 2, 810);
 
-  // ===== SCORE DISPLAY BOX =====
-  const scoreBoxY = detailsY + 60;
-  const scoreBoxWidth = 600;
-  const scoreBoxHeight = 100;
-  const scoreBoxX = width / 2 - scoreBoxWidth / 2;
-
-  ctx.save();
-  const scoreGradient = ctx.createLinearGradient(
-    scoreBoxX,
-    scoreBoxY,
-    scoreBoxX + scoreBoxWidth,
-    scoreBoxY + scoreBoxHeight
-  );
-  scoreGradient.addColorStop(0, "rgba(16, 185, 129, 0.2)");
-  scoreGradient.addColorStop(1, "rgba(5, 150, 105, 0.2)");
-  ctx.fillStyle = scoreGradient;
-  ctx.beginPath();
-  ctx.roundRect(scoreBoxX, scoreBoxY, scoreBoxWidth, scoreBoxHeight, 15);
-  ctx.fill();
-
-  ctx.strokeStyle = "#10b981";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  ctx.fillStyle = "#10b981";
-  ctx.font = "bold 48px Arial";
-  ctx.fillText(`SCORE: ${score}%`, width / 2, scoreBoxY + 40);
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-  ctx.font = "22px Arial";
-  ctx.fillText(
-    `${correctAnswers} of ${totalQuestions} Questions • Grade: ${grade}`,
-    width / 2,
-    scoreBoxY + 75
-  );
-  ctx.restore();
-
-  // ===== VERIFICATION SECTION =====
-  const verifyY = 880;
-
-  ctx.save();
-  ctx.fillStyle = "rgba(59, 130, 246, 0.1)";
-  ctx.beginPath();
-  ctx.roundRect(width / 2 - 250, verifyY - 25, 500, 50, 10);
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(59, 130, 246, 0.3)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
-  ctx.font = "16px Arial";
-  ctx.fillText("Certificate ID", width / 2, verifyY - 5);
-
-  ctx.fillStyle = "#3b82f6";
-  ctx.font = "bold 22px monospace";
-  ctx.fillText(certificateNumber, width / 2, verifyY + 20);
-  ctx.restore();
-
-  // Issue date
-  const dateY = 945;
-  ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-  ctx.font = "20px Arial";
-  ctx.fillText(
-    `Issued on ${new Date(completedDate).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    })}`,
-    width / 2,
-    dateY
-  );
-
-  // ===== FOOTER CREDENTIALS =====
-  const footerY = 1005;
-
-  if (designedBy) {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-    ctx.font = "14px Arial";
-    ctx.textAlign = "left";
-    ctx.fillText("Designed by", 120, footerY);
-
-    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-    ctx.font = "bold 16px Arial";
-    ctx.fillText(designedBy, 120, footerY + 22);
+  if (subcategories && subcategories.length > 0) {
+    ctx.fillStyle = "#111d60";
+    ctx.font = "24px MyRoboto";
+    const subCatText = subcategories.join(" • ");
+    ctx.fillText(subCatText, width / 2, 867);
   }
 
-  if (auditedBy) {
-    ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-    ctx.font = "14px Arial";
-    ctx.textAlign = "right";
-    ctx.fillText("Audited by", width - 120, footerY);
+  // ===== CERTIFICATE NUMBER - Using Roboto =====
+  ctx.fillStyle = "#767676";
+  ctx.font = "34px MyRoboto";
+  ctx.fillText(certificateNumber, 1090, 1008);
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-    ctx.font = "bold 16px Arial";
-    ctx.fillText(auditedBy, width - 120, footerY + 22);
-  }
+  // ===== SCORE - Using CormorantBold =====
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "57px MyCormorantBold";
+  ctx.fillText(`${score}%`, 1751, 913);
 
-  // Blockchain verified badge
-  ctx.fillStyle = "rgba(59, 130, 246, 0.6)";
-  ctx.textAlign = "center";
-  ctx.font = "bold 13px Arial";
-  ctx.fillText(
-    "🔒 BLOCKCHAIN VERIFIED • TAMPER-PROOF • GLOBALLY RECOGNIZED",
-    width / 2,
-    1050
-  );
+  // ===== GRADE - Using CormorantBold =====
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "20px MyCormorantBold";
+  ctx.fillText(grade.toUpperCase(), 1753, 961);
+
+  // ===== DATE - Using CormorantLight =====
+  ctx.fillStyle = "#0e0e0e";
+  ctx.font = "18px MyCormorantLight";
+  const dateStr = completedDate.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  ctx.fillText(`Issued on ${dateStr}`, 160, 1050);
 
   return canvas.toBuffer("image/png");
 };
+
+// Helper function
+function wrapText(ctx, text, maxWidth) {
+  const words = text.split(" ");
+  const lines = [];
+  let currentLine = words[0];
+
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i];
+    const width = ctx.measureText(currentLine + " " + word).width;
+
+    if (width < maxWidth) {
+      currentLine += " " + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  lines.push(currentLine);
+  return lines;
+}
 /**
  * Get user's eligible certificates (passed tests, not yet paid)
  */

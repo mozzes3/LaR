@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const adminPaymentController = require("../controllers/adminController");
-const { protect, adminOnly } = require("../../..middleware/auth");
-const { writeLimiter } = require("../../..middleware/rateLimits");
+const { authenticate, isAdmin } = require("../../../middleware/auth");
+const { writeLimiter } = require("../../../middleware/rateLimits");
 
 // All routes require admin authentication
-router.use(protect);
-router.use(adminOnly);
+router.use(authenticate);
+router.use(isAdmin);
 
 /**
  * PAYMENT TOKEN MANAGEMENT
