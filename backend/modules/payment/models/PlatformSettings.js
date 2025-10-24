@@ -2,29 +2,26 @@ const mongoose = require("mongoose");
 
 const platformSettingsSchema = new mongoose.Schema(
   {
-    // Fee settings
     defaultPlatformFeePercentage: {
       type: Number,
       required: true,
-      default: 20, // 20%
       min: 0,
-      max: 100,
+      max: 10000, // Changed from 100 to 10000 (basis points)
+      default: 2000, // 20%
     },
     defaultInstructorFeePercentage: {
       type: Number,
       required: true,
-      default: 80, // 80%
       min: 0,
-      max: 100,
+      max: 10000, // Changed from 100 to 10000 (basis points)
+      default: 8000, // 80%
     },
-
-    // Revenue split wallet (20% of platform fee goes here)
     revenueSplitPercentage: {
       type: Number,
       required: true,
-      default: 20, // 20% of platform fee
       min: 0,
-      max: 100,
+      max: 10000, // Changed from 100 to 10000 (basis points)
+      default: 2000, // 20%
     },
 
     // Escrow settings
@@ -34,6 +31,7 @@ const platformSettingsSchema = new mongoose.Schema(
       default: 14,
       min: 1,
       max: 90,
+      default: 14,
     },
     defaultMinWatchPercentage: {
       type: Number,

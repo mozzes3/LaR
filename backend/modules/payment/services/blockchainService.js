@@ -101,14 +101,65 @@ class PaymentBlockchainService {
    * Initialize wallet with military-grade security
    * @private
    */
+  /**
+   * Initialize wallet with military-grade security
+   * @private
+   */
   async initializeSecureWallet(provider) {
     try {
-      // Method 1: Encrypted wallet file (RECOMMENDED for production)
+      const paymentMode = process.env.PAYMENT_MODE || "blockchain";
+
+      // DUMMY MODE - For development/testing
+      if (paymentMode === "dummy") {
+        console.log("🔧 DUMMY MODE: Using test wallet");
+        const dummyPrivateKey = "0x" + "1".repeat(64); // Dummy key
+        return new ethers.Wallet(dummyPrivateKey, provider);
+      }
+
+      // BLOCKCHAIN MODE - Production with AWS Secrets Manager
+      const awsSecretsEnabled = process.env.AWS_SECRETS_ENABLED === "true";
+      const activeNetwork = process.env.ACTIVE_NETWORK || "sepolia";
+
+      if (awsSecretsEnabled) {
+        console.log(
+          `🔐 Loading operator wallet from AWS Secrets Manager (${activeNetwork})`
+        );
+
+        const {
+          SecretsManagerClient,
+          GetSecretValueCommand,
+        } = require("@aws-sdk/client-secrets-manager");
+
+        const client = new SecretsManagerClient({
+          region: process.env.AWS_REGION || "us-east-1",
+        });
+
+        const secretName = `payment-operator-${activeNetwork}`;
+
+        try {
+          const response = await client.send(
+            new GetSecretValueCommand({
+              SecretId: secretName,
+            })
+          );
+
+          const secret = JSON.parse(response.SecretString);
+          const wallet = new ethers.Wallet(secret.privateKey, provider);
+
+          console.log(`✅ Operator wallet loaded: ${wallet.address}`);
+          return wallet;
+        } catch (error) {
+          console.error("❌ Failed to load AWS secret:", error.message);
+          throw new Error(`AWS Secrets Manager failed: ${error.message}`);
+        }
+      }
+
+      // FALLBACK - Encrypted wallet file (RECOMMENDED for self-hosted)
       if (
         process.env.PAYMENT_WALLET_FILE_PATH &&
         process.env.PAYMENT_WALLET_PASSWORD
       ) {
-        console.log("🔐 Loading encrypted payment wallet...");
+        console.log("🔐 Loading encrypted payment wallet from file...");
 
         if (!fs.existsSync(process.env.PAYMENT_WALLET_FILE_PATH)) {
           throw new Error(
@@ -120,7 +171,6 @@ class PaymentBlockchainService {
           process.env.PAYMENT_WALLET_FILE_PATH,
           "utf8"
         );
-
         const wallet = await ethers.Wallet.fromEncryptedJson(
           encryptedJson,
           process.env.PAYMENT_WALLET_PASSWORD
@@ -129,27 +179,7 @@ class PaymentBlockchainService {
         return wallet.connect(provider);
       }
 
-      // Method 2: Environment variable encrypted key (Backup method)
-      if (process.env.PAYMENT_WALLET_ENCRYPTED_KEY) {
-        console.log("🔐 Loading encrypted payment wallet from ENV...");
-
-        const encrypted = process.env.PAYMENT_WALLET_ENCRYPTED_KEY;
-        const password = process.env.PAYMENT_WALLET_PASSWORD;
-
-        if (!password) {
-          throw new Error("PAYMENT_WALLET_PASSWORD required");
-        }
-
-        // Decrypt the key
-        const decipher = crypto.createDecipher("aes-256-cbc", password);
-        let privateKey = decipher.update(encrypted, "hex", "utf8");
-        privateKey += decipher.final("utf8");
-
-        const wallet = new ethers.Wallet(privateKey, provider);
-        return wallet;
-      }
-
-      // Method 3: Plain private key (ONLY FOR TESTING - NOT PRODUCTION)
+      // TESTING ONLY - Plain private key
       if (process.env.PAYMENT_WALLET_PRIVATE_KEY) {
         console.warn("⚠️  WARNING: Using unencrypted private key");
         console.warn("⚠️  This is NOT secure for production");
@@ -163,9 +193,10 @@ class PaymentBlockchainService {
 
       throw new Error(
         "No wallet configuration found. Set one of:\n" +
-          "1. PAYMENT_WALLET_FILE_PATH + PAYMENT_WALLET_PASSWORD (recommended)\n" +
-          "2. PAYMENT_WALLET_ENCRYPTED_KEY + PAYMENT_WALLET_PASSWORD\n" +
-          "3. PAYMENT_WALLET_PRIVATE_KEY (testing only)"
+          "1. PAYMENT_MODE=dummy (for testing)\n" +
+          "2. AWS_SECRETS_ENABLED=true + AWS_REGION + ACTIVE_NETWORK (production)\n" +
+          "3. PAYMENT_WALLET_FILE_PATH + PAYMENT_WALLET_PASSWORD (self-hosted)\n" +
+          "4. PAYMENT_WALLET_PRIVATE_KEY (testing only)"
       );
     } catch (error) {
       console.error("❌ Failed to initialize wallet:", error.message);

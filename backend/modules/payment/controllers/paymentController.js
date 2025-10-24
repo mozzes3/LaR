@@ -3,7 +3,7 @@ const PaymentToken = require("../models/PaymentToken");
 const PlatformSettings = require("../models/PlatformSettings");
 const InstructorFeeSettings = require("../models/InstructorFeeSettings");
 const Purchase = require("../models/Purchase");
-const Course = require("../../../models/Course"); // ✅ CORRECT - go up 3 levels
+const Course = require("../../../models/Course");
 const User = require("../../../models/User");
 const { ethers } = require("ethers");
 const axios = require("axios");
@@ -169,66 +169,66 @@ const calculatePayment = async (req, res) => {
     // Get token price
     const tokenPriceUSD = await getTokenPriceUSD(paymentToken);
 
-    // Get course price in USD
-    const coursePrice = course.price.usd;
-
-    // Calculate amount in tokens
+    // Calculate token amount needed
+    const usdPrice = course.price?.usd || 0;
     const tokenAmount = calculateTokenAmount(
-      coursePrice,
+      usdPrice,
       tokenPriceUSD,
       paymentToken.decimals
     );
 
-    // Get fee settings
+    // Get fee settings for this instructor
     const feeSettings = await InstructorFeeSettings.getEffectiveFees(
       course.instructor._id
     );
 
-    // Calculate fees
     const platformFeePercentage = feeSettings.platformFeePercentage;
     const instructorFeePercentage = feeSettings.instructorFeePercentage;
+
+    // Calculate fee amounts
+    const tokenAmountBN = ethers.getBigInt(tokenAmount);
+    const platformFeeAmount =
+      (tokenAmountBN * BigInt(platformFeePercentage)) / BigInt(10000);
+    const instructorFeeAmount = tokenAmountBN - platformFeeAmount;
 
     // Get platform settings for revenue split
     const platformSettings = await PlatformSettings.getSettings();
     const revenueSplitPercentage = platformSettings.revenueSplitPercentage;
 
-    // Calculate escrow period
-    const escrowPeriodDays =
-      course.escrowSettings?.refundPeriodDays ||
-      platformSettings.defaultEscrowPeriodDays;
+    // Calculate revenue split (from platform fee)
+    const revenueSplitAmount =
+      (platformFeeAmount * BigInt(revenueSplitPercentage)) / BigInt(10000);
 
-    // Calculate instructor wallet address
-    const instructorWallet =
-      course.instructor.paymentWallets?.get(paymentToken.blockchain) || null;
+    // Get instructor wallet for this blockchain
+    const instructorWallet = course.instructor.paymentWallets?.find(
+      (w) =>
+        w.blockchain === paymentToken.blockchain &&
+        w.chainId === paymentToken.chainId
+    )?.address;
 
     if (!instructorWallet) {
       return res.status(400).json({
-        error: "Instructor has not set up payment wallet for this blockchain",
+        error: "Instructor has not configured payment wallet for this chain",
       });
     }
 
     res.json({
       success: true,
-      payment: {
-        courseId: course._id,
-        courseName: course.title,
-        coursePrice: coursePrice,
-        paymentToken: {
-          id: paymentToken._id,
-          symbol: paymentToken.symbol,
-          name: paymentToken.name,
-          contractAddress: paymentToken.contractAddress,
-          blockchain: paymentToken.blockchain,
-          chainId: paymentToken.chainId,
-          decimals: paymentToken.decimals,
-          isNative: paymentToken.isNative,
+      calculation: {
+        coursePrice: usdPrice,
+        tokenPrice: tokenPriceUSD,
+        tokenAmount: tokenAmount,
+        tokenSymbol: paymentToken.symbol,
+        platformFee: platformFeeAmount.toString(),
+        instructorFee: instructorFeeAmount.toString(),
+        revenueSplit: revenueSplitAmount.toString(),
+        feePercentages: {
+          platform: platformFeePercentage / 100,
+          instructor: instructorFeePercentage / 100,
+          revenueSplit: revenueSplitPercentage / 100,
         },
-        tokenPriceUSD,
-        tokenAmount,
-        platformFeePercentage,
-        instructorFeePercentage,
-        revenueSplitPercentage,
-        escrowPeriodDays,
+        blockchain: paymentToken.blockchain,
+        chainId: paymentToken.chainId,
         instructorAddress: instructorWallet,
         escrowContractAddress: paymentToken.paymentContractAddress,
       },
@@ -266,8 +266,12 @@ const processPurchase = async (req, res) => {
       return res.status(400).json({ error: "Missing required parameters" });
     }
 
-    // Validate transaction hash format
-    if (!/^0x[a-fA-F0-9]{64}$/.test(transactionHash)) {
+    // Validate transaction hash format (only for blockchain mode)
+    const paymentMode = process.env.PAYMENT_MODE || "blockchain";
+    if (
+      paymentMode !== "dummy" &&
+      !/^0x[a-fA-F0-9]{64}$/.test(transactionHash)
+    ) {
       return res.status(400).json({ error: "Invalid transaction hash" });
     }
 
@@ -276,10 +280,12 @@ const processPurchase = async (req, res) => {
       return res.status(400).json({ error: "Invalid wallet address" });
     }
 
-    // Check if transaction already processed
-    const existingPurchase = await Purchase.findOne({ transactionHash });
-    if (existingPurchase) {
-      return res.status(400).json({ error: "Transaction already processed" });
+    // Check if transaction already processed (only for real transactions)
+    if (paymentMode !== "dummy") {
+      const existingPurchase = await Purchase.findOne({ transactionHash });
+      if (existingPurchase) {
+        return res.status(400).json({ error: "Transaction already processed" });
+      }
     }
 
     // Get course with instructor
@@ -309,7 +315,92 @@ const processPurchase = async (req, res) => {
         .json({ error: "Wallet address does not match user" });
     }
 
-    // Verify transaction on blockchain
+    // ============ DUMMY MODE ============
+    if (paymentMode === "dummy") {
+      console.log("🔧 DUMMY MODE: Skipping blockchain verification");
+
+      // Calculate USD value (for dummy)
+      const tokenPriceUSD = await getTokenPriceUSD(paymentToken);
+      const tokenAmountBN = ethers.getBigInt(amountInToken);
+      const decimals = paymentToken.decimals;
+      const tokenAmountFloat = Number(
+        ethers.formatUnits(tokenAmountBN, decimals)
+      );
+      const usdValue = tokenAmountFloat * tokenPriceUSD;
+
+      // Get fee settings
+      const feeSettings = await InstructorFeeSettings.getEffectiveFees(
+        course.instructor._id
+      );
+      const platformFeePercentage = feeSettings.platformFeePercentage;
+
+      // Calculate fee amounts
+      const platformFeeAmount =
+        (tokenAmountBN * BigInt(platformFeePercentage)) / BigInt(10000);
+      const instructorFeeAmount = tokenAmountBN - platformFeeAmount;
+
+      // Get revenue split
+      const platformSettings = await PlatformSettings.getSettings();
+      const revenueSplitPercentage = platformSettings.revenueSplitPercentage;
+      const revenueSplitAmount =
+        (platformFeeAmount * BigInt(revenueSplitPercentage)) / BigInt(10000);
+
+      // Get instructor wallet
+      const instructorWallet = course.instructor.paymentWallets?.find(
+        (w) =>
+          w.blockchain === paymentToken.blockchain &&
+          w.chainId === paymentToken.chainId
+      )?.address;
+
+      if (!instructorWallet) {
+        return res
+          .status(400)
+          .json({ error: "Instructor payment wallet not configured" });
+      }
+
+      // Create purchase record (DUMMY)
+      const purchase = new Purchase({
+        user: userId,
+        course: courseId,
+        paymentToken: paymentTokenId,
+        transactionHash:
+          transactionHash ||
+          `dummy_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        fromAddress: studentAddress,
+        toAddress: instructorWallet,
+        amountInToken: amountInToken,
+        amountInUSD: usdValue,
+        instructorAmount: instructorFeeAmount.toString(),
+        platformAmount: platformFeeAmount.toString(),
+        revenueSplitAmount: revenueSplitAmount.toString(),
+        blockchain: paymentToken.blockchain,
+        status: "completed",
+        escrowStatus: "dummy",
+        escrowId: `dummy_escrow_${courseId}_${Date.now()}`,
+        escrowReleaseDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      });
+
+      await purchase.save();
+
+      console.log("✅ DUMMY purchase created:", purchase._id);
+
+      return res.json({
+        success: true,
+        message: "Purchase successful (DUMMY MODE)",
+        purchase: {
+          _id: purchase._id,
+          transactionHash: purchase.transactionHash,
+          status: purchase.status,
+          escrowStatus: "dummy",
+          mode: "dummy",
+        },
+      });
+    }
+
+    // ============ BLOCKCHAIN MODE ============
+    console.log("🔗 BLOCKCHAIN MODE: Verifying transaction");
+
+    // Initialize payment service
     const paymentService = getPaymentService();
     await paymentService.initialize(paymentToken);
 
@@ -318,6 +409,7 @@ const processPurchase = async (req, res) => {
       paymentToken.chainId
     );
 
+    // Verify transaction on blockchain
     const txReceipt = await provider.getTransactionReceipt(transactionHash);
 
     if (!txReceipt) {
@@ -355,7 +447,6 @@ const processPurchase = async (req, res) => {
     const feeSettings = await InstructorFeeSettings.getEffectiveFees(
       course.instructor._id
     );
-
     const platformFeePercentage = feeSettings.platformFeePercentage;
     const instructorFeePercentage = feeSettings.instructorFeePercentage;
 
@@ -373,50 +464,96 @@ const processPurchase = async (req, res) => {
     // Calculate escrow release date
     const escrowPeriodDays =
       course.escrowSettings?.refundPeriodDays ||
-      platformSettings.defaultEscrowPeriodDays;
-
+      platformSettings.defaultEscrowPeriod ||
+      14;
     const escrowReleaseDate = new Date();
     escrowReleaseDate.setDate(escrowReleaseDate.getDate() + escrowPeriodDays);
+
+    // Get instructor wallet
+    const instructorWallet = course.instructor.paymentWallets?.find(
+      (w) =>
+        w.blockchain === paymentToken.blockchain &&
+        w.chainId === paymentToken.chainId
+    )?.address;
+
+    if (!instructorWallet) {
+      return res
+        .status(400)
+        .json({
+          error: "Instructor payment wallet not configured for this blockchain",
+        });
+    }
 
     // Create purchase record
     const purchase = new Purchase({
       user: userId,
       course: courseId,
       paymentToken: paymentTokenId,
-      amount: tokenAmountFloat,
-      amountInToken: amountInToken,
-      priceUSD: usdValue,
       transactionHash,
-      blockchain: paymentToken.blockchain,
-      blockNumber: txReceipt.blockNumber,
       fromAddress: studentAddress,
-      platformFeeAmount: platformFeeAmount.toString(),
-      instructorFeeAmount: instructorFeeAmount.toString(),
+      toAddress: instructorWallet,
+      amountInToken: amountInToken,
+      amountInUSD: usdValue,
+      instructorAmount: instructorFeeAmount.toString(),
+      platformAmount: platformFeeAmount.toString(),
       revenueSplitAmount: revenueSplitAmount.toString(),
-      platformFeePercentage,
-      instructorFeePercentage,
+      blockchain: paymentToken.blockchain,
+      status: "completed",
       escrowStatus: "pending",
       escrowReleaseDate,
-      refundEligible: true,
-      status: "active",
-      smartContractData: {
-        verified: true,
-        verifiedAt: new Date(),
-      },
     });
 
     await purchase.save();
 
-    console.log("✅ Purchase created:", purchase._id);
+    console.log("✅ Purchase record created:", purchase._id);
+
+    // Register escrow in smart contract
+    try {
+      const finalPlatformFee = platformFeePercentage;
+
+      const escrowResult = await paymentService.createEscrowPayment({
+        studentAddress: purchase.fromAddress,
+        instructorAddress: instructorWallet,
+        amountInToken: purchase.amountInToken,
+        courseId: course._id.toString(),
+        escrowPeriodDays,
+        customPlatformFee: finalPlatformFee,
+        blockchain: paymentToken.blockchain,
+        chainId: paymentToken.chainId,
+      });
+
+      purchase.escrowId = escrowResult.escrowId;
+      purchase.escrowCreatedTxHash = escrowResult.transactionHash;
+      await purchase.save();
+
+      console.log(
+        "✅ Escrow registered in smart contract:",
+        escrowResult.escrowId
+      );
+    } catch (escrowError) {
+      console.error(
+        "❌ Failed to create escrow in smart contract:",
+        escrowError
+      );
+      purchase.escrowStatus = "failed";
+      await purchase.save();
+
+      return res.status(500).json({
+        error:
+          "Payment received but escrow registration failed. Contact support.",
+        purchaseId: purchase._id,
+      });
+    }
 
     res.json({
       success: true,
-      message: "Purchase processed successfully",
+      message: "Purchase successful",
       purchase: {
-        id: purchase._id,
+        _id: purchase._id,
         transactionHash: purchase.transactionHash,
-        escrowReleaseDate: purchase.escrowReleaseDate,
-        refundEligibleUntil: purchase.escrowReleaseDate,
+        escrowId: purchase.escrowId,
+        status: purchase.status,
+        escrowStatus: purchase.escrowStatus,
       },
     });
   } catch (error) {
@@ -426,11 +563,7 @@ const processPurchase = async (req, res) => {
 };
 
 /**
- * Request refund
- * AUTHENTICATED + CRITICAL RATE LIMITED
- */
-/**
- * Request refund
+ * Request refund for a purchase
  * AUTHENTICATED + CRITICAL RATE LIMITED
  */
 const requestRefund = async (req, res) => {
@@ -442,7 +575,7 @@ const requestRefund = async (req, res) => {
       return res.status(400).json({ error: "Purchase ID required" });
     }
 
-    // Get purchase
+    // Get purchase with course details
     const purchase = await Purchase.findById(purchaseId).populate("course");
 
     if (!purchase) {
@@ -450,7 +583,7 @@ const requestRefund = async (req, res) => {
     }
 
     // Verify ownership
-    if (purchase.user.toString() !== userId) {
+    if (purchase.user.toString() !== userId.toString()) {
       return res
         .status(403)
         .json({ error: "Not authorized to refund this purchase" });
@@ -463,6 +596,34 @@ const requestRefund = async (req, res) => {
       return res.status(400).json({ error: eligibility.reason });
     }
 
+    const paymentMode = process.env.PAYMENT_MODE || "blockchain";
+
+    // DUMMY MODE - Instant refund
+    if (paymentMode === "dummy") {
+      console.log("🔧 DUMMY MODE: Processing instant refund");
+
+      purchase.escrowStatus = "refunded";
+      purchase.status = "refunded";
+      purchase.refundRequestedAt = new Date();
+      purchase.refundProcessedAt = new Date();
+      purchase.refundTransactionHash = `dummy_refund_${Date.now()}`;
+      purchase.refundEligible = false;
+
+      await purchase.save();
+
+      return res.json({
+        success: true,
+        message: "Refund processed successfully (DUMMY MODE)",
+        refund: {
+          transactionHash: purchase.refundTransactionHash,
+          amount: purchase.amountInToken,
+          processedAt: purchase.refundProcessedAt,
+          mode: "dummy",
+        },
+      });
+    }
+
+    // BLOCKCHAIN MODE - Process via smart contract
     // Get payment token
     const paymentToken = await PaymentToken.findById(purchase.paymentToken);
     if (!paymentToken) {
@@ -523,7 +684,6 @@ const requestRefund = async (req, res) => {
   }
 };
 
-// ← ADD THIS EXPORT SECTION
 module.exports = {
   getPaymentTokens,
   getTokenPrice,

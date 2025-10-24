@@ -33,6 +33,9 @@ const purchaseSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    amountInUSD: {
+      type: Number, // Alias for compatibility
+    },
 
     // Transaction
     transactionHash: {
@@ -51,15 +54,24 @@ const purchaseSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    toAddress: {
+      type: String, // NEW - instructor wallet address
+    },
 
     // Fee distribution
     platformFeeAmount: {
       type: String, // In token
       required: true,
     },
+    platformAmount: {
+      type: String, // Alias for compatibility
+    },
     instructorFeeAmount: {
       type: String, // In token
       required: true,
+    },
+    instructorAmount: {
+      type: String, // Alias for compatibility
     },
     revenueSplitAmount: {
       type: String, // In token (20% of platform fee)
@@ -75,9 +87,13 @@ const purchaseSchema = new mongoose.Schema(
     },
 
     // Escrow status
+    escrowId: {
+      type: String, // NEW - smart contract escrow ID
+      index: true,
+    },
     escrowStatus: {
       type: String,
-      enum: ["pending", "released", "refunded"],
+      enum: ["pending", "released", "refunded", "failed", "dummy"], // UPDATED - added 'failed' and 'dummy'
       default: "pending",
       index: true,
     },
@@ -88,6 +104,8 @@ const purchaseSchema = new mongoose.Schema(
     },
     escrowReleasedAt: Date,
     escrowReleaseTransactionHash: String,
+    escrowCreatedTxHash: String, // NEW - tx hash when escrow created in contract
+    escrowReleaseTxHash: String, // NEW - alias for escrowReleaseTransactionHash
 
     // Refund tracking
     refundEligible: {
@@ -160,6 +178,43 @@ purchaseSchema.index({ course: 1, createdAt: -1 });
 purchaseSchema.index({ escrowStatus: 1, escrowReleaseDate: 1 });
 purchaseSchema.index({ transactionHash: 1 }, { unique: true });
 purchaseSchema.index({ refundEligible: 1, status: 1 });
+
+// Pre-save hook to sync alias fields
+purchaseSchema.pre("save", function (next) {
+  // Sync amountInUSD with priceUSD
+  if (this.priceUSD && !this.amountInUSD) {
+    this.amountInUSD = this.priceUSD;
+  }
+  if (this.amountInUSD && !this.priceUSD) {
+    this.priceUSD = this.amountInUSD;
+  }
+
+  // Sync platformAmount with platformFeeAmount
+  if (this.platformFeeAmount && !this.platformAmount) {
+    this.platformAmount = this.platformFeeAmount;
+  }
+  if (this.platformAmount && !this.platformFeeAmount) {
+    this.platformFeeAmount = this.platformAmount;
+  }
+
+  // Sync instructorAmount with instructorFeeAmount
+  if (this.instructorFeeAmount && !this.instructorAmount) {
+    this.instructorAmount = this.instructorFeeAmount;
+  }
+  if (this.instructorAmount && !this.instructorFeeAmount) {
+    this.instructorFeeAmount = this.instructorAmount;
+  }
+
+  // Sync escrowReleaseTxHash with escrowReleaseTransactionHash
+  if (this.escrowReleaseTransactionHash && !this.escrowReleaseTxHash) {
+    this.escrowReleaseTxHash = this.escrowReleaseTransactionHash;
+  }
+  if (this.escrowReleaseTxHash && !this.escrowReleaseTransactionHash) {
+    this.escrowReleaseTransactionHash = this.escrowReleaseTxHash;
+  }
+
+  next();
+});
 
 // Method to check refund eligibility
 purchaseSchema.methods.checkRefundEligibility = function () {

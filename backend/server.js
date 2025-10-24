@@ -92,13 +92,8 @@ app.use("/api/purchases", require("./routes/purchases"));
 app.use("/api/reviews", require("./routes/reviews"));
 app.use("/api/enrollments", require("./routes/enrollments")); // ← ADD THIS
 app.use("/api/questions", require("./routes/questions"));
-app.use("/api/certificates", certificateRoutes);
-app.use("/api/notes", require("./routes/Notes"));
-app.use("/api/levels", levelRoutes);
-app.use("/api/upload", uploadRoutes);
-app.use("/api/categories", categoryRoutes);
 app.use("/api/admin", require("./routes/admin"));
-app.use("/api/nft", nftRoutes);
+app.use("/api/notes", require("./routes/Notes"));
 app.use(
   "/api/professional-certifications",
   require("./routes/professionalCertifications")
@@ -108,6 +103,16 @@ app.use(
   require("./routes/adminProfessionalCertifications")
 );
 app.use("/api/payment", require("./modules/payment/routes"));
+
+app.use("/api/certificates", certificateRoutes);
+
+app.use("/api/levels", levelRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/categories", categoryRoutes);
+
+app.use("/api/payment", paymentRoutes);
+app.use("/api/admin/payment", adminPaymentRoutes);
+app.use("/api/nft", nftRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
