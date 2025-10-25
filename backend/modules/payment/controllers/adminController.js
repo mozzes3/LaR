@@ -263,68 +263,38 @@ const getAllInstructorFeeSettings = async (req, res) => {
  */
 const getAllEscrows = async (req, res) => {
   try {
-    const { status, blockchain, page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 20, escrowStatus, status } = req.query;
 
+    const Purchase = require("../../../models/Purchase");
     const query = {};
 
-    if (status) {
-      query.escrowStatus = status;
-    }
-
-    if (blockchain) {
-      query.blockchain = blockchain;
-    }
-
-    const Purchase = require("../models/Purchase");
+    if (escrowStatus) query.escrowStatus = escrowStatus;
+    if (status) query.status = status;
 
     const escrows = await Purchase.find(query)
-      .populate("user", "username email displayName")
-      .populate("course", "title slug")
-      .populate("paymentToken", "name symbol decimals")
+      .populate("user", "username email walletAddress")
+      .populate("course", "title slug thumbnail")
+      .populate("paymentToken", "symbol name")
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
       .lean();
-
-    console.log("📊 First escrow user data:", {
-      user: escrows[0]?.user,
-      hasUser: !!escrows[0]?.user,
-      userName: escrows[0]?.user?.name,
-      userDisplayName: escrows[0]?.user?.displayName,
-    });
 
     const total = await Purchase.countDocuments(query);
 
-    const escrowsWithDetails = escrows.map((escrow) => {
-      const now = new Date();
-      const releaseDate = new Date(escrow.escrowReleaseDate);
-      const canRelease = now >= releaseDate && escrow.escrowStatus === "locked";
-      const canRefund = now < releaseDate && escrow.escrowStatus === "locked";
-
-      return {
-        ...escrow,
-        canRelease,
-        canRefund,
-        daysUntilRelease: Math.max(
-          0,
-          Math.ceil((releaseDate - now) / (1000 * 60 * 60 * 24))
-        ),
-      };
-    });
-
     res.json({
       success: true,
-      escrows: escrowsWithDetails,
+      escrows,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / parseInt(limit)),
+        pages: Math.ceil(total / limit),
       },
     });
   } catch (error) {
-    console.error("Get all escrows error:", error);
-    res.status(500).json({ success: false, error: "Failed to fetch escrows" });
+    console.error("Get escrows error:", error);
+    res.status(500).json({ error: "Failed to fetch escrows" });
   }
 };
 

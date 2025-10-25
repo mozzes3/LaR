@@ -1,39 +1,63 @@
 const express = require("express");
 const router = express.Router();
 const adminPaymentController = require("../controllers/adminController"); // ✅ Keep this
-const { authenticate, isAdmin } = require("../../../middleware/auth");
+const { authenticate } = require("../../../middleware/auth");
+const { isPaymentAdmin } = require("../../../middleware/paymentAdmin");
 const {
   writeLimiter,
   adminLimiter,
+  paymentAdminLimiter,
+  paymentAdminReadLimiter,
+  paymentAdminDeleteLimiter,
 } = require("../../../middleware/rateLimits");
+const {
+  validateTokenCreation,
+  validateTokenUpdate,
+  validateSettingsUpdate,
+} = require("../../../middleware/paymentAdminValidation");
+const { auditLog } = require("../../../middleware/paymentAdminAudit");
 
 // All routes require admin authentication
 router.use(authenticate);
-router.use(isAdmin);
-
+router.use(isPaymentAdmin);
+router.use(auditLog);
 /**
  * PAYMENT TOKEN MANAGEMENT
  */
-router.get("/tokens", adminPaymentController.getPaymentTokensAdmin);
-router.post("/tokens", writeLimiter, adminPaymentController.createPaymentToken);
+router.get(
+  "/tokens",
+  paymentAdminReadLimiter,
+  adminPaymentController.getPaymentTokensAdmin
+);
+router.post(
+  "/tokens",
+  paymentAdminLimiter,
+  validateTokenCreation,
+  adminPaymentController.createPaymentToken
+);
 router.put(
   "/tokens/:tokenId",
-  writeLimiter,
+  paymentAdminLimiter,
   adminPaymentController.updatePaymentToken
 );
 router.delete(
   "/tokens/:tokenId",
-  writeLimiter,
+  paymentAdminDeleteLimiter, // 3 per HOUR
+  validateTokenUpdate,
   adminPaymentController.deletePaymentToken
 );
 
 /**
  * PLATFORM SETTINGS
  */
-router.get("/settings", adminPaymentController.getPlatformSettings);
+router.get(
+  "/settings",
+  paymentAdminReadLimiter,
+  adminPaymentController.getPlatformSettings
+);
 router.put(
   "/settings",
-  writeLimiter,
+  paymentAdminReadLimiter, // 20/min
   adminPaymentController.updatePlatformSettings
 );
 
@@ -42,30 +66,36 @@ router.put(
  */
 router.get(
   "/instructor-fees",
+  paymentAdminReadLimiter,
   adminPaymentController.getAllInstructorFeeSettings
 );
 router.get(
   "/instructor-fees/:instructorId",
+  paymentAdminReadLimiter,
   adminPaymentController.getInstructorFeeSettings
 );
 router.put(
   "/instructor-fees/:instructorId",
-  writeLimiter,
+  paymentAdminLimiter,
   adminPaymentController.updateInstructorFeeSettings
 );
 
 /**
  * ESCROW MANAGEMENT (NEW)
  */
-router.get("/escrows", adminLimiter, adminPaymentController.getAllEscrows);
+router.get(
+  "/escrows",
+  paymentAdminLimiter,
+  adminPaymentController.getAllEscrows
+);
 router.post(
   "/escrows/:escrowId/release",
-  adminLimiter,
+  paymentAdminLimiter,
   adminPaymentController.manualReleaseEscrow
 );
 router.post(
   "/escrows/:escrowId/refund",
-  adminLimiter,
+  paymentAdminLimiter,
   adminPaymentController.manualRefundEscrow
 );
 

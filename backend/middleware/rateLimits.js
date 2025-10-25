@@ -215,6 +215,29 @@ const readLimiter = createLimiter({
   prefix: "rl:browse:",
   message: "Slow down! Too many page loads.",
 });
+
+const paymentAdminLimiter = createLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Only 10 operations per 15 minutes
+  prefix: "rl:payment-admin:",
+  message: "Payment admin rate limit exceeded. Wait 15 minutes.",
+  skipSuccessfulRequests: false,
+  skipFailedRequests: false,
+});
+
+const paymentAdminReadLimiter = createLimiter({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 20, // 20 reads per minute
+  prefix: "rl:payment-admin-read:",
+  message: "Too many payment admin reads. Slow down.",
+});
+
+const paymentAdminDeleteLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // Only 3 deletes per hour
+  prefix: "rl:payment-admin-delete:",
+  message: "Delete limit exceeded. Wait 1 hour.",
+});
 module.exports = {
   browsingLimiter,
   publicLimiter,
@@ -230,4 +253,7 @@ module.exports = {
   redisClient,
   previewLimiter,
   readLimiter,
+  paymentAdminLimiter,
+  paymentAdminReadLimiter,
+  paymentAdminDeleteLimiter,
 };
