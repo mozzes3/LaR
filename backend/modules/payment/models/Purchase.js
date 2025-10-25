@@ -1,5 +1,9 @@
 const mongoose = require("mongoose");
 
+// CRITICAL: Delete existing model to prevent cache issues
+delete mongoose.connection.models.Purchase;
+delete mongoose.models.Purchase;
+
 const purchaseSchema = new mongoose.Schema(
   {
     user: {
@@ -15,127 +19,31 @@ const purchaseSchema = new mongoose.Schema(
       index: true,
     },
 
-    // NEW PAYMENT SYSTEM FIELDS
+    // NEW Payment System Fields (OPTIONAL for backward compatibility)
     paymentToken: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "PaymentToken",
-      required: false, // Made optional for backward compatibility
     },
-    amountInToken: {
-      type: String,
-      required: false,
-    },
-    amountInUSD: {
-      type: Number,
-      required: false,
-    },
+    amountInToken: String,
+    amountInUSD: Number,
+    platformAmount: String,
+    instructorAmount: String,
+    revenueSplitAmount: String,
+    platformFeePercentage: Number,
+    instructorFeePercentage: Number,
 
-    // Transaction
-    transactionHash: {
-      type: String,
-      required: false, // Made optional for backward compatibility
-      index: true,
-      sparse: true, // Allow multiple null values
-    },
-    blockchain: {
-      type: String,
-      enum: ["evm", "solana"],
-      required: false,
-    },
-    blockNumber: Number,
-    fromAddress: {
-      type: String,
-      required: false,
-    },
-    toAddress: String,
-
-    // Fee distribution (new system)
-    platformAmount: {
-      type: String,
-      required: false,
-    },
-    instructorAmount: {
-      type: String,
-      required: false,
-    },
-    revenueSplitAmount: {
-      type: String,
-      required: false,
-    },
-    platformFeePercentage: {
-      type: Number,
-      required: false,
-    },
-    instructorFeePercentage: {
-      type: Number,
-      required: false,
-    },
-
-    // Escrow
-    escrowId: String,
-    escrowStatus: {
-      type: String,
-      enum: ["pending", "released", "refunded", "failed", "dummy", "locked"],
-      default: "pending",
-      index: true,
-    },
-    escrowReleaseDate: {
-      type: Date,
-      required: false, // Made optional for backward compatibility
-    },
-    escrowReleasedAt: Date,
-    escrowReleasedBy: String, // Wallet address that released
-    escrowReleaseReason: String,
-    escrowReleaseSignature: String,
-    escrowCreatedTxHash: String,
-    escrowReleaseTxHash: String,
-
-    // Refund
-    refundEligible: {
-      type: Boolean,
-      default: true,
-    },
-    refundRequestedAt: Date,
-    refundProcessedAt: Date,
-    refundTransactionHash: String,
-    refundReason: String,
-    refundedAt: Date,
-
-    // Admin grant tracking
-    grantedByAdmin: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    grantReason: {
-      type: String,
-      default: null,
-    },
-
-    // OLD PAYMENT SYSTEM FIELDS (for backward compatibility)
+    // OLD Payment System Fields (OPTIONAL for backward compatibility)
     paymentMethod: {
       type: String,
-      enum: ["fdr", "usdt", "usdc", "eth", "stripe", "crypto", "free"],
-      required: false,
+      enum: ["fdr", "usdt", "usdc", "eth", "crypto"],
     },
-    amount: {
-      type: Number,
-      required: false,
-    },
+    amount: Number,
     currency: {
       type: String,
-      enum: ["USD", "FDR", "USDC", "USDT"],
-      required: false,
+      enum: ["USD", "FDR"],
     },
-    instructorRevenue: {
-      type: Number,
-      required: false,
-    },
-    platformFee: {
-      type: Number,
-      required: false,
-    },
-    paymentId: String, // For Stripe
+    instructorRevenue: Number,
+    platformFee: Number,
     cashbackAmount: {
       type: Number,
       default: 0,
@@ -145,7 +53,48 @@ const purchaseSchema = new mongoose.Schema(
       default: false,
     },
 
-    // Progress tracking
+    // Transaction
+    transactionHash: {
+      type: String,
+      index: true,
+    },
+    blockchain: {
+      type: String,
+      enum: ["evm", "solana"],
+    },
+    blockNumber: Number,
+    fromAddress: String,
+    toAddress: String,
+
+    // Escrow
+    escrowId: String,
+    escrowStatus: {
+      type: String,
+      enum: ["pending", "released", "refunded", "failed", "dummy", "locked"],
+      default: "pending",
+      index: true,
+    },
+    escrowReleaseDate: Date,
+    escrowReleasedAt: Date,
+    escrowCreatedTxHash: String,
+    escrowReleaseTxHash: String,
+
+    // Refund
+    refundEligible: {
+      type: Boolean,
+      default: true,
+    },
+    grantedByAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    grantReason: String,
+    refundRequestedAt: Date,
+    refundProcessedAt: Date,
+    refundTransactionHash: String,
+    refundReason: String,
+
+    // Progress
     progress: {
       type: Number,
       default: 0,
@@ -172,12 +121,6 @@ const purchaseSchema = new mongoose.Schema(
     },
     certificateId: String,
 
-    // Experience earned
-    experienceEarned: {
-      type: Number,
-      default: 0,
-    },
-
     // Status
     status: {
       type: String,
@@ -185,14 +128,13 @@ const purchaseSchema = new mongoose.Schema(
         "pending",
         "active",
         "refunded",
+        "expired",
         "escrow_released",
         "disputed",
         "failed",
         "revoked",
-        "expired",
-        "completed",
       ],
-      default: "pending",
+      default: "active",
       index: true,
     },
     revokedAt: Date,
@@ -201,6 +143,11 @@ const purchaseSchema = new mongoose.Schema(
       ref: "User",
     },
     revokeReason: String,
+    refundedAt: Date,
+    experienceEarned: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -210,27 +157,16 @@ const purchaseSchema = new mongoose.Schema(
 // Indexes
 purchaseSchema.index({ user: 1, course: 1 });
 purchaseSchema.index({ user: 1, status: 1 });
+purchaseSchema.index({ course: 1, createdAt: -1 });
+purchaseSchema.index({ escrowStatus: 1, escrowReleaseDate: 1 });
+purchaseSchema.index({ transactionHash: 1 });
 purchaseSchema.index({ user: 1, isCompleted: 1 });
 purchaseSchema.index({ course: 1, isCompleted: 1 });
-purchaseSchema.index({ course: 1, createdAt: -1 });
-purchaseSchema.index({ course: 1, status: 1 });
 purchaseSchema.index({ lastAccessedAt: -1 });
 purchaseSchema.index({ status: 1, createdAt: -1 });
-purchaseSchema.index({ escrowStatus: 1, escrowReleaseDate: 1 });
-purchaseSchema.index({ transactionHash: 1 }, { sparse: true });
+purchaseSchema.index({ course: 1, status: 1 });
 
-// Mark lesson as completed (from old model)
-purchaseSchema.methods.completeLesson = function (lessonId) {
-  if (!this.completedLessons.includes(lessonId)) {
-    this.completedLessons.push(lessonId);
-    this.lastAccessedLesson = lessonId;
-    this.lastAccessedAt = new Date();
-    return this.save();
-  }
-  return Promise.resolve(this);
-};
-
-// Refund eligibility check
+// Method: Check refund eligibility
 purchaseSchema.methods.checkRefundEligibility = function () {
   const now = new Date();
   const daysSincePurchase = (now - this.createdAt) / (1000 * 60 * 60 * 24);
@@ -250,6 +186,17 @@ purchaseSchema.methods.checkRefundEligibility = function () {
   return { eligible: true };
 };
 
-module.exports =
-  mongoose.models.PaymentPurchase ||
-  mongoose.model("PaymentPurchase", purchaseSchema, "purchases");
+// Method: Mark lesson as completed
+purchaseSchema.methods.completeLesson = function (lessonId) {
+  if (!this.completedLessons.includes(lessonId)) {
+    this.completedLessons.push(lessonId);
+    this.lastAccessedLesson = lessonId;
+    this.lastAccessedAt = new Date();
+  }
+  return this.save();
+};
+
+// CRITICAL: Force create with specific collection name
+const Purchase = mongoose.model("Purchase", purchaseSchema, "purchases");
+
+module.exports = Purchase;

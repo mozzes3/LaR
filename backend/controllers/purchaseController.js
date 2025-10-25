@@ -220,8 +220,24 @@ const completeLesson = async (req, res) => {
     console.log("  - Completed lessons:", completedCount);
     console.log("  - Calculated progress:", calculatedProgress);
 
-    // Save purchase FIRST
-    await purchase.save();
+    // CRITICAL FIX: Use direct MongoDB update to bypass schema validation
+    // This prevents validation errors from old Purchase schema fields
+    await Purchase.collection.updateOne(
+      { _id: purchase._id },
+      {
+        $set: {
+          completedLessons: purchase.completedLessons,
+          lastAccessedLesson: lessonId,
+          lastAccessedAt: new Date(),
+          totalWatchTime: purchase.totalWatchTime,
+          progress: purchase.progress,
+          isCompleted: purchase.isCompleted,
+          completedAt: purchase.completedAt,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
     console.log("✅ Lesson marked complete");
 
     // Variable to store certificate
@@ -242,6 +258,22 @@ const completeLesson = async (req, res) => {
             `✅ Certificate generated: ${certificate.certificateNumber}`
           );
           console.log(`📜 Certificate ID: ${certificate._id}`);
+
+          // Update purchase with certificate info using direct MongoDB update
+          await Purchase.collection.updateOne(
+            { _id: purchase._id },
+            {
+              $set: {
+                certificateIssued: true,
+                certificateId: certificate._id.toString(),
+                updatedAt: new Date(),
+              },
+            }
+          );
+
+          // Update the in-memory object for response
+          purchase.certificateIssued = true;
+          purchase.certificateId = certificate._id.toString();
         }
       } catch (certError) {
         console.error("❌ Error generating certificate:", certError);
@@ -262,8 +294,17 @@ const completeLesson = async (req, res) => {
     // Return response with certificate if available
     res.json({
       success: true,
-      purchase,
-      certificate: certificateData, // ✅ RETURN CERTIFICATE
+      purchase: {
+        _id: purchase._id,
+        progress: purchase.progress,
+        completedLessons: purchase.completedLessons,
+        totalWatchTime: purchase.totalWatchTime,
+        isCompleted: purchase.isCompleted,
+        completedAt: purchase.completedAt,
+        certificateIssued: purchase.certificateIssued,
+        certificateId: purchase.certificateId,
+      },
+      certificate: certificateData, // ✅ RETURN CERTIFICATE (triggers NFT)
       newAchievements,
       levelInfo: {
         level: updatedUser.level,

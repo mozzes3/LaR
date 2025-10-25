@@ -1,7 +1,8 @@
 // backend/services/professionalCertificateBlockchainService.js
 const { ethers } = require("ethers");
+const fs = require("fs").promises;
+const path = require("path");
 
-// UPDATED ABI - Matches simplified contract (no uint16 fields, no level, no revoked)
 const PROFESSIONAL_CERT_ABI = [
   "function recordCertificate(string certificateNumber, string certificateType, string studentName, string studentWallet, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate) public returns (bytes32)",
   "function verifyCertificate(string certificateNumber) public view returns (bool exists, string studentName, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate)",
@@ -10,67 +11,76 @@ const PROFESSIONAL_CERT_ABI = [
   "event CertificateRecorded(bytes32 indexed certificateHash, string certificateNumber, string studentName, string certificationTitle, uint256 timestamp)",
 ];
 
-/**
- * Extend existing BlockchainService with professional certificate methods
- */
 class ProfessionalCertificateBlockchainService {
-  constructor(blockchainService) {
-    this.service = blockchainService;
-    this.provider = blockchainService.provider;
-    this.wallet = blockchainService.wallet;
+  constructor() {
+    this.provider = null;
+    this.wallet = null;
+    this.contract = null;
     this.contractAddress = process.env.PROFESSIONAL_CERT_CONTRACT_ADDRESS;
-    this.network = blockchainService.network;
+    this.network = "testnet";
+    this.initialized = false;
+  }
 
-    console.log("🔍 DEBUG - Contract Address from ENV:", this.contractAddress); // Add this
+  async initialize() {
+    if (this.initialized) return;
 
-    if (!this.contractAddress) {
-      console.warn(
-        "⚠️ PROFESSIONAL_CERT_CONTRACT_ADDRESS not set - professional certificates will not be recorded on blockchain"
+    try {
+      // Initialize provider
+      const rpcUrl = process.env.BLOCKCHAIN_RPC_URL;
+      if (!rpcUrl) {
+        throw new Error("BLOCKCHAIN_RPC_URL not configured");
+      }
+
+      this.provider = new ethers.JsonRpcProvider(rpcUrl);
+      console.log("✅ Provider initialized:", rpcUrl);
+
+      // Load wallet from encrypted file
+      const walletPath = process.env.WALLET_FILE_PATH;
+      const walletPassword = process.env.WALLET_PASSWORD;
+
+      if (!walletPath || !walletPassword) {
+        throw new Error("Wallet configuration missing");
+      }
+
+      const encryptedJson = await fs.readFile(walletPath, "utf8");
+      this.wallet = await ethers.Wallet.fromEncryptedJson(
+        encryptedJson,
+        walletPassword
       );
-      this.contract = null;
-    } else {
-      // Wait for wallet to be ready before creating contract
-      if (!this.wallet) {
-        console.warn("⚠️ Wallet not initialized yet");
-        this.contract = null;
-      } else {
-        this.contract = new ethers.Contract(
-          this.contractAddress,
-          PROFESSIONAL_CERT_ABI,
-          this.wallet
-        );
-        console.log(
-          "✅ Professional Certificate Contract initialized:",
-          this.contractAddress
-        );
+      this.wallet = this.wallet.connect(this.provider);
+
+      console.log("✅ Wallet loaded:", this.wallet.address);
+
+      // Initialize contract
+      if (!this.contractAddress) {
+        console.warn("⚠️ PROFESSIONAL_CERT_CONTRACT_ADDRESS not set");
+        return;
       }
+
+      this.contract = new ethers.Contract(
+        this.contractAddress,
+        PROFESSIONAL_CERT_ABI,
+        this.wallet
+      );
+
+      console.log(
+        "✅ Professional Certificate Contract initialized:",
+        this.contractAddress
+      );
+      this.initialized = true;
+    } catch (error) {
+      console.error(
+        "❌ Failed to initialize ProfessionalCertificateBlockchainService:",
+        error
+      );
+      throw error;
     }
   }
 
-  async ensureContractReady() {
-    if (!this.contract && this.contractAddress) {
-      // Wallet should be ready now
-      this.wallet = this.service.wallet;
-      if (this.wallet) {
-        this.contract = new ethers.Contract(
-          this.contractAddress,
-          PROFESSIONAL_CERT_ABI,
-          this.wallet
-        );
-        console.log(
-          "✅ Professional Certificate Contract initialized (delayed)"
-        );
-      }
-    }
-  }
-
-  /**
-   * Record professional certificate on blockchain
-   * UPDATED: Matches simplified contract (10 parameters)
-   */
   async recordProfessionalCertificate(certificateData) {
     try {
-      await this.ensureContractReady(); // Add this line
+      await this.initialize();
+
       if (!this.contract) {
         throw new Error("Professional certificate contract not initialized");
       }
@@ -92,29 +102,16 @@ class ProfessionalCertificateBlockchainService {
         `📝 Recording professional certificate: ${certificateNumber}`
       );
 
-      // Get gas price
       const feeData = await this.provider.getFeeData();
       const gasPrice = feeData.gasPrice;
       const gasPriceGwei = ethers.formatUnits(gasPrice, "gwei");
       console.log(`⛽ Gas price: ${gasPriceGwei} gwei`);
 
-      // Convert dates to timestamps
       const completedTimestamp = Math.floor(
         new Date(completedDate).getTime() / 1000
       );
       const issuedTimestamp = Math.floor(new Date(issuedDate).getTime() / 1000);
 
-      console.log("📋 Certificate data:", {
-        certificateNumber,
-        certificateType,
-        studentName,
-        certificationTitle,
-        category,
-        score,
-        grade,
-      });
-
-      // Estimate gas
       const gasEstimate = await this.contract.recordCertificate.estimateGas(
         certificateNumber,
         certificateType,
@@ -130,7 +127,6 @@ class ProfessionalCertificateBlockchainService {
 
       console.log(`⛽ Estimated gas: ${gasEstimate.toString()}`);
 
-      // Send transaction with 20% gas buffer
       const gasLimit = (gasEstimate * 120n) / 100n;
 
       const tx = await this.contract.recordCertificate(
@@ -151,24 +147,14 @@ class ProfessionalCertificateBlockchainService {
       );
 
       console.log(`📤 Transaction sent: ${tx.hash}`);
-      console.log("⏳ Waiting for confirmation...");
-
       const receipt = await tx.wait();
-
       console.log(`✅ Transaction confirmed in block ${receipt.blockNumber}`);
-      console.log(
-        `⛽ Gas used: ${receipt.gasUsed.toString()} (${
-          this.network === "mainnet" ? "STT" : "testnet STT"
-        })`
-      );
 
-      // Get explorer URL
-      const explorerBaseUrl = "https://shannon-explorer.somnia.network";
-      const explorerUrl = `${explorerBaseUrl}/tx/${tx.hash}`;
+      const explorerUrl = `https://shannon-explorer.somnia.network/tx/${tx.hash}`;
 
       return {
         success: true,
-        hash: tx.hash, // Changed from transactionHash to hash
+        hash: tx.hash,
         transactionHash: tx.hash,
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed.toString(),
@@ -180,30 +166,17 @@ class ProfessionalCertificateBlockchainService {
         "❌ Professional certificate blockchain recording failed:",
         error
       );
-
-      if (error.reason) {
-        console.error("Error reason:", error.reason);
-      }
-      if (error.data) {
-        console.error("Error data:", error.data);
-      }
-
       throw new Error(`Blockchain recording failed: ${error.message}`);
     }
   }
 
-  /**
-   * Verify professional certificate on blockchain
-   */
   async verifyProfessionalCertificate(certificateNumber) {
     try {
+      await this.initialize();
+
       if (!this.contract) {
         throw new Error("Professional certificate contract not initialized");
       }
-
-      console.log(
-        `🔍 Verifying professional certificate: ${certificateNumber}`
-      );
 
       const result = await this.contract.verifyCertificate(certificateNumber);
 
@@ -223,28 +196,25 @@ class ProfessionalCertificateBlockchainService {
     }
   }
 
-  /**
-   * Check if certificate is valid
-   */
   async isCertificateValid(certificateNumber) {
     try {
+      await this.initialize();
+
       if (!this.contract) {
         return false;
       }
 
-      const isValid = await this.contract.isCertificateValid(certificateNumber);
-      return isValid;
+      return await this.contract.isCertificateValid(certificateNumber);
     } catch (error) {
       console.error("Certificate validation error:", error);
       return false;
     }
   }
 
-  /**
-   * Get full certificate details from blockchain
-   */
   async getCertificateDetails(certificateNumber) {
     try {
+      await this.initialize();
+
       if (!this.contract) {
         throw new Error("Professional certificate contract not initialized");
       }
@@ -274,15 +244,14 @@ class ProfessionalCertificateBlockchainService {
   }
 }
 
-// Singleton instance
+// Singleton
 let professionalCertBlockchainService = null;
 
 const getProfessionalCertBlockchainService = async () => {
   if (!professionalCertBlockchainService) {
-    const { getBlockchainService } = require("./blockchainService");
-    const baseService = await getBlockchainService(); // Add await
     professionalCertBlockchainService =
-      new ProfessionalCertificateBlockchainService(baseService);
+      new ProfessionalCertificateBlockchainService();
+    await professionalCertBlockchainService.initialize();
   }
   return professionalCertBlockchainService;
 };

@@ -1,6 +1,8 @@
 // backend/services/nftBlockchainService.js
 const { ethers } = require("ethers");
-
+const {
+  getPaymentService,
+} = require("../modules/payment/services/blockchainService");
 const COMPETENCY_NFT_ABI = [
   "function mintCertificate(address student, string certificateNumber, string metadataURI) external returns (uint256)",
   "function batchMintCertificates(address[] students, string[] certificateNumbers, string[] metadataURIs) external",
@@ -87,33 +89,78 @@ class NFTBlockchainService {
   }
 
   async ensureContractReady() {
-    // EXISTING: Competency contract delayed init (unchanged)
-    if (!this.competencyContract && this.competencyContractAddress) {
-      this.wallet = this.service.wallet;
-      if (this.wallet) {
-        this.competencyContract = new ethers.Contract(
-          this.competencyContractAddress,
-          COMPETENCY_NFT_ABI,
-          this.wallet
+    // Initialize provider and wallet if not ready
+    if (!this.wallet || !this.provider) {
+      console.log("🔧 Initializing NFT wallet from encrypted file...");
+
+      // Get network configuration
+      const network = process.env.BLOCKCHAIN_NETWORK || "testnet";
+      const rpcUrl = process.env.BLOCKCHAIN_RPC_URL;
+
+      if (!rpcUrl) {
+        throw new Error("BLOCKCHAIN_RPC_URL not configured");
+      }
+
+      // Initialize provider for Somnia
+      this.provider = new ethers.JsonRpcProvider(rpcUrl);
+      console.log(`✅ Provider initialized: ${rpcUrl}`);
+
+      // Load wallet from encrypted file
+      try {
+        const fs = require("fs");
+        const walletFilePath = process.env.WALLET_FILE_PATH;
+        const walletPassword = process.env.WALLET_PASSWORD;
+
+        if (!walletFilePath || !walletPassword) {
+          throw new Error("WALLET_FILE_PATH or WALLET_PASSWORD not configured");
+        }
+
+        // Read encrypted wallet file
+        const encryptedJson = fs.readFileSync(walletFilePath, "utf8");
+
+        // Decrypt wallet
+        this.wallet = await ethers.Wallet.fromEncryptedJson(
+          encryptedJson,
+          walletPassword
         );
-        console.log("✅ Competency NFT Contract initialized (delayed)");
+
+        // Connect to provider
+        this.wallet = this.wallet.connect(this.provider);
+
+        console.log(`✅ NFT Wallet loaded: ${this.wallet.address}`);
+        console.log(`✅ Network: ${network}`);
+      } catch (error) {
+        console.error("❌ Failed to load NFT wallet:", error.message);
+        throw new Error(`NFT wallet initialization failed: ${error.message}`);
       }
     }
 
-    // NEW: Completion contract delayed init
+    // Initialize Competency contract if needed
+    if (!this.competencyContract && this.competencyContractAddress) {
+      this.competencyContract = new ethers.Contract(
+        this.competencyContractAddress,
+        COMPETENCY_NFT_ABI,
+        this.wallet
+      );
+      console.log(
+        "✅ Competency NFT Contract initialized:",
+        this.competencyContractAddress
+      );
+    }
+
+    // Initialize Completion contract if needed
     if (!this.completionContract && this.completionContractAddress) {
-      this.wallet = this.service.wallet;
-      if (this.wallet) {
-        this.completionContract = new ethers.Contract(
-          this.completionContractAddress,
-          COMPLETION_NFT_ABI,
-          this.wallet
-        );
-        console.log("✅ Completion NFT Contract initialized (delayed)");
-      }
+      this.completionContract = new ethers.Contract(
+        this.completionContractAddress,
+        COMPLETION_NFT_ABI,
+        this.wallet
+      );
+      console.log(
+        "✅ Completion NFT Contract initialized:",
+        this.completionContractAddress
+      );
     }
   }
-
   /**
    * EXISTING: Mint Certificate of Competency NFT (UNCHANGED - your working version)
    */
@@ -444,9 +491,33 @@ let nftServiceInstance = null;
 
 async function getNFTBlockchainService() {
   if (!nftServiceInstance) {
-    const { getBlockchainService } = require("./blockchainService");
-    const blockchainService = await getBlockchainService();
-    nftServiceInstance = new NFTBlockchainService(blockchainService);
+    const {
+      getPaymentService,
+    } = require("../modules/payment/services/blockchainService");
+    const paymentService = getPaymentService();
+
+    // Ensure payment service is initialized with a payment token
+    const PaymentToken = require("../modules/payment/models/PaymentToken");
+
+    try {
+      // Get an active payment token to initialize the service
+      const activeToken = await PaymentToken.findOne({
+        isActive: true,
+        blockchain: "evm",
+      }).lean();
+
+      if (activeToken) {
+        console.log("🔧 Initializing payment service for NFT...");
+        await paymentService.initialize(activeToken);
+
+        // Wait a moment for wallet to be ready
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    } catch (error) {
+      console.error("⚠️ Failed to initialize payment service:", error.message);
+    }
+
+    nftServiceInstance = new NFTBlockchainService(paymentService);
   }
   return nftServiceInstance;
 }

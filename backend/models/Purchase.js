@@ -1,3 +1,1 @@
-const PaymentPurchase = require("../modules/payment/models/Purchase");
-
-module.exports = PaymentPurchase;
+module.exports = require("../modules/payment/models/Purchase");
