@@ -89,15 +89,108 @@ const isInstructor = (req, res, next) => {
 };
 
 /**
- * Check if user is admin
+ * Check if user is admin or moderator
  */
-const isAdmin = (req, res, next) => {
-  if (req.user.role !== "admin" && !req.user.isSuperAdmin) {
+const isAdmin = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    // SuperAdmin always has access
+    if (user.isSuperAdmin) {
+      req.userRole = "superadmin";
+      return next();
+    }
+
+    // Legacy admin check
+    if (user.role === "admin") {
+      req.userRole = "admin";
+      return next();
+    }
+
+    // Check if user has admin or moderator roleRef
+    if (user.roleRef) {
+      const Role = require("../models/Role");
+      const role = await Role.findById(user.roleRef);
+
+      if (role && role.isActive) {
+        // Allow admin, moderator, or any role with "moderator" in name
+        if (
+          role.name === "admin" ||
+          role.name === "moderator" ||
+          role.name.includes("moderator")
+        ) {
+          req.userRole = role.name;
+          return next();
+        }
+      }
+    }
+
     return res.status(403).json({
-      error: "Access denied. Admin privileges required.",
+      error: "Access denied. Admin/Moderator privileges required.",
     });
+  } catch (error) {
+    console.error("Admin check error:", error);
+    return res.status(500).json({ error: "Failed to verify access" });
   }
-  next();
+};
+
+/**
+ * Check if user has admin/moderator access (legacy OR AWS verified)
+ */
+const hasAdminAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    // SuperAdmin always has access
+    if (user.isSuperAdmin) {
+      req.userRole = "superadmin";
+      return next();
+    }
+
+    // Check if user has admin role
+    if (user.role === "admin") {
+      // Verify wallet in AWS
+      const awsModeratorService = require("../services/awsModeratorService");
+      const walletRole = await awsModeratorService.getWalletRole(
+        user.walletAddress
+      );
+
+      if (walletRole) {
+        req.userRole = walletRole;
+        return next();
+      }
+    }
+
+    // Check if user has moderator role ref
+    if (user.roleRef) {
+      const Role = require("../models/Role");
+      const role = await Role.findById(user.roleRef);
+
+      if (
+        role &&
+        role.isActive &&
+        (role.name === "admin" || role.name === "moderator")
+      ) {
+        // Verify wallet in AWS
+        const awsModeratorService = require("../services/awsModeratorService");
+        const walletRole = await awsModeratorService.getWalletRole(
+          user.walletAddress
+        );
+
+        if (walletRole) {
+          req.userRole = walletRole;
+          return next();
+        }
+      }
+    }
+
+    return res.status(403).json({
+      error: "Access denied. Admin/Moderator privileges required.",
+    });
+  } catch (error) {
+    console.error("Admin access check error:", error);
+    return res.status(500).json({ error: "Failed to verify access" });
+  }
 };
 
 module.exports = {
@@ -105,4 +198,5 @@ module.exports = {
   optionalAuth,
   isInstructor,
   isAdmin,
+  hasAdminAccess, // ADD THIS
 };

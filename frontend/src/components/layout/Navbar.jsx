@@ -212,7 +212,11 @@ const Navbar = () => {
                           </Link>
                         </div>
 
-                        {(user?.role === "admin" || user?.isSuperAdmin) && (
+                        {(user?.role === "admin" ||
+                          user?.isSuperAdmin ||
+                          user?.roleRef?.name === "admin" ||
+                          user?.roleRef?.name === "moderator" ||
+                          user?.roleRef?.name?.includes("moderator")) && (
                           <>
                             <div className="border-t border-gray-200 dark:border-gray-800 my-2"></div>
                             <Link
@@ -321,7 +325,11 @@ const Navbar = () => {
                   </Link>
                 </>
               )}
-              {(user?.role === "admin" || user?.isSuperAdmin) && (
+              {(user?.role === "admin" ||
+                user?.isSuperAdmin ||
+                user?.roleRef?.name === "admin" ||
+                user?.roleRef?.name === "moderator" ||
+                user?.roleRef?.name?.includes("moderator")) && (
                 <Link
                   to="/admin"
                   className="block py-2 text-sm font-bold text-primary-500 hover:text-primary-400"

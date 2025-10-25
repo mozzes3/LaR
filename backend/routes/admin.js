@@ -5,11 +5,18 @@ const { enforcePaginationLimits } = require("../middleware/paginationLimits");
 const adminController = require("../controllers/adminController");
 const { authenticate, isAdmin } = require("../middleware/auth");
 const { hasPermission, isSuperAdmin } = require("../middleware/permission");
+const {
+  verifyAdminAccess,
+  requireAdmin,
+} = require("../middleware/roleVerification");
+const { auditAdminAction } = require("../middleware/adminAudit");
 
-// All admin routes require authentication and admin role
+// All admin routes require authentication
 router.use(authenticate);
 router.use(isAdmin);
+router.use(verifyAdminAccess); // AWS WALLET VERIFICATION
 router.use(enforcePaginationLimits);
+
 // ===== DASHBOARD (Expensive) =====
 router.get(
   "/dashboard/stats",
@@ -22,19 +29,25 @@ router.get("/roles", adminLimiter, adminController.getAllRoles);
 router.post(
   "/roles",
   adminLimiter,
+  requireAdmin, // Only admins, not moderators
   hasPermission("roles", "create"),
+  auditAdminAction("create_role", "Role"),
   adminController.createRole
 );
 router.put(
   "/roles/:roleId",
   adminLimiter,
+  requireAdmin,
   hasPermission("roles", "update"),
+  auditAdminAction("update_role", "Role"),
   adminController.updateRole
 );
 router.delete(
   "/roles/:roleId",
   adminLimiter,
+  requireAdmin,
   hasPermission("roles", "delete"),
+  auditAdminAction("delete_role", "Role"),
   adminController.deleteRole
 );
 
@@ -45,24 +58,28 @@ router.post(
   "/users/:userId/assign-role",
   adminLimiter,
   hasPermission("users", "update"),
+  auditAdminAction("assign_role", "User"),
   adminController.assignRole
 );
 router.put(
   "/users/:userId/permissions",
   adminLimiter,
   hasPermission("users", "update"),
+  auditAdminAction("update_user_permissions", "User"),
   adminController.updateUserPermissions
 );
 router.post(
   "/users/:userId/toggle-ban",
   adminLimiter,
   hasPermission("users", "update"),
+  auditAdminAction("toggle_user_ban", "User"),
   adminController.toggleUserBan
 );
 router.post(
   "/users/:userId/make-super-admin",
   adminLimiter,
-  isSuperAdmin,
+  isSuperAdmin, // Only superadmin
+  auditAdminAction("make_super_admin", "User"),
   adminController.makeSuperAdmin
 );
 router.put(
@@ -75,6 +92,7 @@ router.post(
   "/users/:userId/toggle-instructor",
   adminLimiter,
   hasPermission("users", "update"),
+  auditAdminAction("toggle_instructor_status", "User"),
   adminController.toggleInstructorStatus
 );
 
@@ -84,15 +102,16 @@ router.put(
   "/courses/:courseId/status",
   adminLimiter,
   hasPermission("courses", "update"),
+  auditAdminAction("update_course_status", "Course"),
   adminController.updateCourseStatus
 );
 router.delete(
   "/courses/:courseId",
   adminLimiter,
   hasPermission("courses", "delete"),
+  auditAdminAction("delete_course", "Course"),
   adminController.deleteCourse
 );
-
 // ===== REVIEW MANAGEMENT (Expensive) =====
 router.get("/reviews", expensiveLimiter, adminController.getAllReviewsAdmin);
 router.put(

@@ -155,14 +155,16 @@ const AdminUserEditPage = () => {
   const loadUserDetails = async () => {
     try {
       setLoading(true);
-      const response = await adminApi.getUserDetails(userId);
-      const userData = response.data.user;
+      const [userResponse, rolesResponse] = await Promise.all([
+        adminApi.getUserDetails(userId),
+        adminApi.getAllRoles(),
+      ]);
 
+      const userData = userResponse.data.user;
       setUser(userData);
-      setSelectedRole(userData.roleRef?._id || "");
-      setUserPermissions(response.data.permissions || []);
+      setRoles(rolesResponse.data.roles);
+      setUserPermissions(userResponse.data.permissions || []);
 
-      // Populate edit form
       setUserDetails({
         username: userData.username || "",
         displayName: userData.displayName || "",
@@ -182,6 +184,7 @@ const AdminUserEditPage = () => {
         },
       });
 
+      // ✅ LOAD CUSTOM PERMISSIONS
       if (userData.customPermissions) {
         setCustomPermissions(
           userData.customPermissions.customPermissions || []
@@ -190,6 +193,16 @@ const AdminUserEditPage = () => {
           userData.customPermissions.deniedPermissions || []
         );
         setNotes(userData.customPermissions.notes || "");
+      } else {
+        // ✅ INITIALIZE FROM ROLE PERMISSIONS IF NO CUSTOM PERMS
+        if (userData.roleRef?.permissions) {
+          const rolePerms = userData.roleRef.permissions.map((perm) => ({
+            resource: perm.resource,
+            actions: [...perm.actions],
+            granted: true,
+          }));
+          setCustomPermissions(rolePerms);
+        }
       }
     } catch (error) {
       console.error("Load user error:", error);
@@ -269,7 +282,9 @@ const AdminUserEditPage = () => {
     try {
       setSaving(true);
       await adminApi.assignRole(userId, { roleId: selectedRole });
-      toast.success("Role assigned successfully");
+      toast.success(
+        "Role assigned successfully. User should reconnect wallet to see changes."
+      );
       loadUserDetails();
     } catch (error) {
       console.error("Assign role error:", error);

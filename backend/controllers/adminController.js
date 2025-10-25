@@ -348,13 +348,20 @@ const updateUserPermissions = async (req, res) => {
     const { userId } = req.params;
     const { customPermissions, deniedPermissions, notes } = req.body;
 
+    console.log("🔐 Updating permissions for user:", userId);
+    console.log("   Custom Permissions:", customPermissions);
+    console.log("   Denied Permissions:", deniedPermissions);
+
+    // ✅ DEBUG: Verify UserPermission model is loaded
+    console.log("   UserPermission model:", typeof UserPermission);
+    console.log("   UserPermission.findOne:", typeof UserPermission.findOne);
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
     let userPerm = await UserPermission.findOne({ user: userId });
-
     if (!userPerm) {
       userPerm = await UserPermission.create({
         user: userId,

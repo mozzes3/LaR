@@ -1,7 +1,7 @@
 const PaymentToken = require("../models/PaymentToken");
 const PlatformSettings = require("../models/PlatformSettings");
 const InstructorFeeSettings = require("../models/InstructorFeeSettings");
-const AdminAuditLog = require("../models/AdminAuditLog");
+const AdminAuditLog = require("../../../models/AdminAuditLog");
 const User = require("../../../models/User");
 
 /**
@@ -824,7 +824,7 @@ const getAuditLogs = async (req, res) => {
   try {
     const { page = 1, limit = 50, action, admin } = req.query;
 
-    const AdminAuditLog = require("../models/AdminAuditLog");
+    const AdminAuditLog = require("../../..models/AdminAuditLog");
 
     const query = {};
     if (action) query.action = action;

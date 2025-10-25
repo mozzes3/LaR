@@ -114,7 +114,6 @@ app.use("/api/categories", categoryRoutes);
 
 app.use("/api/payment", paymentRoutes);
 app.use("/api/admin/payment", adminPaymentRoutes);
-app.use("/api/admin/payment", authenticate, isAdmin, adminPaymentRoutes);
 app.use("/api/nft", nftRoutes);
 
 // Error handling middleware

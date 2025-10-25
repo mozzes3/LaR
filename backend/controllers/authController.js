@@ -171,7 +171,10 @@ const verifyAndLogin = async (req, res) => {
     // Update last login
     user.lastLogin = new Date();
     await user.save();
-
+    user = await User.findById(user._id)
+      .populate("roleRef")
+      .populate("customPermissions")
+      .lean();
     // Generate JWT tokens
     const accessToken = jwt.sign(
       {
@@ -220,6 +223,9 @@ const verifyAndLogin = async (req, res) => {
         avatar: user.avatar,
         role: user.role,
         isInstructor: user.isInstructor,
+        roleRef: user.roleRef, // ✅ ADD THIS
+        customPermissions: user.customPermissions, // ✅ ADD THIS
+        isSuperAdmin: user.isSuperAdmin, // ✅ ADD THIS
         level: user.level,
         experience: user.experience,
         bio: user.bio,
@@ -301,7 +307,11 @@ const refreshAccessToken = async (req, res) => {
  */
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select("-__v").lean(); // ✅ OPTIMIZATION
+    const user = await User.findById(req.userId)
+      .populate("roleRef")
+      .populate("customPermissions")
+      .select("-__v")
+      .lean();
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -320,6 +330,9 @@ const getMe = async (req, res) => {
         socialLinks: user.socialLinks,
         isInstructor: user.isInstructor,
         instructorVerified: user.instructorVerified,
+        roleRef: user.roleRef, // ADD THIS
+        customPermissions: user.customPermissions, // ADD THIS
+        isSuperAdmin: user.isSuperAdmin, // ADD THIS
         role: user.role,
         level: user.level,
         experience: user.experience,

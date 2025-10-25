@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { getVisibleStats, getVisibleActions } from "@utils/permissions";
+import { useWallet } from "@contexts/WalletContext";
 import { Link } from "react-router-dom";
 import {
   Users,
@@ -19,6 +21,7 @@ import toast from "react-hot-toast";
 
 const AdminDashboardPage = () => {
   const [loading, setLoading] = useState(true);
+  const { user } = useWallet();
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalCourses: 0,
@@ -54,21 +57,24 @@ const AdminDashboardPage = () => {
       setLoading(false);
     }
   };
-  const statCards = [
+  const visibleStats = getVisibleStats(user);
+
+  const allStatCards = [
     {
       title: "Total Users",
       value: stats.totalUsers,
       icon: Users,
       color: "blue",
       link: "/admin/users",
+      visible: visibleStats.totalUsers,
     },
-
     {
       title: "Total Courses",
       value: stats.totalCourses,
       icon: BookOpen,
       color: "purple",
       link: "/admin/courses",
+      visible: visibleStats.totalCourses,
     },
     {
       title: "Total Purchases",
@@ -76,12 +82,14 @@ const AdminDashboardPage = () => {
       icon: DollarSign,
       color: "green",
       link: "/admin/purchases",
+      visible: visibleStats.totalPurchases,
     },
     {
       title: "Total Revenue",
       value: `${stats.totalRevenue.toLocaleString()}`,
       icon: TrendingUp,
       color: "orange",
+      visible: visibleStats.totalRevenue,
     },
     {
       title: "Pending Applications",
@@ -89,6 +97,7 @@ const AdminDashboardPage = () => {
       icon: Clock,
       color: "yellow",
       link: "/admin/applications?status=pending",
+      visible: visibleStats.pendingApplications,
     },
     {
       title: "Pending Courses",
@@ -96,6 +105,7 @@ const AdminDashboardPage = () => {
       icon: BookOpen,
       color: "purple",
       link: "/admin/courses?status=pending",
+      visible: visibleStats.pendingCourses,
     },
     {
       title: "Pending Reviews",
@@ -103,6 +113,7 @@ const AdminDashboardPage = () => {
       icon: Star,
       color: "blue",
       link: "/admin/reviews?status=pending",
+      visible: visibleStats.pendingReviews,
     },
     {
       title: "Flagged Reviews",
@@ -110,6 +121,7 @@ const AdminDashboardPage = () => {
       icon: AlertCircle,
       color: "red",
       link: "/admin/reviews?status=flagged",
+      visible: visibleStats.flaggedReviews,
     },
     {
       title: "Total Certifications",
@@ -117,6 +129,7 @@ const AdminDashboardPage = () => {
       icon: Award,
       color: "purple",
       link: "/admin/professional-certifications",
+      visible: visibleStats.totalCertifications,
     },
     {
       title: "Active Escrows",
@@ -124,24 +137,31 @@ const AdminDashboardPage = () => {
       icon: Lock,
       color: "green",
       link: "/admin/escrows",
+      visible: visibleStats.activeEscrows,
     },
   ];
 
-  const quickActions = [
+  // Filter visible cards
+  const statCards = allStatCards.filter((card) => card.visible !== false);
+
+  const visibleActions = getVisibleActions(user);
+
+  const allQuickActions = [
     {
       title: "Manage Users",
       description: "View and manage all users",
       icon: Users,
       link: "/admin/users",
       color: "blue",
+      visible: visibleActions.manageUsers,
     },
-
     {
       title: "Manage Roles",
       description: "Configure roles and permissions",
       icon: Shield,
       link: "/admin/roles",
       color: "purple",
+      visible: visibleActions.manageRoles,
     },
     {
       title: "Review Applications",
@@ -149,43 +169,54 @@ const AdminDashboardPage = () => {
       icon: CheckCircle,
       link: "/admin/applications",
       color: "green",
+      visible: visibleActions.reviewApplications,
     },
     {
       title: "Manage Courses",
-      description: "Moderate and manage courses",
+      description: "View and moderate courses",
       icon: BookOpen,
       link: "/admin/courses",
-      color: "orange",
+      color: "purple",
+      visible: visibleActions.manageCourses,
     },
     {
-      title: "Review Management",
+      title: "Manage Reviews",
       description: "Moderate course reviews",
       icon: Star,
       link: "/admin/reviews",
-      color: "yellow",
+      color: "blue",
+      visible: visibleActions.manageReviews,
     },
     {
-      title: "Professional Certifications",
-      description: "Manage certification tests",
-      icon: Award, // import Award from lucide-react
+      title: "Manage Certifications",
+      description: "Professional certifications",
+      icon: Award,
       link: "/admin/professional-certifications",
       color: "purple",
+      visible: visibleActions.manageCertifications,
     },
     {
-      title: "Escrow Management",
-      description: "Manage payments and refunds",
+      title: "View Purchases",
+      description: "Monitor all purchases",
       icon: DollarSign,
-      link: "/admin/escrows",
+      link: "/admin/purchases",
       color: "green",
+      visible: visibleActions.managePurchases,
     },
     {
-      title: "Audit Logs",
-      description: "View admin action history",
-      icon: FileText, // import FileText from lucide-react
-      link: "/admin/audit-logs",
-      color: "blue",
+      title: "Manage Escrows",
+      description: "Payment escrow management",
+      icon: Lock,
+      link: "/admin/escrows",
+      color: "orange",
+      visible: visibleActions.manageEscrows,
     },
   ];
+
+  // Filter visible actions
+  const quickActions = allQuickActions.filter(
+    (action) => action.visible !== false
+  );
 
   const getColorClasses = (color) => {
     const colors = {

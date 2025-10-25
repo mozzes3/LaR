@@ -116,6 +116,13 @@ export const WalletProvider = ({ children }) => {
         });
 
         setUser(loginData.user);
+        // ✅ DEBUG LOGGING
+        console.log("🔐 User logged in:", {
+          username: loginData.user.username,
+          role: loginData.user.role,
+          roleRef: loginData.user.roleRef,
+          isSuperAdmin: loginData.user.isSuperAdmin,
+        });
 
         toast.success(
           loginData.isNewUser ? "Welcome to Lizard Academy!" : "Welcome back!"
