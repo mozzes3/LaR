@@ -1,4 +1,4 @@
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED");
 const Course = require("../models/Course");
 const User = require("../models/User");
 const { checkAchievements } = require("../services/achievementService");
@@ -278,9 +278,241 @@ const completeLesson = async (req, res) => {
   }
 };
 
+/**
+ * Calculate refund eligibility for a purchase
+ */
+function calculateRefundEligibility(purchase) {
+  // Can't refund if already completed, refunded, or released
+  if (purchase.status === "completed") {
+    return {
+      eligible: false,
+      reason: "Course already completed",
+      daysLeft: 0,
+      hoursLeft: 0,
+      progressLimit: false,
+    };
+  }
+
+  if (purchase.status === "refunded") {
+    return {
+      eligible: false,
+      reason: "Already refunded",
+      daysLeft: 0,
+      hoursLeft: 0,
+      progressLimit: false,
+    };
+  }
+
+  if (purchase.escrowStatus === "released") {
+    return {
+      eligible: false,
+      reason: "Payment already released to instructor",
+      daysLeft: 0,
+      hoursLeft: 0,
+      progressLimit: false,
+    };
+  }
+
+  // Check if within time window (before escrow release)
+  const now = new Date();
+  const releaseDate = new Date(purchase.escrowReleaseDate);
+  const timeLeft = releaseDate - now;
+
+  if (timeLeft <= 0) {
+    return {
+      eligible: false,
+      reason: "Refund period expired",
+      daysLeft: 0,
+      hoursLeft: 0,
+      progressLimit: false,
+    };
+  }
+
+  // Check progress limit (e.g., can't refund if >20% completed)
+  const PROGRESS_LIMIT = 20; // 20%
+  if (purchase.progress > PROGRESS_LIMIT) {
+    return {
+      eligible: false,
+      reason: `Cannot refund after completing ${PROGRESS_LIMIT}% of course`,
+      daysLeft: Math.floor(timeLeft / (1000 * 60 * 60 * 24)),
+      hoursLeft: Math.floor(timeLeft / (1000 * 60 * 60)),
+      progressLimit: true,
+      currentProgress: purchase.progress,
+      maxProgress: PROGRESS_LIMIT,
+    };
+  }
+
+  // Eligible for refund
+  return {
+    eligible: true,
+    reason: "Eligible for full refund",
+    daysLeft: Math.floor(timeLeft / (1000 * 60 * 60 * 24)),
+    hoursLeft: Math.floor(timeLeft / (1000 * 60 * 60)),
+    progressLimit: false,
+    currentProgress: purchase.progress,
+    maxProgress: PROGRESS_LIMIT,
+  };
+}
+
+/**
+ * Get student purchase history with refund eligibility
+ */
+const getStudentPurchaseHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    console.log("📚 Fetching purchase history for user:", userId);
+
+    // Fetch all purchases with populated data
+    const purchases = await Purchase.find({ user: userId })
+      .populate({
+        path: "course",
+        select:
+          "title slug thumbnail price duration totalLessons instructor status",
+        populate: {
+          path: "instructor",
+          select: "name username avatar",
+        },
+      })
+      .populate({
+        path: "paymentToken",
+        select: "name symbol decimals chainId blockchain",
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    console.log(`✅ Found ${purchases.length} purchase(s)`);
+
+    // Calculate refund eligibility for each purchase
+    const purchasesWithEligibility = purchases.map((purchase) => {
+      const refundEligibility = calculateRefundEligibility(purchase);
+
+      return {
+        _id: purchase._id,
+        course: purchase.course,
+        paymentToken: purchase.paymentToken,
+        amountInToken: purchase.amountInToken,
+        amountInUSD: purchase.amountInUSD,
+        status: purchase.status,
+        escrowStatus: purchase.escrowStatus,
+        purchaseDate: purchase.createdAt,
+        progress: purchase.progress,
+        completedLessons: purchase.completedLessons,
+        totalWatchTime: purchase.totalWatchTime,
+        isCompleted: purchase.isCompleted,
+        escrowReleaseDate: purchase.escrowReleaseDate,
+        escrowReleasedAt: purchase.escrowReleasedAt,
+        refundEligibility,
+      };
+    });
+
+    res.json({
+      success: true,
+      purchases: purchasesWithEligibility,
+    });
+  } catch (error) {
+    console.error("❌ Get purchase history error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch purchase history",
+    });
+  }
+};
+/**
+ * Request refund for a purchase
+ */
+const requestRefund = async (req, res) => {
+  try {
+    const { purchaseId } = req.params;
+    const userId = req.user._id;
+
+    console.log("💸 Refund request:", { purchaseId, userId });
+
+    // Find purchase
+    const purchase = await Purchase.findOne({
+      _id: purchaseId,
+      user: userId,
+    })
+      .populate("course")
+      .populate("paymentToken");
+
+    if (!purchase) {
+      return res.status(404).json({
+        success: false,
+        error: "Purchase not found",
+      });
+    }
+
+    // Check eligibility
+    const eligibility = calculateRefundEligibility(purchase);
+
+    if (!eligibility.eligible) {
+      return res.status(400).json({
+        success: false,
+        error: eligibility.reason,
+        eligibility,
+      });
+    }
+
+    // Check if escrow exists
+    if (!purchase.escrowId) {
+      return res.status(400).json({
+        success: false,
+        error: "No escrow found for this purchase",
+      });
+    }
+
+    console.log("✅ Refund eligible, processing...");
+
+    // Initialize payment service
+    const paymentService = getPaymentService();
+    await paymentService.initialize(purchase.paymentToken);
+
+    // Refund escrow on blockchain
+    console.log("🔐 Calling refundEscrow on blockchain...");
+    const result = await paymentService.refundEscrow({
+      escrowId: purchase.escrowId,
+      blockchain: purchase.blockchain,
+      chainId: purchase.paymentToken.chainId,
+    });
+
+    console.log("✅ Blockchain refund successful:", result.transactionHash);
+
+    // Update purchase status
+    purchase.status = "refunded";
+    purchase.escrowStatus = "refunded";
+    purchase.refundedAt = new Date();
+    purchase.refundTransactionHash = result.transactionHash;
+    purchase.refundEligible = false;
+    await purchase.save();
+
+    console.log("✅ Purchase updated to refunded status");
+
+    res.json({
+      success: true,
+      message: "Refund processed successfully",
+      transactionHash: result.transactionHash,
+      purchase: {
+        _id: purchase._id,
+        status: purchase.status,
+        escrowStatus: purchase.escrowStatus,
+        refundedAt: purchase.refundedAt,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Refund error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to process refund",
+    });
+  }
+};
+
 module.exports = {
   purchaseCourse,
   getMyPurchases,
   getPurchase,
   completeLesson,
+  getStudentPurchaseHistory,
+  requestRefund,
 };

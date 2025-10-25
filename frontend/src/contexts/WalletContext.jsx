@@ -12,14 +12,6 @@ import api from "@services/api";
 
 const WalletContext = createContext();
 
-export const useWallet = () => {
-  const context = useContext(WalletContext);
-  if (!context) {
-    throw new Error("useWallet must be used within WalletProvider");
-  }
-  return context;
-};
-
 export const WalletProvider = ({ children }) => {
   const [account, setAccount] = useState(null);
   const [provider, setProvider] = useState(null);
@@ -30,7 +22,178 @@ export const WalletProvider = ({ children }) => {
   const lastRefreshAttempt = useRef(0);
   const REFRESH_COOLDOWN = 30000;
 
-  // Auto-refresh token before expiration (every 10 minutes)
+  const disconnect = useCallback(async () => {
+    try {
+      if (user) {
+        await api.post("/auth/logout");
+      }
+    } catch (error) {
+      if (error.response?.status !== 401) {
+        console.error("Logout error:", error);
+      }
+    }
+
+    setAccount(null);
+    setProvider(null);
+    setSigner(null);
+    setUser(null);
+
+    toast.success("Wallet disconnected");
+  }, [user]);
+
+  const refreshAccessToken = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastRefreshAttempt.current < REFRESH_COOLDOWN) {
+      return false;
+    }
+    lastRefreshAttempt.current = now;
+
+    try {
+      await api.post("/auth/refresh");
+      return true;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      disconnect();
+      toast.error("Session expired. Please reconnect your wallet.");
+      return false;
+    }
+  }, [disconnect]);
+
+  const fetchUser = useCallback(async () => {
+    try {
+      const response = await api.get("/auth/me", {
+        validateStatus: (status) => status < 500,
+      });
+
+      if (response.status === 200 && response.data?.user) {
+        setUser(response.data.user);
+      }
+    } catch (error) {
+      // Silently fail
+    }
+  }, []);
+
+  const connectWallet = useCallback(
+    async (walletProvider = null) => {
+      const ethereumProvider = walletProvider || window.ethereum;
+
+      if (!ethereumProvider) {
+        toast.error("No wallet detected");
+        return false;
+      }
+
+      // SECURITY: Validate provider
+      const requiredMethods = ["request", "on", "removeListener"];
+      for (const method of requiredMethods) {
+        if (typeof ethereumProvider[method] !== "function") {
+          toast.error("Invalid wallet provider");
+          return false;
+        }
+      }
+
+      setIsConnecting(true);
+
+      try {
+        const provider = new ethers.BrowserProvider(ethereumProvider);
+        await provider.send("eth_requestAccounts", []);
+
+        const signer = await provider.getSigner();
+        const address = await signer.getAddress();
+
+        setProvider(provider);
+        setSigner(signer);
+        setAccount(address);
+
+        const { data: nonceData } = await api.post("/auth/nonce", {
+          walletAddress: address,
+        });
+
+        const signature = await signer.signMessage(nonceData.message);
+
+        const { data: loginData } = await api.post("/auth/verify", {
+          walletAddress: address,
+          signature,
+        });
+
+        setUser(loginData.user);
+
+        toast.success(
+          loginData.isNewUser ? "Welcome to Lizard Academy!" : "Welcome back!"
+        );
+
+        return true;
+      } catch (error) {
+        console.error("Wallet connection error:", error);
+        disconnect();
+
+        if (error.response?.status === 429) {
+          toast.error("Too many requests. Please wait a moment and try again.");
+        } else if (error.code === 4001) {
+          toast.error("Connection rejected");
+        } else if (error.code === -32002) {
+          toast.error("Please check your wallet");
+        } else {
+          toast.error(
+            error.response?.data?.error || "Failed to connect wallet"
+          );
+        }
+
+        return false;
+      } finally {
+        setIsConnecting(false);
+      }
+    },
+    [disconnect]
+  );
+
+  const initializeWallet = useCallback(async () => {
+    if (!window.ethereum) return;
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.listAccounts();
+
+      if (accounts.length > 0) {
+        setProvider(provider);
+        const signer = await provider.getSigner();
+        setSigner(signer);
+        const address = await signer.getAddress();
+        setAccount(address);
+      }
+    } catch (error) {
+      console.error("Error initializing wallet:", error);
+    }
+  }, []);
+  const handleAccountsChanged = useCallback(
+    async (accounts) => {
+      if (accounts.length === 0) {
+        disconnect();
+        return;
+      }
+
+      const newAddress = accounts[0];
+
+      if (
+        user &&
+        user.walletAddress.toLowerCase() !== newAddress.toLowerCase()
+      ) {
+        toast.error("Wallet changed. Please sign in with the new wallet.");
+        disconnect();
+      } else {
+        setAccount(newAddress);
+      }
+    },
+    [user, disconnect]
+  );
+
+  const handleChainChanged = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  const handleDisconnect = useCallback(() => {
+    disconnect();
+  }, [disconnect]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (user) {
@@ -39,31 +202,27 @@ export const WalletProvider = ({ children }) => {
     }, 10 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, refreshAccessToken]);
 
-  // Initialize wallet and fetch user ONCE on mount
   useEffect(() => {
     const initialize = async () => {
       if (fetchingUser.current) return;
       fetchingUser.current = true;
 
       try {
-        // Try to fetch user first (check if already logged in)
         await fetchUser();
       } catch (error) {
         console.error("No active session");
       }
 
-      // Initialize wallet connection
       await initializeWallet();
 
       fetchingUser.current = false;
     };
 
     initialize();
-  }, []);
+  }, [fetchUser, initializeWallet]);
 
-  // Handle wallet events
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", handleAccountsChanged);
@@ -81,170 +240,7 @@ export const WalletProvider = ({ children }) => {
         window.ethereum.removeListener("disconnect", handleDisconnect);
       }
     };
-  }, [user]);
-
-  const initializeWallet = async () => {
-    if (!window.ethereum) return;
-
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await provider.listAccounts();
-
-      if (accounts.length > 0) {
-        setProvider(provider);
-        const signer = await provider.getSigner();
-        setSigner(signer);
-        const address = await signer.getAddress();
-        setAccount(address);
-
-        // Verify wallet matches user
-        if (
-          user &&
-          user.walletAddress.toLowerCase() !== address.toLowerCase()
-        ) {
-          console.warn("Wallet mismatch detected");
-          toast.error("Wallet address mismatch. Please reconnect.");
-          disconnect();
-        }
-      }
-    } catch (error) {
-      console.error("Error initializing wallet:", error);
-    }
-  };
-
-  const handleAccountsChanged = async (accounts) => {
-    console.log("Account changed:", accounts);
-
-    if (accounts.length === 0) {
-      disconnect();
-      return;
-    }
-
-    const newAddress = accounts[0];
-
-    if (user && user.walletAddress.toLowerCase() !== newAddress.toLowerCase()) {
-      toast.error("Wallet changed. Please sign in with the new wallet.");
-      disconnect();
-    } else {
-      setAccount(newAddress);
-    }
-  };
-
-  const handleChainChanged = () => {
-    window.location.reload();
-  };
-
-  const handleDisconnect = () => {
-    console.log("Wallet disconnected");
-    disconnect();
-  };
-
-  const refreshAccessToken = async () => {
-    // Debounce: prevent multiple refresh attempts within cooldown period
-    const now = Date.now();
-    if (now - lastRefreshAttempt.current < REFRESH_COOLDOWN) {
-      console.log("⏳ Token refresh on cooldown");
-      return false;
-    }
-    lastRefreshAttempt.current = now;
-
-    try {
-      const response = await api.post("/auth/refresh");
-      await api.post("/auth/refresh");
-    } catch (error) {
-      console.error("Token refresh failed:", error);
-      disconnect();
-      toast.error("Session expired. Please reconnect your wallet.");
-    }
-  };
-
-  const fetchUser = async () => {
-    try {
-      const response = await api.get("/auth/me", {
-        validateStatus: (status) => status < 500, // Accept any status < 500
-      });
-
-      // Only set user if response is successful
-      if (response.status === 200 && response.data?.user) {
-        setUser(response.data.user);
-      }
-    } catch (error) {
-      // Silently fail - user not logged in
-    }
-  };
-
-  const connectWallet = async () => {
-    if (!window.ethereum) {
-      toast.error("Please install MetaMask to connect your wallet");
-      return;
-    }
-
-    setIsConnecting(true);
-
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-
-      const signer = await provider.getSigner();
-      const address = await signer.getAddress();
-
-      setProvider(provider);
-      setSigner(signer);
-      setAccount(address);
-
-      // Get nonce
-      const { data: nonceData } = await api.post("/auth/nonce", {
-        walletAddress: address,
-      });
-
-      // Sign message
-      const signature = await signer.signMessage(nonceData.message);
-
-      // Verify signature and login
-      const { data: loginData } = await api.post("/auth/verify", {
-        walletAddress: address,
-        signature,
-      });
-
-      setUser(loginData.user);
-
-      toast.success(
-        loginData.isNewUser ? "Welcome to Lizard Academy!" : "Welcome back!"
-      );
-    } catch (error) {
-      console.error("Wallet connection error:", error);
-      disconnect();
-
-      if (error.response?.status === 429) {
-        toast.error("Too many requests. Please wait a moment and try again.");
-      } else {
-        toast.error(error.response?.data?.error || "Failed to connect wallet");
-      }
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const disconnect = useCallback(async () => {
-    try {
-      // Only call logout if user is logged in
-      if (user) {
-        await api.post("/auth/logout");
-      }
-    } catch (error) {
-      // Silently fail - user might already be logged out
-      if (error.response?.status !== 401) {
-        console.error("Logout error:", error);
-      }
-    }
-
-    setAccount(null);
-    setProvider(null);
-    setSigner(null);
-    setUser(null);
-
-    toast.success("Wallet disconnected");
-  }, [user]);
+  }, [handleAccountsChanged, handleChainChanged, handleDisconnect]);
 
   const value = {
     account,
@@ -262,4 +258,12 @@ export const WalletProvider = ({ children }) => {
   return (
     <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
   );
+};
+
+export const useWallet = () => {
+  const context = useContext(WalletContext);
+  if (!context) {
+    throw new Error("useWallet must be used within WalletProvider");
+  }
+  return context;
 };

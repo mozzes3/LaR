@@ -18,12 +18,14 @@ import {
 import { useTheme } from "@contexts/ThemeContext";
 import { useWallet } from "@contexts/WalletContext";
 import { Shield } from "lucide-react";
+import WalletSelectorModal from "@components/wallet/WalletSelectorModal";
 import toast from "react-hot-toast";
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
   const {
     isConnected,
@@ -35,10 +37,9 @@ const Navbar = () => {
   } = useWallet();
   const navigate = useNavigate();
 
-  const handleConnect = async () => {
-    await connectWallet();
+  const handleConnect = () => {
+    setShowWalletModal(true);
   };
-
   const handleDisconnect = () => {
     disconnect();
     setUserMenuOpen(false);
@@ -386,6 +387,17 @@ const Navbar = () => {
           </div>
         </div>
       )}
+      <WalletSelectorModal
+        isOpen={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+        onConnect={async (provider) => {
+          const success = await connectWallet(provider);
+          if (success) {
+            setShowWalletModal(false);
+          }
+        }}
+        isConnecting={isConnecting}
+      />
     </>
   );
 };

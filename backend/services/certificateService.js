@@ -8,7 +8,7 @@ const { ethers } = require("ethers");
 const Certificate = require("../models/Certificate");
 const User = require("../models/User");
 const Course = require("../models/Course");
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED");
 // Register fonts
 try {
   registerFont(path.join(__dirname, "../assets/fonts/Poppins-Bold.ttf"), {

@@ -117,6 +117,17 @@ const courseSchema = new mongoose.Schema(
       fdr: Number,
     },
     discountEndDate: Date,
+    // Payment methods (NEW)
+    acceptedPaymentMethods: {
+      type: [String],
+      default: ["usdt", "usdc"],
+      validate: {
+        validator: function (arr) {
+          return arr.length > 0;
+        },
+        message: "At least one payment method must be selected",
+      },
+    },
 
     // Category & Tags
     category: {

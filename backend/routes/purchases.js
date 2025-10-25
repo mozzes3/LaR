@@ -1,11 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const {
+  readLimiter,
   authLimiter,
   criticalLimiter,
   expensiveLimiter,
 } = require("../middleware/rateLimits");
 const purchaseController = require("../controllers/purchaseController");
+const paymentController = require("../modules/payment/controllers/paymentController");
 const { authenticate } = require("../middleware/auth");
 
 router.post(
@@ -31,6 +33,21 @@ router.post(
   authLimiter,
   authenticate,
   purchaseController.completeLesson
+);
+
+// Student purchase history with refund eligibility
+router.get(
+  "/student/history",
+  authenticate,
+  readLimiter,
+  paymentController.getStudentPurchaseHistory // ✅ Correct
+);
+
+router.post(
+  "/:purchaseId/refund",
+  authenticate,
+  criticalLimiter,
+  paymentController.requestRefund // ✅ Correct
 );
 
 module.exports = router;

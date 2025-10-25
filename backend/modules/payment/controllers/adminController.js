@@ -1,6 +1,7 @@
 const PaymentToken = require("../models/PaymentToken");
 const PlatformSettings = require("../models/PlatformSettings");
 const InstructorFeeSettings = require("../models/InstructorFeeSettings");
+const AdminAuditLog = require("../models/AdminAuditLog");
 const User = require("../../../models/User");
 
 /**
@@ -251,14 +252,657 @@ const getAllInstructorFeeSettings = async (req, res) => {
   }
 };
 
+/**
+ * ============================================
+ * ESCROW MANAGEMENT
+ * ============================================
+ */
+
+/**
+ * Get all escrows with filters
+ */
+const getAllEscrows = async (req, res) => {
+  try {
+    const { status, blockchain, page = 1, limit = 50 } = req.query;
+
+    const query = {};
+
+    if (status) {
+      query.escrowStatus = status;
+    }
+
+    if (blockchain) {
+      query.blockchain = blockchain;
+    }
+
+    const Purchase = require("../models/Purchase");
+
+    const escrows = await Purchase.find(query)
+      .populate("user", "username email displayName")
+      .populate("course", "title slug")
+      .populate("paymentToken", "name symbol decimals")
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .lean();
+
+    console.log("📊 First escrow user data:", {
+      user: escrows[0]?.user,
+      hasUser: !!escrows[0]?.user,
+      userName: escrows[0]?.user?.name,
+      userDisplayName: escrows[0]?.user?.displayName,
+    });
+
+    const total = await Purchase.countDocuments(query);
+
+    const escrowsWithDetails = escrows.map((escrow) => {
+      const now = new Date();
+      const releaseDate = new Date(escrow.escrowReleaseDate);
+      const canRelease = now >= releaseDate && escrow.escrowStatus === "locked";
+      const canRefund = now < releaseDate && escrow.escrowStatus === "locked";
+
+      return {
+        ...escrow,
+        canRelease,
+        canRefund,
+        daysUntilRelease: Math.max(
+          0,
+          Math.ceil((releaseDate - now) / (1000 * 60 * 60 * 24))
+        ),
+      };
+    });
+
+    res.json({
+      success: true,
+      escrows: escrowsWithDetails,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error("Get all escrows error:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch escrows" });
+  }
+};
+
+/**
+ * Manually release escrow
+ */
+const manualReleaseEscrow = async (req, res) => {
+  try {
+    const { escrowId } = req.params;
+    const { reason, signature, signerAddress } = req.body;
+    const adminId = req.userId;
+
+    console.log("🔓 Admin manual release:", {
+      escrowId,
+      adminId,
+      reason,
+      signerAddress,
+    });
+
+    // Validate reason
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Reason is required",
+      });
+    }
+
+    // ✅ SECURITY: Require wallet signature
+    if (!signature || !signerAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Wallet signature required for security",
+      });
+    }
+
+    // GET ADMIN USER - FIND THIS SECTION AND REPLACE IT
+    if (!signature || !signerAddress) {
+      return res.status(400).json({
+        success: false,
+        error: "Wallet signature required for security",
+      });
+    }
+
+    // ← REPLACE FROM HERE
+    const User = require("../../../models/User");
+    const admin = await User.findById(adminId);
+
+    if (!admin) {
+      return res.status(403).json({
+        success: false,
+        error: "Admin not found",
+      });
+    }
+
+    // ✅ DEBUG: Log addresses being compared
+    console.log("🔍 Signature verification:");
+    console.log("   Signer address:", signerAddress);
+    console.log("   Admin stored wallet:", admin.walletAddress);
+    console.log("   Admin email:", admin.email);
+
+    // ✅ FLEXIBLE: If admin doesn't have wallet stored, update it
+    if (!admin.walletAddress) {
+      console.log("⚠️ Admin has no stored wallet, updating...");
+      admin.walletAddress = signerAddress;
+      await admin.save();
+    }
+
+    // ✅ SECURITY: Verify signature matches admin's wallet
+    if (signerAddress.toLowerCase() !== admin.walletAddress.toLowerCase()) {
+      console.error("❌ Wallet mismatch!");
+      console.error("   Expected:", admin.walletAddress.toLowerCase());
+      console.error("   Got:", signerAddress.toLowerCase());
+
+      return res.status(403).json({
+        success: false,
+        error: `Signature must be from your registered wallet: ${admin.walletAddress}`,
+        details: {
+          registeredWallet: admin.walletAddress,
+          attemptedWallet: signerAddress,
+        },
+      });
+    }
+
+    // ✅ SECURITY: Verify the signature is valid
+    const ethers = require("ethers");
+    const message = `Release escrow ${escrowId}\nReason: ${reason}\nTimestamp: ${Date.now()}`;
+
+    try {
+      const recoveredAddress = ethers.verifyMessage(message, signature);
+      console.log("🔐 Recovered address from signature:", recoveredAddress);
+
+      if (recoveredAddress.toLowerCase() !== signerAddress.toLowerCase()) {
+        throw new Error("Invalid signature");
+      }
+    } catch (err) {
+      console.error("❌ Signature verification failed:", err.message);
+      return res.status(403).json({
+        success: false,
+        error: "Invalid wallet signature",
+      });
+    }
+
+    console.log("✅ Signature verified for admin:", admin.email);
+
+    // Find the purchase by escrowId
+    const Purchase = require("../models/Purchase");
+    const purchase = await Purchase.findOne({ escrowId })
+      .populate("user", "name email")
+      .populate("course", "title")
+      .populate("paymentToken");
+
+    if (!purchase) {
+      return res.status(404).json({
+        success: false,
+        error: "Escrow not found",
+      });
+    }
+
+    // Check if already released
+    if (purchase.escrowStatus === "released") {
+      return res.status(400).json({
+        success: false,
+        error: "Escrow already released",
+      });
+    }
+
+    // Check if already refunded
+    if (purchase.escrowStatus === "refunded") {
+      return res.status(400).json({
+        success: false,
+        error: "Cannot release - escrow was refunded",
+      });
+    }
+
+    // ✅ SECURITY: Check amount threshold (require super admin for large amounts)
+    const LARGE_AMOUNT_THRESHOLD = 1000; // $1000 USD
+    if (purchase.amountInUSD > LARGE_AMOUNT_THRESHOLD && !admin.isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: `Only super admins can release escrows over $${LARGE_AMOUNT_THRESHOLD}`,
+      });
+    }
+
+    // Get blockchain service
+    const PaymentBlockchainService = require("../services/blockchainService");
+    const blockchainService = new PaymentBlockchainService(
+      purchase.blockchain,
+      purchase.paymentToken.chainId
+    );
+
+    // Release escrow on blockchain
+    console.log(`🔓 Releasing escrow: ${purchase.transactionHash}`);
+    const releaseResult = await blockchainService.releaseEscrow(
+      purchase.escrowId,
+      purchase.paymentToken.contractAddress
+    );
+
+    // Update purchase status
+    purchase.escrowStatus = "released";
+    purchase.escrowReleasedTxHash = releaseResult.transactionHash;
+    purchase.escrowReleasedAt = new Date();
+    purchase.escrowReleasedBy = adminId;
+    purchase.escrowReleaseReason = reason;
+    purchase.escrowReleaseSignature = signature; // Store signature
+    purchase.status = "completed";
+    await purchase.save();
+
+    // Create audit log
+    const AdminAuditLog = require("../models/AdminAuditLog");
+    await AdminAuditLog.create({
+      admin: adminId,
+      action: "manual_escrow_release",
+      targetType: "Purchase",
+      targetId: purchase._id,
+      details: {
+        escrowId: purchase.escrowId,
+        transactionHash: releaseResult.transactionHash,
+        userName: purchase.user.name,
+        courseTitle: purchase.course.title,
+        amount: purchase.amountInUSD,
+        reason,
+        signerAddress,
+        signature, // Log the signature for audit
+      },
+      ipAddress: req.ip,
+    });
+
+    console.log("✅ Escrow released successfully with signature verification");
+
+    res.json({
+      success: true,
+      message: "Escrow released successfully",
+      transactionHash: releaseResult.transactionHash,
+    });
+  } catch (error) {
+    console.error("Manual release error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to release escrow",
+    });
+  }
+};
+
+/**
+ * Manually refund escrow
+ */
+const manualRefundEscrow = async (req, res) => {
+  try {
+    const { escrowId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user._id;
+
+    console.log("💸 Admin manual refund:", { escrowId, adminId, reason });
+
+    const Purchase = require("../models/Purchase");
+    const AdminAuditLog = require("../models/AdminAuditLog");
+    const { getPaymentService } = require("../services/blockchainService");
+
+    const purchase = await Purchase.findOne({ escrowId })
+      .populate("paymentToken")
+      .populate("user", "name email")
+      .populate("course", "title");
+
+    if (!purchase) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Escrow not found" });
+    }
+
+    if (purchase.escrowStatus === "refunded") {
+      return res
+        .status(400)
+        .json({ success: false, error: "Already refunded" });
+    }
+
+    if (purchase.escrowStatus === "released") {
+      return res
+        .status(400)
+        .json({ success: false, error: "Already released, cannot refund" });
+    }
+
+    const paymentService = getPaymentService();
+    await paymentService.initialize(purchase.paymentToken);
+
+    const result = await paymentService.refundEscrow({
+      escrowId: purchase.escrowId,
+    });
+
+    purchase.status = "refunded";
+    purchase.escrowStatus = "refunded";
+    purchase.refundedAt = new Date();
+    purchase.refundTransactionHash = result.transactionHash;
+    await purchase.save();
+
+    await AdminAuditLog.create({
+      admin: adminId,
+      action: "manual_escrow_refund",
+      targetType: "Purchase",
+      targetId: purchase._id,
+      details: {
+        escrowId,
+        purchaseId: purchase._id,
+        userId: purchase.user._id,
+        courseId: purchase.course._id,
+        transactionHash: result.transactionHash,
+        reason,
+      },
+      ipAddress: req.ip,
+    });
+
+    console.log("✅ Manual refund successful");
+
+    res.json({
+      success: true,
+      message: "Escrow refunded successfully",
+      transactionHash: result.transactionHash,
+    });
+  } catch (error) {
+    console.error("Manual refund error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * ============================================
+ * COURSE ACCESS MANAGEMENT
+ * ============================================
+ */
+
+/**
+ * Grant free course access
+ */
+const grantFreeCourseAccess = async (req, res) => {
+  try {
+    const { userId, courseId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.userId;
+
+    console.log("🎁 Admin granting free access:", {
+      userId,
+      courseId,
+      adminId,
+      reason,
+    });
+
+    // Validate reason
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Reason is required",
+      });
+    }
+
+    // Validate user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // Validate course exists
+    const Course = require("../../../models/Course");
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        error: "Course not found",
+      });
+    }
+
+    // Check if user already has active/completed access
+    const Purchase = require("../models/Purchase");
+    const existingPurchase = await Purchase.findOne({
+      user: userId,
+      course: courseId,
+      status: { $in: ["active", "completed"] },
+    });
+
+    if (existingPurchase) {
+      return res.status(400).json({
+        success: false,
+        error: "User already has access to this course",
+      });
+    }
+
+    // Get first available payment token (for schema requirement)
+    const PaymentToken = require("../models/PaymentToken");
+    const defaultToken = await PaymentToken.findOne({ isActive: true });
+
+    if (!defaultToken) {
+      return res.status(500).json({
+        success: false,
+        error: "No active payment token found in system",
+      });
+    }
+
+    // Create purchase record with admin grant flag
+    const purchase = await Purchase.create({
+      user: userId,
+      course: courseId,
+      paymentToken: defaultToken._id, // Required by schema
+      amountInToken: "0",
+      amountInUSD: 0,
+      transactionHash: `admin_grant_${Date.now()}`,
+      blockchain: defaultToken.blockchain, // Use default token's blockchain
+      fromAddress: "0x0000000000000000000000000000000000000000",
+      toAddress: "0x0000000000000000000000000000000000000000",
+      platformAmount: "0",
+      instructorAmount: "0",
+      revenueSplitAmount: "0",
+      platformFeePercentage: 0,
+      instructorFeePercentage: 0,
+      escrowStatus: "released", // No escrow for free grants
+      escrowReleaseDate: new Date(), // Set to now (already released)
+      escrowId: 0,
+      escrowCreatedTxHash: `admin_grant_${Date.now()}`,
+      refundEligible: false, // Cannot refund free grants
+      status: "active",
+      grantedByAdmin: adminId, // Track who granted it
+      grantReason: reason, // Track why it was granted
+    });
+
+    // Create audit log
+    await AdminAuditLog.create({
+      admin: adminId,
+      action: "grant_free_course_access",
+      targetModel: "Purchase",
+      targetType: "Purchase",
+      targetId: purchase._id,
+      details: {
+        userId,
+        userName: user.name,
+        courseId,
+        courseTitle: course.title,
+        reason,
+      },
+      ipAddress: req.ip,
+    });
+
+    console.log("✅ Free course access granted successfully");
+
+    res.json({
+      success: true,
+      message: "Free course access granted successfully",
+      purchase: {
+        _id: purchase._id,
+        course: course.title,
+        user: user.name,
+        status: purchase.status,
+      },
+    });
+  } catch (error) {
+    console.error("Grant free access error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to grant course access",
+    });
+  }
+};
+
+/**
+ * Remove course access
+ */
+const removeCourseAccess = async (req, res) => {
+  try {
+    const { userId, courseId } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user._id;
+
+    console.log("🚫 Admin removing access:", {
+      userId,
+      courseId,
+      adminId,
+      reason,
+    });
+
+    const Purchase = require("../models/Purchase");
+    const AdminAuditLog = require("../models/AdminAuditLog");
+
+    const purchase = await Purchase.findOne({
+      user: userId,
+      course: courseId,
+      status: { $in: ["active", "completed"] },
+    })
+      .populate("user", "name email")
+      .populate("course", "title");
+
+    if (!purchase) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Access not found" });
+    }
+
+    purchase.status = "revoked";
+    purchase.revokedAt = new Date();
+    purchase.revokedBy = adminId;
+    purchase.revokeReason = reason;
+    await purchase.save();
+
+    await AdminAuditLog.create({
+      admin: adminId,
+      action: "remove_course_access",
+      targetType: "Purchase",
+      targetId: purchase._id,
+      details: {
+        userId,
+        courseId,
+        userName: purchase.user.name,
+        userEmail: purchase.user.email,
+        courseTitle: purchase.course.title,
+        reason,
+      },
+      ipAddress: req.ip,
+    });
+
+    console.log("✅ Access removed");
+
+    res.json({
+      success: true,
+      message: "Course access removed",
+    });
+  } catch (error) {
+    console.error("Remove access error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * Get user purchases for admin
+ */
+const getUserPurchases = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const Purchase = require("../models/Purchase");
+
+    const purchases = await Purchase.find({ user: userId })
+      .populate("course", "title slug thumbnail")
+      .populate("paymentToken", "name symbol")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      purchases,
+    });
+  } catch (error) {
+    console.error("Get user purchases error:", error);
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch purchases" });
+  }
+};
+
+/**
+ * ============================================
+ * AUDIT LOGS
+ * ============================================
+ */
+
+/**
+ * Get audit logs
+ */
+const getAuditLogs = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, action, admin } = req.query;
+
+    const AdminAuditLog = require("../models/AdminAuditLog");
+
+    const query = {};
+    if (action) query.action = action;
+    if (admin) query.admin = admin;
+
+    const logs = await AdminAuditLog.find(query)
+      .populate("admin")
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .lean();
+
+    const total = await AdminAuditLog.countDocuments(query);
+
+    res.json({
+      success: true,
+      logs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error("Get audit logs error:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch logs" });
+  }
+};
+
 module.exports = {
+  // Existing exports
   getPaymentTokensAdmin,
   createPaymentToken,
   updatePaymentToken,
   deletePaymentToken,
   getPlatformSettings,
   updatePlatformSettings,
+  getAllInstructorFeeSettings,
   getInstructorFeeSettings,
   updateInstructorFeeSettings,
-  getAllInstructorFeeSettings,
+
+  // NEW - Make sure ALL these are here:
+  getAllEscrows,
+  manualReleaseEscrow,
+  manualRefundEscrow,
+  grantFreeCourseAccess,
+  removeCourseAccess,
+  getUserPurchases,
+  getAuditLogs, // ← THIS MUST BE HERE
 };

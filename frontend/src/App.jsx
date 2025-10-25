@@ -35,6 +35,8 @@ import AdminPurchasesPage from "@pages/AdminPurchasesPage";
 import AdminApplicationsPage from "@pages/AdminApplicationsPage";
 import AdminProfessionalCertificationsPage from "@pages/AdminProfessionalCertificationsPage";
 import AdminCreateProfessionalCertificationPage from "@pages/AdminCreateProfessionalCertificationPage";
+import AdminEscrowManagementPage from "@pages/AdminEscrowManagementPage";
+import AdminAuditLogsPage from "@pages/AdminAuditLogsPage";
 import CertificateVerificationPage from "@pages/CertificateVerificationPage";
 import InstructorEarningsPage from "@pages/InstructorEarningsPage";
 import ProfessionalCertificationsPage from "@pages/ProfessionalCertificationsPage";
@@ -42,7 +44,9 @@ import ProfessionalCertificationDetailPage from "@pages/ProfessionalCertificatio
 import ProfessionalCertificationTestPage from "@pages/ProfessionalCertificationTestPage";
 import ProfessionalCertificationResultsPage from "@pages/ProfessionalCertificationResultPage";
 import MyProfessionalAttemptsPage from "@pages/MyProfessionalAttemptsPage";
+
 import NFTCertificateViewer from "./pages/NFTViewerPage";
+import PurchaseHistoryPage from "./pages/PurchaseHistoryPage";
 import { useEffect } from "react";
 import { toast } from "react-hot-toast";
 // Protected Route
@@ -85,6 +89,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="dashboard/purchases"
+              element={
+                <ProtectedRoute>
+                  <PurchaseHistoryPage />
                 </ProtectedRoute>
               }
             />
@@ -324,6 +336,22 @@ function App() {
             element={
               <ProtectedRoute requireAdmin>
                 <AdminPurchasesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/escrows"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminEscrowManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="admin/audit-logs"
+            element={
+              <ProtectedRoute requireAdmin>
+                <AdminAuditLogsPage />
               </ProtectedRoute>
             }
           />

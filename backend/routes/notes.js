@@ -3,7 +3,7 @@ const router = express.Router();
 const { authLimiter, writeLimiter } = require("../middleware/rateLimits");
 const { authenticate } = require("../middleware/auth");
 const Note = require("../models/Note");
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED");
 
 /**
  * @route   GET /api/notes/:courseId/:lessonId

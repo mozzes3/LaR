@@ -6,19 +6,16 @@ const PlatformSettings = require("../models/PlatformSettings");
 
 // Contract ABI
 const ESCROW_ABI = [
-  "function createEscrowPayment(address student, address instructor, uint256 amount, bytes32 courseId, uint256 escrowPeriodDays, uint256 customPlatformFee) external returns (bytes32)",
+  "function createEscrowFromApproval(address student, address instructor, uint256 amount, bytes32 courseId, uint256 escrowPeriodDays, uint256 customPlatformFee) external returns (bytes32)",
   "function releaseEscrow(bytes32 escrowId) external",
-  "function processRefund(bytes32 escrowId) external",
-  "function batchReleaseEscrows(bytes32[] calldata escrowIds) external",
-  "function getEscrow(bytes32 escrowId) external view returns (tuple(address student, address instructor, uint256 totalAmount, uint256 platformFee, uint256 instructorFee, uint256 revenueSplitAmount, uint256 releaseDate, bool isReleased, bool isRefunded, uint256 createdAt, bytes32 courseId))",
-  "function canReleaseEscrow(bytes32 escrowId) external view returns (bool)",
-  "function escrows(bytes32) external view returns (address student, address instructor, uint256 totalAmount, uint256 platformFee, uint256 instructorFee, uint256 revenueSplitAmount, uint256 releaseDate, bool isReleased, bool isRefunded, uint256 createdAt, bytes32 courseId)",
-  "function studentCourseEscrow(address student, bytes32 courseId) external view returns (bytes32)",
+  "function batchReleaseEscrows(bytes32[] escrowIds) external",
+  "function refundEscrow(bytes32 escrowId) external",
+  "function getEscrow(bytes32 escrowId) view returns (tuple(address student, address instructor, uint256 totalAmount, uint256 platformFee, uint256 instructorFee, uint256 revenueSplitAmount, uint256 releaseDate, bool isReleased, bool isRefunded, uint256 createdAt, bytes32 courseId))",
+  "function studentCourseEscrow(address student, bytes32 courseId) view returns (bytes32)",
+  "function OPERATOR_ROLE() view returns (bytes32)",
+  "function hasRole(bytes32 role, address account) view returns (bool)",
   "event PaymentReceived(bytes32 indexed escrowId, address indexed student, address indexed instructor, uint256 amount, bytes32 courseId)",
-  "event EscrowReleased(bytes32 indexed escrowId, address indexed student, address indexed instructor, uint256 instructorAmount, uint256 platformAmount, uint256 revenueSplitAmount)",
-  "event RefundProcessed(bytes32 indexed escrowId, address indexed student, uint256 amount)",
 ];
-
 // ERC20 ABI (for approvals and balance checks)
 const ERC20_ABI = [
   "function approve(address spender, uint256 amount) external returns (bool)",
@@ -90,11 +87,21 @@ class PaymentBlockchainService {
       console.log(`   Token Contract: ${paymentToken.contractAddress}`);
       console.log(`   Operator Wallet: ${wallet.address}`);
 
+      // ✅ ADD THESE LINES HERE (inside try block, before initialized = true):
+      this.currentBlockchain = paymentToken.blockchain;
+      this.currentChainId = paymentToken.chainId;
+
+      console.log("✅ Stored:", {
+        blockchain: this.currentBlockchain,
+        chainId: this.currentChainId,
+      });
+
       this.initialized = true;
     } catch (error) {
       console.error("❌ Failed to initialize payment service:", error);
       throw error;
     }
+    // ❌ REMOVE THE LINES FROM HERE - they were outside try-catch!
   }
 
   /**
@@ -270,7 +277,67 @@ class PaymentBlockchainService {
     } = params;
 
     try {
-      console.log("📝 Creating escrow payment:", {
+      const escrowContract = this.getEscrowContract(blockchain, chainId);
+      const courseIdBytes32 = ethers.id(courseId);
+
+      // CHECK FOR EXISTING ESCROW ON BLOCKCHAIN
+      console.log("🔍 Checking for existing on-chain escrow...");
+
+      try {
+        const existingEscrowId = await escrowContract.studentCourseEscrow(
+          studentAddress,
+          courseIdBytes32
+        );
+
+        if (existingEscrowId !== ethers.ZeroHash) {
+          console.log("⚠️  Found existing escrow:", existingEscrowId);
+
+          const escrowData = await escrowContract.getEscrow(existingEscrowId);
+
+          if (!escrowData.isReleased && !escrowData.isRefunded) {
+            console.log("⚠️  Existing escrow is still active");
+            console.log(
+              "   Release Date:",
+              new Date(Number(escrowData.releaseDate) * 1000)
+            );
+
+            const canRelease =
+              Date.now() / 1000 >= Number(escrowData.releaseDate);
+            console.log("   Can release now:", canRelease);
+
+            if (canRelease) {
+              console.log("🔓 Auto-releasing old escrow...");
+              const releaseTx = await escrowContract.releaseEscrow(
+                existingEscrowId
+              );
+              await releaseTx.wait();
+              console.log("✅ Old escrow released");
+            } else {
+              throw new Error(
+                `You already have an active purchase for this course. ` +
+                  `Wait until ${new Date(
+                    Number(escrowData.releaseDate) * 1000
+                  ).toLocaleString()} to purchase again.`
+              );
+            }
+          } else {
+            console.log("✅ Existing escrow already released/refunded");
+          }
+        } else {
+          console.log("✅ No existing escrow found");
+        }
+      } catch (checkError) {
+        if (checkError.message.includes("active purchase")) {
+          throw checkError;
+        }
+        console.warn(
+          "⚠️  Could not check existing escrow:",
+          checkError.message
+        );
+      }
+
+      // CREATE NEW ESCROW
+      console.log("📝 Creating escrow via backend:", {
         student: studentAddress,
         instructor: instructorAddress,
         amount: amountInToken,
@@ -278,13 +345,16 @@ class PaymentBlockchainService {
         escrowPeriodDays,
       });
 
-      const escrowContract = this.getEscrowContract(blockchain, chainId);
+      console.log("🔐 Backend calling createEscrowFromApproval...");
+      console.log("   Contract:", await escrowContract.getAddress());
+      console.log("   Student:", studentAddress);
+      console.log("   Instructor:", instructorAddress);
+      console.log("   Amount:", amountInToken);
+      console.log("   Course ID (bytes32):", courseIdBytes32);
+      console.log("   Escrow Period:", escrowPeriodDays, "days");
+      console.log("   Custom Fee:", customPlatformFee || 0);
 
-      // Convert course ID to bytes32
-      const courseIdBytes32 = ethers.id(courseId);
-
-      // Estimate gas
-      const gasEstimate = await escrowContract.createEscrowPayment.estimateGas(
+      const tx = await escrowContract.createEscrowFromApproval(
         studentAddress,
         instructorAddress,
         amountInToken,
@@ -293,52 +363,61 @@ class PaymentBlockchainService {
         customPlatformFee || 0
       );
 
-      console.log(`⛽ Estimated gas: ${gasEstimate.toString()}`);
+      console.log("   Transaction sent:", tx.hash);
+      console.log("   Waiting for confirmation...");
 
-      // Execute transaction
-      const tx = await escrowContract.createEscrowPayment(
-        studentAddress,
-        instructorAddress,
-        amountInToken,
-        courseIdBytes32,
-        escrowPeriodDays,
-        customPlatformFee || 0,
-        {
-          gasLimit: (gasEstimate * BigInt(120)) / BigInt(100), // 20% buffer
-        }
-      );
-
-      console.log(`📤 Transaction sent: ${tx.hash}`);
-
-      // Wait for confirmation
       const receipt = await tx.wait();
-      console.log(`✅ Transaction confirmed in block ${receipt.blockNumber}`);
 
-      // Extract escrow ID from event
-      const event = receipt.logs.find((log) => {
-        try {
-          const parsed = escrowContract.interface.parseLog(log);
-          return parsed.name === "PaymentReceived";
-        } catch {
-          return false;
-        }
-      });
+      console.log("   ✅ Confirmed in block:", receipt.blockNumber);
 
-      let escrowId = null;
-      if (event) {
-        const parsed = escrowContract.interface.parseLog(event);
-        escrowId = parsed.args[0];
+      const event = receipt.logs
+        .map((log) => {
+          try {
+            return escrowContract.interface.parseLog(log);
+          } catch {
+            return null;
+          }
+        })
+        .find((e) => e && e.name === "PaymentReceived");
+
+      if (!event) {
+        throw new Error("PaymentReceived event not found in transaction");
       }
+
+      const escrowId = event.args.escrowId;
+
+      console.log("✅ Escrow created successfully");
+      console.log("   Escrow ID:", escrowId);
+      console.log("   TX Hash:", tx.hash);
 
       return {
         success: true,
+        escrowId: escrowId,
         transactionHash: tx.hash,
         blockNumber: receipt.blockNumber,
-        escrowId,
-        gasUsed: receipt.gasUsed.toString(),
       };
     } catch (error) {
-      console.error("❌ Failed to create escrow payment:", error);
+      console.error("❌ Failed to create escrow:", error);
+      console.error("   Error message:", error.message);
+      console.error("   Error code:", error.code);
+
+      if (error.message.includes("EscrowAlreadyExists")) {
+        throw new Error("You have already purchased this course");
+      }
+      if (error.message.includes("active purchase")) {
+        throw error;
+      }
+      if (error.message.includes("insufficient allowance")) {
+        throw new Error(
+          "Token approval insufficient. Please approve tokens first."
+        );
+      }
+      if (error.message.includes("AccessControl")) {
+        throw new Error(
+          "Backend wallet lacks required permissions. Contact support."
+        );
+      }
+
       throw error;
     }
   }
@@ -390,41 +469,58 @@ class PaymentBlockchainService {
   }
 
   /**
+   * Refund an escrow
+   */
+
+  /**
    * Process refund to student
    * @param {Object} params - Refund parameters
    * @returns {Object} Transaction result
    */
-  async processRefund(params) {
-    const { escrowId, blockchain, chainId } = params;
+  async refundEscrow(params) {
+    const { escrowId } = params;
 
     try {
-      console.log(`💸 Processing refund: ${escrowId}`);
+      console.log("💸 Refunding escrow:", escrowId);
 
-      const escrowContract = this.getEscrowContract(blockchain, chainId);
+      // Get the initialized escrow contract
+      const blockchain = this.currentBlockchain;
+      const chainId = this.currentChainId;
 
-      // Estimate gas
-      const gasEstimate = await escrowContract.processRefund.estimateGas(
-        escrowId
-      );
+      if (!blockchain || !chainId) {
+        throw new Error(
+          "Payment service not initialized. Call initialize() first."
+        );
+      }
 
-      // Execute transaction
-      const tx = await escrowContract.processRefund(escrowId, {
-        gasLimit: (gasEstimate * BigInt(120)) / BigInt(100),
-      });
+      const contractKey = `escrow_${blockchain}_${chainId}`;
+      const escrowContract = this.contracts.get(contractKey); // ✅ Use .get()
 
-      console.log(`📤 Refund transaction sent: ${tx.hash}`);
+      if (!escrowContract) {
+        console.error(
+          "Available contracts:",
+          Array.from(this.contracts.keys())
+        );
+        throw new Error(`Escrow contract not found: ${contractKey}`);
+      }
+
+      console.log("   Using contract:", await escrowContract.getAddress());
+      console.log("   Refunding to student...");
+
+      // Call refundEscrow on contract
+      const tx = await escrowContract.refundEscrow(escrowId);
+      console.log("   Transaction sent:", tx.hash);
 
       const receipt = await tx.wait();
-      console.log(`✅ Refund processed in block ${receipt.blockNumber}`);
+      console.log("   ✅ Confirmed in block:", receipt.blockNumber);
 
       return {
         success: true,
         transactionHash: tx.hash,
         blockNumber: receipt.blockNumber,
-        gasUsed: receipt.gasUsed.toString(),
       };
     } catch (error) {
-      console.error("❌ Failed to process refund:", error);
+      console.error("❌ Refund escrow failed:", error);
       throw error;
     }
   }

@@ -3,7 +3,7 @@ const Role = require("../models/Role");
 const UserPermission = require("../models/UserPermission");
 const Course = require("../models/Course");
 const Review = require("../models/Review");
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED");
 
 const InstructorApplication = require("../models/InstructorApplication");
 const { getUserPermissions } = require("../middleware/permission");

@@ -12,18 +12,20 @@ const levelRoutes = require("./routes/levels");
 const categoryRoutes = require("./routes/categories");
 const { sanitizeInput } = require("./middleware/sanitize");
 const nftRoutes = require("./routes/nft");
-
-// NEW imports
-const paymentRoutes = require("./modules/payment/routes");
+const { authenticate, isAdmin } = require("./middleware/auth");
 const adminPaymentRoutes = require("./modules/payment/routes/admin");
-// Payment automation
+const paymentRoutes = require("./modules/payment/routes");
 const {
   getEscrowAutomationService,
 } = require("./modules/payment/services/automationService");
-
-// ... in your server startup
 const automationService = getEscrowAutomationService();
 automationService.start();
+
+console.log("🔍 Environment check:");
+console.log("   NODE_ENV:", process.env.NODE_ENV);
+console.log("   PAYMENT_MODE:", process.env.PAYMENT_MODE);
+console.log("   AWS_SECRETS_ENABLED:", process.env.AWS_SECRETS_ENABLED);
+console.log("   ACTIVE_NETWORK:", process.env.ACTIVE_NETWORK);
 
 const app = express();
 app.use(
@@ -112,6 +114,7 @@ app.use("/api/categories", categoryRoutes);
 
 app.use("/api/payment", paymentRoutes);
 app.use("/api/admin/payment", adminPaymentRoutes);
+app.use("/api/admin/payment", authenticate, isAdmin, adminPaymentRoutes);
 app.use("/api/nft", nftRoutes);
 
 // Error handling middleware

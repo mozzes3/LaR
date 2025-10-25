@@ -1,5 +1,5 @@
 require("dotenv").config();
-const bunnyService = require("./services/bunnyService");
+const bunnyService = require("../../services/bunnyService");
 
 async function test() {
   try {

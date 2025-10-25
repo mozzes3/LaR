@@ -21,14 +21,14 @@ class EscrowAutomationService {
     console.log("🤖 Starting Escrow Automation Service...");
 
     // Run every hour
-    cron.schedule("0 * * * *", async () => {
+    cron.schedule("*/5 * * * *", async () => {
       await this.processEligibleEscrows();
     });
 
     // Also run on startup after 2 minutes
     setTimeout(() => {
       this.processEligibleEscrows();
-    }, 120000);
+    }, 30000);
 
     console.log("✅ Escrow Automation Service started");
   }
@@ -50,7 +50,7 @@ class EscrowAutomationService {
 
       // Find purchases eligible for escrow release
       const eligiblePurchases = await Purchase.find({
-        escrowStatus: "pending",
+        escrowStatus: "locked",
         status: "active",
         escrowReleaseDate: { $lte: now },
       })
@@ -72,16 +72,9 @@ class EscrowAutomationService {
       const groupedByChain = {};
 
       for (const purchase of eligiblePurchases) {
-        // Additional eligibility check
-        const purchaseDoc = await Purchase.findById(purchase._id);
-        const eligibility = purchaseDoc.checkEscrowReleaseEligibility(
-          purchase.course
-        );
-
-        if (!eligibility.canRelease) {
-          console.log(
-            `⏭️  Skipping purchase ${purchase._id}: ${eligibility.reason}`
-          );
+        // Skip if no escrow ID
+        if (!purchase.escrowId) {
+          console.log(`⏭️  Skipping purchase ${purchase._id}: No escrow ID`);
           continue;
         }
 
@@ -139,15 +132,34 @@ class EscrowAutomationService {
             purchase.fromAddress,
             courseIdBytes32
           );
-
           if (escrowId !== ethers.ZeroHash) {
-            // Verify escrow can be released
-            const canRelease = await escrowContract.canReleaseEscrow(escrowId);
-            if (canRelease) {
-              escrowIds.push({
-                escrowId,
-                purchaseId: purchase._id,
-              });
+            // Get escrow data and verify it can be released
+            try {
+              const escrowData = await escrowContract.getEscrow(escrowId);
+
+              const canRelease =
+                !escrowData.isReleased &&
+                !escrowData.isRefunded &&
+                Date.now() / 1000 >= Number(escrowData.releaseDate);
+
+              if (canRelease) {
+                console.log(`   ✅ Escrow ${escrowId} is eligible for release`);
+                escrowIds.push({
+                  escrowId,
+                  purchaseId: purchase._id,
+                });
+              } else {
+                console.log(
+                  `   ⏭️  Escrow ${escrowId} not yet eligible (release: ${new Date(
+                    Number(escrowData.releaseDate) * 1000
+                  )})`
+                );
+              }
+            } catch (err) {
+              console.error(
+                `   ❌ Error checking escrow ${escrowId}:`,
+                err.message
+              );
             }
           }
         } catch (error) {
@@ -241,18 +253,16 @@ class EscrowAutomationService {
         throw new Error("Purchase not found");
       }
 
-      if (purchase.escrowStatus !== "pending") {
-        throw new Error("Escrow is not in pending status");
+      if (purchase.escrowStatus !== "locked") {
+        throw new Error("Escrow is not in locked status");
+      }
+      if (purchase.escrowStatus !== "locked") {
+        throw new Error("Escrow is not in locked status");
       }
 
-      const eligibility = purchase.checkEscrowReleaseEligibility(
-        purchase.course
-      );
-
-      if (!eligibility.canRelease) {
-        throw new Error(eligibility.reason);
+      if (new Date() < purchase.escrowReleaseDate) {
+        throw new Error("Escrow release date has not passed");
       }
-
       const paymentService = getPaymentService();
       await paymentService.initialize(purchase.paymentToken);
 

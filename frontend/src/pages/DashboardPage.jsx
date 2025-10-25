@@ -30,6 +30,7 @@ import {
   FileText,
   ArrowRight,
   Plus,
+  ShoppingBag,
 } from "lucide-react";
 
 const DashboardPage = () => {
@@ -337,11 +338,11 @@ const DashboardPage = () => {
               My Learning
             </h1>
             <Link
-              to="/courses"
-              className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition font-medium flex items-center space-x-2"
+              to="/dashboard/purchases"
+              className="px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-green-400 transition font-medium flex items-center space-x-2"
             >
-              <Plus className="w-4 h-4" />
-              <span>Browse Courses</span>
+              <ShoppingBag className="w-4 h-4" />
+              <span>Purchase History</span>
             </Link>
           </div>
           <p className="text-gray-600 dark:text-gray-400">
@@ -440,14 +441,16 @@ const DashboardPage = () => {
             <div className="grid md:grid-cols-3 gap-4">
               <button
                 key="quick-action-courses"
-                onClick={() => navigate("/courses")}
+                onClick={() => navigate("/dashboard/purchases")}
                 className="p-4 bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-800 rounded-xl hover:border-primary-400 transition text-left group"
               >
-                <BookOpen className="w-8 h-8 text-blue-500 mb-3 group-hover:scale-110 transition" />
+                <ShoppingBag className="w-8 h-8 text-blue-500 mb-3 group-hover:scale-110 transition" />
                 <h4 className="font-bold text-gray-900 dark:text-white mb-1">
-                  Browse Courses
+                  Purchase History
                 </h4>
-                <p className="text-xs text-gray-500">Discover new skills</p>
+                <p className="text-xs text-gray-500">
+                  View your purchases & refunds
+                </p>
               </button>
               <button
                 key="quick-action-certificates"

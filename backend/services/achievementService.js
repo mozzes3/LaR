@@ -1,6 +1,6 @@
 const achievements = require("../config/achievements");
 const User = require("../models/User");
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED");
 
 /**
  * Check and unlock achievements for a user

@@ -3,7 +3,7 @@ const sharp = require("sharp");
 const path = require("path");
 const Course = require("../models/Course"); // ✅ ADD THIS if missing
 const Review = require("../models/Review");
-const Purchase = require("../models/Purchase"); // ✅ ADD THIS
+const Purchase = require("../models/Purchase.DEPRECATED"); // ✅ ADD THIS
 const Certificate = require("../models/Certificate"); // ✅ ADD THIS
 const fs = require("fs").promises;
 const { getLevelProgress } = require("../config/levels");
@@ -179,7 +179,7 @@ const getInstructorPublicStats = async (req, res) => {
     }
 
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Review = require("../models/Review");
 
     // Get only PUBLISHED courses
@@ -395,7 +395,7 @@ const getInstructorDashboardStats = async (req, res) => {
 
     // Get all instructor's courses with only needed fields
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Review = require("../models/Review");
 
     const courses = await Course.find({ instructor: instructorId })
@@ -490,7 +490,7 @@ const getInstructorEarningsHistory = async (req, res) => {
     }
 
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
 
     const courses = await Course.find({ instructor: instructorId });
     const courseIds = courses.map((c) => c._id);
@@ -600,7 +600,7 @@ const getInstructorRecentActivity = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
 
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Review = require("../models/Review");
 
     // Get instructor's course IDs
@@ -707,7 +707,7 @@ const getAllStudents = async (req, res) => {
 
     // Get all instructor's courses
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
 
     const courses = await Course.find({ instructor: instructorId });
     const courseIds = courses.map((c) => c._id);
@@ -715,7 +715,7 @@ const getAllStudents = async (req, res) => {
     // Get all purchases for instructor's courses
     const purchases = await Purchase.find({
       course: { $in: courseIds },
-      status: "active",
+      status: { $in: ["active", "completed"] }, // ← Check both
     })
       .populate("user", "username avatar email lastLogin")
       .populate("course", "title")
@@ -835,7 +835,7 @@ const getStudentAnalytics = async (req, res) => {
   try {
     const userId = req.userId;
 
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Course = require("../models/Course");
     const { getUserAchievements } = require("../services/achievementService");
 
@@ -1056,7 +1056,7 @@ const getInstructorEarningsTransactions = async (req, res) => {
     }
 
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
 
     const courses = await Course.find({ instructor: instructorId });
     const courseIds = courses.map((c) => c._id);
@@ -1118,7 +1118,7 @@ const getStudentDetails = async (req, res) => {
     }
 
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
 
     // Get instructor's courses
     const courses = await Course.find({ instructor: instructorId });
@@ -1733,7 +1733,7 @@ const getInstructorDashboardComplete = async (req, res) => {
     }
 
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Review = require("../models/Review");
 
     const courses = await Course.find({ instructor: instructorId });
@@ -1976,7 +1976,7 @@ const getProfileComplete = async (req, res) => {
     const requestingUserId = req.userId;
 
     const User = require("../models/User");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Certificate = require("../models/Certificate");
     const ProfessionalCertificate = require("../models/ProfessionalCertificate");
     const { getLevelProgress } = require("../config/levels");
@@ -2206,7 +2206,7 @@ const getInstructorEarningsComplete = async (req, res) => {
     }
 
     const Course = require("../models/Course");
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Review = require("../models/Review");
 
     const courses = await Course.find({ instructor: instructorId })

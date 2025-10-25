@@ -15,111 +15,137 @@ const purchaseSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Payment details
+    // NEW PAYMENT SYSTEM FIELDS
     paymentToken: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "PaymentToken",
-      required: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
+      required: false, // Made optional for backward compatibility
     },
     amountInToken: {
-      type: String, // Store as string to preserve precision
-      required: true,
-    },
-    priceUSD: {
-      type: Number,
-      required: true,
+      type: String,
+      required: false,
     },
     amountInUSD: {
-      type: Number, // Alias for compatibility
+      type: Number,
+      required: false,
     },
 
     // Transaction
     transactionHash: {
       type: String,
-      required: true,
-      unique: true,
+      required: false, // Made optional for backward compatibility
       index: true,
+      sparse: true, // Allow multiple null values
     },
     blockchain: {
       type: String,
       enum: ["evm", "solana"],
-      required: true,
+      required: false,
     },
     blockNumber: Number,
     fromAddress: {
       type: String,
-      required: true,
+      required: false,
     },
-    toAddress: {
-      type: String, // NEW - instructor wallet address
-    },
+    toAddress: String,
 
-    // Fee distribution
-    platformFeeAmount: {
-      type: String, // In token
-      required: true,
-    },
+    // Fee distribution (new system)
     platformAmount: {
-      type: String, // Alias for compatibility
-    },
-    instructorFeeAmount: {
-      type: String, // In token
-      required: true,
+      type: String,
+      required: false,
     },
     instructorAmount: {
-      type: String, // Alias for compatibility
+      type: String,
+      required: false,
     },
     revenueSplitAmount: {
-      type: String, // In token (20% of platform fee)
-      required: true,
+      type: String,
+      required: false,
     },
     platformFeePercentage: {
       type: Number,
-      required: true,
+      required: false,
     },
     instructorFeePercentage: {
       type: Number,
-      required: true,
+      required: false,
     },
 
-    // Escrow status
-    escrowId: {
-      type: String, // NEW - smart contract escrow ID
-      index: true,
-    },
+    // Escrow
+    escrowId: String,
     escrowStatus: {
       type: String,
-      enum: ["pending", "released", "refunded", "failed", "dummy"], // UPDATED - added 'failed' and 'dummy'
+      enum: ["pending", "released", "refunded", "failed", "dummy", "locked"],
       default: "pending",
       index: true,
     },
     escrowReleaseDate: {
       type: Date,
-      required: true,
-      index: true,
+      required: false, // Made optional for backward compatibility
     },
     escrowReleasedAt: Date,
-    escrowReleaseTransactionHash: String,
-    escrowCreatedTxHash: String, // NEW - tx hash when escrow created in contract
-    escrowReleaseTxHash: String, // NEW - alias for escrowReleaseTransactionHash
+    escrowReleasedBy: String, // Wallet address that released
+    escrowReleaseReason: String,
+    escrowReleaseSignature: String,
+    escrowCreatedTxHash: String,
+    escrowReleaseTxHash: String,
 
-    // Refund tracking
+    // Refund
     refundEligible: {
       type: Boolean,
       default: true,
-      index: true,
     },
     refundRequestedAt: Date,
     refundProcessedAt: Date,
     refundTransactionHash: String,
     refundReason: String,
-    refundDenialReason: String,
+    refundedAt: Date,
 
-    // Progress tracking (for refund eligibility)
+    // Admin grant tracking
+    grantedByAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    grantReason: {
+      type: String,
+      default: null,
+    },
+
+    // OLD PAYMENT SYSTEM FIELDS (for backward compatibility)
+    paymentMethod: {
+      type: String,
+      enum: ["fdr", "usdt", "usdc", "eth", "stripe", "crypto", "free"],
+      required: false,
+    },
+    amount: {
+      type: Number,
+      required: false,
+    },
+    currency: {
+      type: String,
+      enum: ["USD", "FDR", "USDC", "USDT"],
+      required: false,
+    },
+    instructorRevenue: {
+      type: Number,
+      required: false,
+    },
+    platformFee: {
+      type: Number,
+      required: false,
+    },
+    paymentId: String, // For Stripe
+    cashbackAmount: {
+      type: Number,
+      default: 0,
+    },
+    cashbackClaimed: {
+      type: Boolean,
+      default: false,
+    },
+
+    // Progress tracking
     progress: {
       type: Number,
       default: 0,
@@ -128,16 +154,10 @@ const purchaseSchema = new mongoose.Schema(
     },
     totalWatchTime: {
       type: Number,
-      default: 0, // in seconds
+      default: 0,
     },
-    completedLessons: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-      },
-    ],
-    lastAccessedLesson: {
-      type: mongoose.Schema.Types.ObjectId,
-    },
+    completedLessons: [mongoose.Schema.Types.ObjectId],
+    lastAccessedLesson: mongoose.Schema.Types.ObjectId,
     lastAccessedAt: Date,
 
     // Completion
@@ -152,163 +172,54 @@ const purchaseSchema = new mongoose.Schema(
     },
     certificateId: String,
 
-    // Smart contract event data
-    smartContractData: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
+    // Experience earned
+    experienceEarned: {
+      type: Number,
+      default: 0,
     },
 
     // Status
     status: {
       type: String,
-      enum: ["active", "refunded", "expired", "completed"],
-      default: "active",
+      enum: [
+        "pending",
+        "active",
+        "refunded",
+        "escrow_released",
+        "disputed",
+        "failed",
+        "revoked",
+        "expired",
+        "completed",
+      ],
+      default: "pending",
       index: true,
     },
+    revokedAt: Date,
+    revokedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    revokeReason: String,
   },
   {
     timestamps: true,
   }
 );
 
-// Compound indexes
-purchaseSchema.index({ user: 1, course: 1 }, { unique: true });
+// Indexes
+purchaseSchema.index({ user: 1, course: 1 });
 purchaseSchema.index({ user: 1, status: 1 });
+purchaseSchema.index({ user: 1, isCompleted: 1 });
+purchaseSchema.index({ course: 1, isCompleted: 1 });
 purchaseSchema.index({ course: 1, createdAt: -1 });
+purchaseSchema.index({ course: 1, status: 1 });
+purchaseSchema.index({ lastAccessedAt: -1 });
+purchaseSchema.index({ status: 1, createdAt: -1 });
 purchaseSchema.index({ escrowStatus: 1, escrowReleaseDate: 1 });
-purchaseSchema.index({ transactionHash: 1 }, { unique: true });
-purchaseSchema.index({ refundEligible: 1, status: 1 });
+purchaseSchema.index({ transactionHash: 1 }, { sparse: true });
 
-// Pre-save hook to sync alias fields
-purchaseSchema.pre("save", function (next) {
-  // Sync amountInUSD with priceUSD
-  if (this.priceUSD && !this.amountInUSD) {
-    this.amountInUSD = this.priceUSD;
-  }
-  if (this.amountInUSD && !this.priceUSD) {
-    this.priceUSD = this.amountInUSD;
-  }
-
-  // Sync platformAmount with platformFeeAmount
-  if (this.platformFeeAmount && !this.platformAmount) {
-    this.platformAmount = this.platformFeeAmount;
-  }
-  if (this.platformAmount && !this.platformFeeAmount) {
-    this.platformFeeAmount = this.platformAmount;
-  }
-
-  // Sync instructorAmount with instructorFeeAmount
-  if (this.instructorFeeAmount && !this.instructorAmount) {
-    this.instructorAmount = this.instructorFeeAmount;
-  }
-  if (this.instructorAmount && !this.instructorFeeAmount) {
-    this.instructorFeeAmount = this.instructorAmount;
-  }
-
-  // Sync escrowReleaseTxHash with escrowReleaseTransactionHash
-  if (this.escrowReleaseTransactionHash && !this.escrowReleaseTxHash) {
-    this.escrowReleaseTxHash = this.escrowReleaseTransactionHash;
-  }
-  if (this.escrowReleaseTxHash && !this.escrowReleaseTransactionHash) {
-    this.escrowReleaseTransactionHash = this.escrowReleaseTxHash;
-  }
-
-  next();
-});
-
-// Method to check refund eligibility
-purchaseSchema.methods.checkRefundEligibility = function () {
-  const now = new Date();
-  const purchaseDate = this.createdAt;
-  const daysSincePurchase = (now - purchaseDate) / (1000 * 60 * 60 * 24);
-
-  // Get course escrow settings
-  const escrowPeriodDays = this.escrowReleaseDate
-    ? (this.escrowReleaseDate - purchaseDate) / (1000 * 60 * 60 * 24)
-    : 14;
-
-  // Check if within refund period
-  if (daysSincePurchase > escrowPeriodDays) {
-    return {
-      eligible: false,
-      reason: "Refund period has expired",
-    };
-  }
-
-  // Check escrow status
-  if (this.escrowStatus === "released") {
-    return {
-      eligible: false,
-      reason: "Payment has already been released from escrow",
-    };
-  }
-
-  if (this.escrowStatus === "refunded") {
-    return {
-      eligible: false,
-      reason: "Payment has already been refunded",
-    };
-  }
-
-  // Eligibility passed
-  return {
-    eligible: true,
-    reason: null,
-  };
-};
-
-// Method to calculate escrow release eligibility
-purchaseSchema.methods.checkEscrowReleaseEligibility = function (courseData) {
-  const now = new Date();
-  const purchaseDate = this.createdAt;
-  const daysSincePurchase = (now - purchaseDate) / (1000 * 60 * 60 * 24);
-
-  const minDays = courseData.escrowSettings?.refundPeriodDays || 14;
-  const minWatchPercentage =
-    courseData.escrowSettings?.minWatchPercentage || 20;
-  const maxWatchTimeMinutes = courseData.escrowSettings?.maxWatchTime || 30;
-
-  // Condition 1: Minimum days passed
-  if (daysSincePurchase >= minDays) {
-    return { canRelease: true, reason: "Minimum escrow period completed" };
-  }
-
-  // Condition 2: Minimum watch percentage
-  if (this.progress >= minWatchPercentage) {
-    return {
-      canRelease: true,
-      reason: `Watched ${this.progress}% of course`,
-    };
-  }
-
-  // Condition 3: Minimum watch time
-  const watchTimeMinutes = this.totalWatchTime / 60;
-  if (watchTimeMinutes >= maxWatchTimeMinutes) {
-    return {
-      canRelease: true,
-      reason: `Watched ${watchTimeMinutes.toFixed(0)} minutes`,
-    };
-  }
-
-  // Condition 4: Course is shorter than threshold, check percentage
-  const courseDurationMinutes = courseData.duration || 0;
-  if (courseDurationMinutes < maxWatchTimeMinutes) {
-    const threshold = 20; // 20% for short courses
-    if (this.progress >= threshold) {
-      return {
-        canRelease: true,
-        reason: `Watched ${this.progress}% of short course`,
-      };
-    }
-  }
-
-  return {
-    canRelease: false,
-    reason: "Escrow conditions not yet met",
-  };
-};
-
-// Method to mark lesson as completed
+// Mark lesson as completed (from old model)
 purchaseSchema.methods.completeLesson = function (lessonId) {
   if (!this.completedLessons.includes(lessonId)) {
     this.completedLessons.push(lessonId);
@@ -316,7 +227,29 @@ purchaseSchema.methods.completeLesson = function (lessonId) {
     this.lastAccessedAt = new Date();
     return this.save();
   }
+  return Promise.resolve(this);
+};
+
+// Refund eligibility check
+purchaseSchema.methods.checkRefundEligibility = function () {
+  const now = new Date();
+  const daysSincePurchase = (now - this.createdAt) / (1000 * 60 * 60 * 24);
+  const escrowPeriodDays = this.escrowReleaseDate
+    ? (this.escrowReleaseDate - this.createdAt) / (1000 * 60 * 60 * 24)
+    : 14;
+
+  if (daysSincePurchase > escrowPeriodDays) {
+    return { eligible: false, reason: "Refund period has expired" };
+  }
+  if (this.escrowStatus === "released") {
+    return { eligible: false, reason: "Payment already released" };
+  }
+  if (this.escrowStatus === "refunded") {
+    return { eligible: false, reason: "Already refunded" };
+  }
+  return { eligible: true };
 };
 
 module.exports =
-  mongoose.models.Purchase || mongoose.model("Purchase", purchaseSchema);
+  mongoose.models.PaymentPurchase ||
+  mongoose.model("PaymentPurchase", purchaseSchema, "purchases");

@@ -1,6 +1,6 @@
 const Course = require("../models/Course");
 const User = require("../models/User");
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED");
 const Review = require("../models/Review");
 const videoService = require("../services/videoService");
 const validator = require("validator");
@@ -43,6 +43,10 @@ const createCourse = async (req, res) => {
       instructor: req.userId,
       status: "draft",
       thumbnail: "", // ← Empty string instead of placeholder!
+      acceptedPaymentMethods: req.body.acceptedPaymentMethods || [
+        "usdt",
+        "usdc",
+      ],
     });
 
     await User.findByIdAndUpdate(req.userId, {
@@ -162,7 +166,7 @@ const getCourses = async (req, res) => {
     const courses = await Course.find(query)
       .populate(
         "instructor",
-        "username displayName avatar instructorVerified expertise badges"
+        "username avatar instructorVerified badges walletAddress evmWalletAddress solanaWalletAddress acceptedPaymentMethods"
       )
 
       .sort(sortQuery)
@@ -214,11 +218,11 @@ const getCourse = async (req, res) => {
     const course = await Course.findOne({ slug })
       .populate(
         "instructor",
-        "username displayName avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks badges"
+        "username displayName avatar bio instructorBio expertise averageRating totalStudents instructorVerified socialLinks badges walletAddress evmWalletAddress solanaWalletAddress acceptedPaymentMethods"
       )
       .select(
-        "title subtitle description category subcategory level price requirements whatYouWillLearn targetAudience tags thumbnail sections averageRating totalRatings enrollmentCount instructor status createdAt"
-      ); // ✅ Add select to limit fields
+        "title subtitle description category subcategory level price acceptedPaymentMethods requirements whatYouWillLearn targetAudience tags thumbnail sections averageRating totalRatings enrollmentCount instructor status createdAt"
+      );
 
     console.log("3. Course found:", course ? "YES" : "NO");
 
@@ -380,6 +384,7 @@ const updateCourse = async (req, res) => {
       "subcategory",
       "level",
       "price",
+      "acceptedPaymentMethods", // ADD THIS
       "requirements",
       "whatYouWillLearn",
       "targetAudience",
@@ -532,7 +537,10 @@ const getCoursesByInstructor = async (req, res) => {
       instructor: instructor._id,
       status: "published", // ← CHANGE FROM isPublished to status
     })
-      .populate("instructor", "username avatar instructorVerified badges")
+      .populate(
+        "instructor",
+        "username avatar instructorVerified badges walletAddress evmWalletAddress solanaWalletAddress acceptedPaymentMethods"
+      )
       .sort({ createdAt: -1 })
       .lean();
 
@@ -694,7 +702,7 @@ const getAllCoursesAnalytics = async (req, res) => {
     const courses = await Course.find({ instructor: instructorId }).lean();
     const courseIds = courses.map((c) => c._id);
 
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Review = require("../models/Review");
 
     const purchases = await Purchase.find({
@@ -856,7 +864,7 @@ const getCourseAnalytics = async (req, res) => {
       return res.status(404).json({ error: "Course not found" });
     }
 
-    const Purchase = require("../models/Purchase");
+    const Purchase = require("../models/Purchase.DEPRECATED");
     const Review = require("../models/Review");
 
     const purchases = await Purchase.find({

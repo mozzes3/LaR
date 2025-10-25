@@ -11,6 +11,8 @@ import {
   Clock,
   Shield,
   Award,
+  FileText,
+  Lock,
 } from "lucide-react";
 import { adminApi, adminProfessionalCertificationApi } from "@services/api";
 import toast from "react-hot-toast";
@@ -116,6 +118,13 @@ const AdminDashboardPage = () => {
       color: "purple",
       link: "/admin/professional-certifications",
     },
+    {
+      title: "Active Escrows",
+      value: stats.activeEscrows,
+      icon: Lock,
+      color: "green",
+      link: "/admin/escrows",
+    },
   ];
 
   const quickActions = [
@@ -161,6 +170,20 @@ const AdminDashboardPage = () => {
       icon: Award, // import Award from lucide-react
       link: "/admin/professional-certifications",
       color: "purple",
+    },
+    {
+      title: "Escrow Management",
+      description: "Manage payments and refunds",
+      icon: DollarSign,
+      link: "/admin/escrows",
+      color: "green",
+    },
+    {
+      title: "Audit Logs",
+      description: "View admin action history",
+      icon: FileText, // import FileText from lucide-react
+      link: "/admin/audit-logs",
+      color: "blue",
     },
   ];
 

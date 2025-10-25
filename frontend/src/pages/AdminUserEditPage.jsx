@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { adminApi } from "@services/api";
+import CourseAccessSection from "@components/admin/CourseAccessSection";
 import toast from "react-hot-toast";
 
 const AdminUserEditPage = () => {
@@ -993,6 +994,7 @@ const AdminUserEditPage = () => {
             <span>{saving ? "Saving..." : "Save Permissions"}</span>
           </button>
         </div>
+        <CourseAccessSection userId={userId} />
       </div>
     </div>
   );

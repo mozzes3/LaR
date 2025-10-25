@@ -134,6 +134,7 @@ export const adminApi = {
   updateCourseStatus: (courseId, data) =>
     api.put(`/admin/courses/${courseId}/status`, data),
   deleteCourse: (courseId) => api.delete(`/admin/courses/${courseId}`),
+  getCourses: (params) => api.get("/admin/courses", { params }),
 
   // Reviews
   getAllReviewsAdmin: (params) => api.get("/admin/reviews", { params }),
@@ -157,6 +158,26 @@ export const adminApi = {
     api.put(`/admin/users/${userId}/details`, data),
   toggleInstructorStatus: (userId, data) =>
     api.post(`/admin/users/${userId}/toggle-instructor`, data),
+
+  // Escrow Management
+  getAllEscrows: (params) => api.get("/admin/payment/escrows", { params }),
+  manualReleaseEscrow: (escrowId, data) =>
+    api.post(`/admin/payment/escrows/${escrowId}/release`, data),
+  manualRefundEscrow: (escrowId, data) =>
+    api.post(`/admin/payment/escrows/${escrowId}/refund`, data),
+
+  // Course Access Management
+  grantFreeCourseAccess: (userId, courseId, data) =>
+    api.post(`/admin/payment/users/${userId}/courses/${courseId}/grant`, data),
+  removeCourseAccess: (userId, courseId, data) =>
+    api.delete(`/admin/payment/users/${userId}/courses/${courseId}/access`, {
+      data,
+    }),
+  getUserPurchases: (userId) =>
+    api.get(`/admin/payment/users/${userId}/purchases`),
+
+  // NEW: Audit Logs
+  getAuditLogs: (params) => api.get("/admin/payment/audit-logs", { params }),
 };
 
 export const certificateApi = {
@@ -443,3 +464,4 @@ export const adminProfessionalCertificationApi = {
     api.get("/professional-certifications/certificates/eligible"),
 };
 export default api;
+export { paymentApi } from "./paymentApi";

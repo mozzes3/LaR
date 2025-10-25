@@ -1,6 +1,6 @@
 const Review = require("../models/Review");
 const Course = require("../models/Course");
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED");
 
 // Create review
 const createReview = async (req, res) => {

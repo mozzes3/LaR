@@ -217,7 +217,7 @@ const CreateCoursePage = () => {
               usd: course.price?.usd?.toString() || "",
               fdr: course.price?.fdr?.toString() || "",
             },
-            acceptedPayments: course.acceptedPayments || ["usdt", "usdc"],
+            acceptedPayments: course.acceptedPaymentMethods || ["usdt", "usdc"],
             escrowSettings: course.escrowSettings || {
               refundPeriodDays: 14,
               minWatchPercentage: 20,
@@ -822,7 +822,7 @@ const CreateCoursePage = () => {
           requirements: courseData.requirements.filter((r) => r.trim()),
           whatYouWillLearn: courseData.whatYouWillLearn.filter((w) => w.trim()),
           targetAudience: courseData.targetAudience.filter((t) => t.trim()),
-          acceptedPayments: courseData.acceptedPayments,
+          acceptedPaymentMethods: courseData.acceptedPayments,
           escrowSettings: courseData.escrowSettings,
         };
 
@@ -843,7 +843,7 @@ const CreateCoursePage = () => {
           requirements: courseData.requirements.filter((r) => r.trim()),
           whatYouWillLearn: courseData.whatYouWillLearn.filter((w) => w.trim()),
           targetAudience: courseData.targetAudience.filter((t) => t.trim()),
-          acceptedPayments: courseData.acceptedPayments,
+          acceptedPaymentMethods: courseData.acceptedPayments,
           escrowSettings: courseData.escrowSettings,
         });
       }

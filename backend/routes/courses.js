@@ -3,6 +3,7 @@ const router = express.Router();
 const rateLimit = require("express-rate-limit");
 const courseController = require("../controllers/courseController");
 const previewCacheService = require("../services/previewCacheService");
+const PaymentPurchase = require("../modules/payment/models/Purchase");
 const {
   authenticate,
   isInstructor,
@@ -20,7 +21,7 @@ const {
 } = require("../middleware/rateLimits");
 
 const Course = require("../models/Course");
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED");
 const bunnyService = require("../services/bunnyService");
 const videoSessionService = require("../services/videoSessionService");
 

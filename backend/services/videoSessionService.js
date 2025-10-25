@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const VideoSession = require("../models/VideoSession.js");
 const Course = require("../models/Course");
-const Purchase = require("../models/Purchase");
+const Purchase = require("../models/Purchase.DEPRECATED.js");
 
 class VideoSessionService {
   /**

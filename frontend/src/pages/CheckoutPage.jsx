@@ -21,7 +21,13 @@ import {
   Check,
   X as XIcon,
 } from "lucide-react";
-import { courseApi, purchaseApi } from "@services/api";
+import { courseApi, purchaseApi, paymentApi } from "@services/api";
+import { ethers } from "ethers";
+import {
+  verifyAndSwitchNetwork,
+  verifyTokenContract,
+  verifyRegistryAddress,
+} from "@utils/networkVerification";
 import { useWallet } from "@contexts/WalletContext";
 import toast from "react-hot-toast";
 
@@ -33,13 +39,17 @@ const CheckoutPage = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const { isConnected, account: walletAddress, connectWallet } = useWallet();
+  const {
+    isConnected,
+    account: walletAddress,
+    provider: web3Provider,
+  } = useWallet();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState(
-    location.state?.paymentMethod || "usdt"
-  );
+  const [availablePaymentTokens, setAvailablePaymentTokens] = useState([]);
+  const [selectedPaymentToken, setSelectedPaymentToken] = useState(null);
+  const [loadingTokens, setLoadingTokens] = useState(false);
   const [showPaymentDropdown, setShowPaymentDropdown] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [promoCode, setPromoCode] = useState("");
@@ -47,90 +57,8 @@ const CheckoutPage = () => {
   const [transactionHash, setTransactionHash] = useState(null);
 
   // Mock crypto prices
-  const cryptoPrices = {
-    eth: 3500,
-    btc: 65000,
-    sol: 140,
-    usdt: 1,
-    usdc: 1,
-    fdr: 1,
-  };
-
-  const calculateCryptoPrice = (usdPrice, crypto) => {
-    const amount = usdPrice / cryptoPrices[crypto];
-    return crypto === "btc" ? amount.toFixed(4) : amount.toFixed(2);
-  };
 
   // Get dynamic payment options based on course price
-  const getPaymentOptions = () => {
-    if (!course?.price) {
-      return [
-        {
-          id: "usdt",
-          name: "USDT",
-          fullName: "Tether USD",
-          icon: "₮",
-          color: "bg-green-500",
-          amount: "0.00",
-          isStable: true,
-          network: "Ethereum (ERC-20)",
-          chainId: 1,
-        },
-      ];
-    }
-
-    const usdPrice = course.price.usd || 0;
-
-    return [
-      {
-        id: "usdt",
-        name: "USDT",
-        fullName: "Tether USD",
-        icon: "₮",
-        color: "bg-green-500",
-        amount: usdPrice.toFixed(2),
-        isStable: true,
-        network: "Ethereum (ERC-20)",
-        chainId: 1,
-      },
-      {
-        id: "usdc",
-        name: "USDC",
-        fullName: "USD Coin",
-        icon: "$",
-        color: "bg-blue-500",
-        amount: usdPrice.toFixed(2),
-        isStable: true,
-        network: "Ethereum (ERC-20)",
-        chainId: 1,
-      },
-      {
-        id: "eth",
-        name: "ETH",
-        fullName: "Ethereum",
-        icon: "Ξ",
-        color: "bg-gradient-to-br from-purple-500 to-blue-500",
-        amount: calculateCryptoPrice(usdPrice, "eth"),
-        isStable: false,
-        network: "Ethereum Mainnet",
-        chainId: 1,
-      },
-      {
-        id: "fdr",
-        name: "$FDR",
-        fullName: "Founder Token",
-        icon: "F",
-        color: "bg-gradient-to-br from-primary-400 to-primary-600",
-        amount: (course.price.fdr || usdPrice).toString(),
-        isStable: true,
-        network: "Polygon Network",
-        chainId: 137,
-        badge: "Platform Token",
-      },
-    ];
-  };
-
-  const allPaymentOptions = getPaymentOptions();
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -190,16 +118,42 @@ const CheckoutPage = () => {
     }
   }, [slug, navigate]);
 
-  // Second useEffect stays the same - it's correct!
+  // Load payment tokens from backend
   useEffect(() => {
-    if (
-      course &&
-      course.instructor?.acceptedPayments && // ← Add optional chaining for safety
-      !course.instructor.acceptedPayments.includes(selectedPayment)
-    ) {
-      setSelectedPayment(course.instructor.acceptedPayments[0]);
-    }
-  }, [course, selectedPayment]);
+    const loadPaymentTokens = async () => {
+      try {
+        setLoadingTokens(true);
+        const response = await paymentApi.getPaymentTokens();
+
+        const tokens = response.data.tokens.filter(
+          (token) => token.isActive && token.isEnabled && token.verified
+        );
+
+        setAvailablePaymentTokens(tokens);
+
+        if (tokens.length > 0 && !selectedPaymentToken) {
+          const defaultToken = location.state?.paymentMethod
+            ? tokens.find(
+                (t) =>
+                  t.symbol.toLowerCase() ===
+                  location.state.paymentMethod.toLowerCase()
+              )
+            : tokens[0];
+
+          setSelectedPaymentToken(defaultToken || tokens[0]);
+        }
+      } catch (error) {
+        console.error("Failed to load payment tokens:", error);
+        toast.error("Failed to load payment methods");
+      } finally {
+        setLoadingTokens(false);
+      }
+    };
+
+    loadPaymentTokens();
+  }, [location.state?.paymentMethod]);
+
+  // Second useEffect stays the same - it's correct!
 
   const handleApplyPromo = () => {
     if (promoCode.toLowerCase() === "save10") {
@@ -220,50 +174,290 @@ const CheckoutPage = () => {
   };
 
   const handleSmartContractPayment = async () => {
+    // VALIDATION 1: Check wallet connected
     if (!isConnected) {
       toast.error("Please connect your wallet");
       return;
     }
 
+    // VALIDATION 2: Check terms agreed
     if (!agreeToTerms) {
       toast.error("Please agree to terms and conditions");
+      return;
+    }
+
+    // VALIDATION 3: Check payment token selected
+    if (!selectedPaymentToken) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    // VALIDATION 4: Check instructor has payment wallet
+    if (!course?.instructor?.walletAddress) {
+      toast.error(
+        "Instructor hasn't set up their payment wallet yet. Please contact support."
+      );
+      return;
+    }
+
+    // VALIDATION 5: Check course accepts this payment method
+    const courseAcceptsToken = course?.acceptedPaymentMethods?.includes(
+      selectedPaymentToken.symbol.toLowerCase()
+    );
+
+    if (!courseAcceptsToken) {
+      toast.error(
+        `This course doesn't accept ${selectedPaymentToken.symbol} payments`
+      );
+      console.error("Course accepted methods:", course?.acceptedPaymentMethods);
+      console.error("Selected token:", selectedPaymentToken.symbol);
+      return;
+    }
+
+    // VALIDATION 6: Check token has all required fields
+    if (!selectedPaymentToken._id || !selectedPaymentToken.contractAddress) {
+      toast.error("Invalid payment token configuration");
+      console.error("Token config:", selectedPaymentToken);
       return;
     }
 
     try {
       setProcessing(true);
 
-      // Real API call to record purchase
-      toast.loading("Processing payment...");
+      // STEP 1: Verify network
+      toast.loading("Verifying network...");
 
-      // Simulate blockchain transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const networkOk = await verifyAndSwitchNetwork(
+        web3Provider,
+        selectedPaymentToken
+      );
+      if (!networkOk) {
+        toast.dismiss();
+        setProcessing(false);
+        return;
+      }
 
-      const mockTxHash = `0x${Math.random().toString(16).substr(2, 64)}`;
-      setTransactionHash(mockTxHash);
+      // STEP 2: Calculate payment details
+      toast.dismiss();
+      toast.loading("Calculating payment...");
 
-      // Send to backend API
-      const response = await purchaseApi.purchase({
-        courseId: course.id,
-        paymentMethod: selectedPayment,
-        transactionHash: mockTxHash,
+      console.log("📤 Sending calculate payment request:");
+      console.log("  courseId:", course._id);
+      console.log("  paymentTokenId:", selectedPaymentToken._id);
+      console.log("  Full course:", course);
+      console.log("  Full token:", selectedPaymentToken);
+
+      const calcResponse = await paymentApi.calculatePayment({
+        courseId: course._id,
+        paymentTokenId: selectedPaymentToken._id,
       });
+
+      console.log("📥 Calculate response:", calcResponse.data);
+
+      // Check if calculation was successful
+      if (!calcResponse.data.success) {
+        toast.dismiss();
+        toast.error(calcResponse.data.error || "Payment calculation failed");
+        setProcessing(false);
+        return;
+      }
+
+      const amountInToken = calcResponse.data.calculation.tokenAmount;
+
+      console.log("💰 Token amount from backend:", amountInToken);
+
+      if (!amountInToken) {
+        console.error("❌ No token amount in response:", calcResponse.data);
+        toast.error("Failed to calculate payment amount");
+        setProcessing(false);
+        return;
+      }
+
+      // STEP 3: Verify token contract AND registry
+      const registryOk = verifyRegistryAddress({
+        chainId: selectedPaymentToken.chainId,
+        registryAddress: calcResponse.data.calculation.registryContractAddress,
+      });
+      if (!registryOk) {
+        toast.dismiss();
+        setProcessing(false);
+        return;
+      }
+
+      const tokenVerified = await verifyTokenContract(
+        web3Provider,
+        selectedPaymentToken.contractAddress,
+        selectedPaymentToken
+      );
+
+      if (!tokenVerified) {
+        toast.dismiss();
+        toast.error("Token contract verification failed");
+        setProcessing(false);
+        return;
+      }
+
+      // STEP 4: Get signer
+      const signer = await web3Provider.getSigner();
+      const userAddress = await signer.getAddress();
+
+      console.log("👤 User address:", userAddress);
+
+      // STEP 5: Setup token contract
+      const ERC20_ABI = [
+        "function approve(address spender, uint256 amount) external returns (bool)",
+        "function allowance(address owner, address spender) external view returns (uint256)",
+        "function balanceOf(address account) external view returns (uint256)",
+      ];
+
+      const tokenContract = new ethers.Contract(
+        selectedPaymentToken.contractAddress,
+        ERC20_ABI,
+        signer
+      );
+
+      // STEP 6: Check balance
+      toast.dismiss();
+      toast.loading("Checking balance...");
+
+      console.log("💳 Checking balance...");
+      const balance = await tokenContract.balanceOf(userAddress);
+      const amountBigInt = ethers.getBigInt(amountInToken);
+
+      console.log(
+        "💰 Balance:",
+        ethers.formatUnits(balance, selectedPaymentToken.decimals),
+        selectedPaymentToken.symbol
+      );
+      console.log(
+        "💰 Required:",
+        ethers.formatUnits(amountBigInt, selectedPaymentToken.decimals),
+        selectedPaymentToken.symbol
+      );
+
+      if (balance < amountBigInt) {
+        toast.dismiss();
+        toast.error(
+          `Insufficient ${
+            selectedPaymentToken.symbol
+          } balance. You need ${ethers.formatUnits(
+            amountBigInt,
+            selectedPaymentToken.decimals
+          )} ${selectedPaymentToken.symbol} but have ${ethers.formatUnits(
+            balance,
+            selectedPaymentToken.decimals
+          )}`
+        );
+        setProcessing(false);
+        return;
+      }
+
+      // STEP 7: Check and approve if needed
+      toast.dismiss();
+      toast.loading("Checking allowance...");
+
+      console.log("🔍 Checking current allowance...");
+      const allowance = await tokenContract.allowance(
+        userAddress,
+        selectedPaymentToken.paymentContractAddress
+      );
+
+      console.log(
+        "Current allowance:",
+        ethers.formatUnits(allowance, selectedPaymentToken.decimals)
+      );
+
+      // Declare approvalTxHash outside the if block
+      let approvalTxHash = null;
+
+      if (allowance < amountBigInt) {
+        toast.dismiss();
+        toast.loading("Please approve token spending in your wallet...");
+
+        console.log("📝 Requesting approval for escrow contract...");
+        console.log(
+          "   Escrow address:",
+          selectedPaymentToken.paymentContractAddress
+        );
+        console.log(
+          "   Amount:",
+          ethers.formatUnits(amountBigInt, selectedPaymentToken.decimals)
+        );
+
+        const approveTx = await tokenContract.approve(
+          selectedPaymentToken.paymentContractAddress,
+          amountBigInt
+        );
+
+        toast.dismiss();
+        toast.loading("Waiting for approval confirmation...");
+
+        console.log("   Approval TX:", approveTx.hash);
+        approvalTxHash = approveTx.hash; // Store the hash
+
+        const approvalReceipt = await approveTx.wait();
+
+        console.log(
+          "   ✅ Approval confirmed in block:",
+          approvalReceipt.blockNumber
+        );
+
+        toast.dismiss();
+        toast.success("Approval confirmed!");
+      } else {
+        console.log("✅ Already approved, no approval needed");
+        approvalTxHash = "already_approved"; // Set placeholder
+        toast.dismiss();
+        toast.success("Tokens already approved!");
+      }
+
+      // STEP 8: Call backend to process purchase
+      // Backend will create escrow and pull tokens
+      toast.loading("Creating escrow and processing payment...");
+
+      console.log("📤 Calling backend to process purchase...");
+      console.log("   Course ID:", course._id);
+      console.log("   Token ID:", selectedPaymentToken._id);
+      console.log("   Student:", userAddress);
+      console.log("   Amount:", amountInToken);
+
+      const purchaseResponse = await paymentApi.processPurchase({
+        courseId: course._id,
+        paymentTokenId: selectedPaymentToken._id,
+        transactionHash: approvalTxHash, // Use the hash we stored
+        studentAddress: userAddress,
+        amountInToken: amountInToken,
+      });
+      console.log("✅ Purchase successful:", purchaseResponse.data);
 
       toast.dismiss();
       toast.success("Purchase successful! 🎉");
 
+      setTransactionHash(
+        purchaseResponse.data.purchase.transactionHash || approvalTxHash
+      );
       setProcessing(false);
 
-      // Redirect to course learning page
+      // Navigate to course
       setTimeout(() => {
-        navigate(`/courses/${course.slug}/learn`);
+        navigate(`/courses/${slug}/learn`);
       }, 2000);
     } catch (error) {
-      console.error("Purchase error:", error);
+      console.error("❌ Purchase error:", error);
       toast.dismiss();
-      toast.error(
-        error.response?.data?.error || "Purchase failed. Please try again."
-      );
+
+      if (error.code === 4001 || error.code === "ACTION_REJECTED") {
+        toast.error("Transaction rejected by user");
+      } else if (error.message?.includes("insufficient funds")) {
+        toast.error("Insufficient funds for gas fees");
+      } else if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else if (error.message) {
+        toast.error(error.message);
+      } else {
+        toast.error("Purchase failed. Please try again.");
+      }
+
       setProcessing(false);
     }
   };
@@ -298,7 +492,7 @@ const CheckoutPage = () => {
     }
   };
 
-  if (loading) {
+  if (loading || loadingTokens) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -327,11 +521,12 @@ const CheckoutPage = () => {
     );
   }
 
-  const paymentOptions = allPaymentOptions.filter((opt) =>
-    course?.instructor?.acceptedPayments?.includes(opt.id)
+  // Filter tokens by instructor accepted methods
+  const paymentOptions = availablePaymentTokens.filter((token) =>
+    course?.acceptedPaymentMethods?.includes(token.symbol.toLowerCase())
   );
-  const selectedOption =
-    paymentOptions.find((p) => p.id === selectedPayment) || paymentOptions[0];
+
+  const selectedOption = selectedPaymentToken;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-12">
@@ -543,27 +738,27 @@ const CheckoutPage = () => {
                           <button
                             key={option.id}
                             onClick={() => {
-                              setSelectedPayment(option.id);
+                              setSelectedPaymentToken(option);
                               setShowPaymentDropdown(false);
                             }}
                             className={`w-full flex items-center justify-between p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition ${
-                              selectedPayment === option.id
+                              selectedPaymentToken?._id === option._id
                                 ? "bg-primary-400/10 border-2 border-primary-400/30"
                                 : ""
                             }`}
                           >
                             <div className="flex items-center space-x-3">
-                              <div
-                                className={`w-12 h-12 ${option.color} rounded-lg flex items-center justify-center text-white font-bold shadow-md`}
-                              >
-                                {option.icon}
-                              </div>
+                              <span className="text-3xl">{option.icon}</span>
                               <div className="text-left">
                                 <div className="font-bold text-gray-900 dark:text-white">
-                                  {option.amount} {option.name}
+                                  {(
+                                    course.price.usd /
+                                    (option.currentPriceUSD || 1)
+                                  ).toFixed(2)}{" "}
+                                  {option.symbol}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  {option.network}
+                                  ≈ ${course.price.usd} USD • {option.chainName}
                                 </div>
                               </div>
                             </div>
@@ -586,33 +781,40 @@ const CheckoutPage = () => {
                             .filter((opt) => !opt.isStable)
                             .map((option) => (
                               <button
-                                key={option.id}
+                                key={option._id}
                                 onClick={() => {
-                                  setSelectedPayment(option.id);
+                                  setSelectedPaymentToken(option);
                                   setShowPaymentDropdown(false);
                                 }}
                                 className={`w-full flex items-center justify-between p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition ${
-                                  selectedPayment === option.id
+                                  selectedPaymentToken?._id === option._id
                                     ? "bg-primary-400/10 border-2 border-primary-400/30"
                                     : ""
                                 }`}
                               >
                                 <div className="flex items-center space-x-3">
-                                  <div
-                                    className={`w-12 h-12 ${option.color} rounded-lg flex items-center justify-center text-white font-bold shadow-md`}
-                                  >
+                                  <span className="text-3xl">
                                     {option.icon}
-                                  </div>
+                                  </span>
                                   <div className="text-left">
                                     <div className="font-bold text-gray-900 dark:text-white">
-                                      {option.amount} {option.name}
+                                      {(
+                                        course.price.usd /
+                                        (option.currentPriceUSD || 1)
+                                      ).toFixed(4)}{" "}
+                                      {option.symbol}
                                     </div>
                                     <div className="text-xs text-gray-500">
                                       ≈ ${course.price.usd} USD •{" "}
-                                      {option.network}
+                                      {option.chainName}
                                     </div>
                                   </div>
                                 </div>
+                                {option.badge && (
+                                  <span className="px-2 py-1 bg-green-500/10 text-green-500 text-xs font-bold rounded">
+                                    {option.badge}
+                                  </span>
+                                )}
                               </button>
                             ))}
                         </>
@@ -797,7 +999,12 @@ const CheckoutPage = () => {
                             ${calculateTotal()}
                           </div>
                           <div className="text-xs text-gray-500">
-                            ≈ {selectedOption?.amount} {selectedOption?.name}
+                            ≈{" "}
+                            {(
+                              calculateTotal() /
+                              (selectedPaymentToken?.currentPriceUSD || 1)
+                            ).toFixed(4)}{" "}
+                            {selectedPaymentToken?.symbol}
                           </div>
                         </div>
                       </div>
@@ -818,9 +1025,10 @@ const CheckoutPage = () => {
                 </div>
                 <div className="p-6 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-800">
                   <button
+                    type="button"
                     onClick={handleSmartContractPayment}
-                    disabled={!isConnected || !agreeToTerms || processing}
-                    className="w-full py-4 bg-gradient-to-r from-primary-400 to-primary-600 text-black rounded-xl font-bold text-lg hover:shadow-xl hover:shadow-primary-400/50 transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
+                    disabled={!agreeToTerms || processing}
+                    className="w-full py-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold hover:from-primary-600 hover:to-primary-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {processing ? (
                       <>
@@ -890,19 +1098,19 @@ const CheckoutPage = () => {
                 <div className="flex flex-wrap gap-2">
                   {paymentOptions.map((option) => (
                     <div
-                      key={option.id}
+                      key={option._id} // ← FIXED
                       className={`flex items-center space-x-2 px-3 py-2 rounded-lg border-2 ${
-                        selectedPayment === option.id
+                        selectedPaymentToken?._id === option._id
                           ? "border-primary-400 bg-primary-400/10"
                           : "border-gray-200 dark:border-gray-800"
                       }`}
                     >
-                      <div
-                        className={`w-6 h-6 ${option.color} rounded flex items-center justify-center text-white text-xs font-bold`}
-                      >
-                        {option.icon}
-                      </div>
-                      <span className="text-sm font-medium">{option.name}</span>
+                      <span className="text-2xl">{option.icon}</span>{" "}
+                      {/* ← FIXED - Show emoji/icon directly */}
+                      <span className="text-sm font-medium">
+                        {option.symbol}
+                      </span>{" "}
+                      {/* ← FIXED - Use symbol */}
                     </div>
                   ))}
                 </div>

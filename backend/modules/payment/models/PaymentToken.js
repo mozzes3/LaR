@@ -64,7 +64,11 @@ const paymentTokenSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-
+    registryContractAddress: {
+      // ADD THIS
+      type: String,
+      required: false, // Optional for backward compatibility
+    },
     // Price oracle configuration
     isStablecoin: {
       type: Boolean,
