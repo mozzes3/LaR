@@ -698,10 +698,10 @@ const processPurchase = async (req, res) => {
           Date.now() + escrowPeriodDays * 24 * 60 * 60 * 1000
         ),
         paymentMethod: paymentToken.symbol.toLowerCase(), // usdc, usdt, etc.
-        amount: paymentAmount, // USD amount
+        amount: usdValue, // USD amount
         currency: "USD",
-        instructorRevenue: paymentAmount * (instructorFeePercentage / 10000),
-        platformFee: paymentAmount * (platformFeePercentage / 10000),
+        instructorRevenue: usdValue * (instructorFeePercentage / 10000),
+        platformFee: usdValue * (platformFeePercentage / 10000),
       });
 
       await purchase.save();
@@ -850,10 +850,10 @@ const processPurchase = async (req, res) => {
       escrowReleaseDate: new Date(Date.now() + 2 * 60 * 1000), // 2 min for testing
       // LEGACY
       paymentMethod: paymentToken.symbol.toLowerCase(), // usdc, usdt, etc.
-      amount: paymentAmount, // USD amount
+      amount: usdValue, // USD amount
       currency: "USD",
-      instructorRevenue: paymentAmount * (instructorFeePercentage / 10000),
-      platformFee: paymentAmount * (platformFeePercentage / 10000),
+      instructorRevenue: usdValue * (instructorFeePercentage / 10000),
+      platformFee: usdValue * (platformFeePercentage / 10000),
     });
 
     await purchase.save();

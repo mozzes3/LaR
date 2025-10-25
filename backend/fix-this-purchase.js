@@ -7,7 +7,7 @@ async function fixPurchase() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
 
-    const purchase = await Purchase.findById("68fbfee8d18b34800dd51532");
+    const purchase = await Purchase.findById("68fcfea3801bd0e195e171d3");
 
     console.log("📊 Current Release Date:", purchase.escrowReleaseDate);
 
