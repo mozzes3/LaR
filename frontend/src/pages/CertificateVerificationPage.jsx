@@ -102,13 +102,35 @@ const CertificateVerificationPage = () => {
   }
 
   const handleViewOnBlockchain = () => {
-    if (certificate.blockchainExplorerUrl) {
-      window.open(certificate.blockchainExplorerUrl, "_blank");
-    } else if (certificate.blockchainHash) {
+    // Check if we have NFT info (contract + tokenId)
+    if (certificate.nftContractAddress && certificate.nftTokenId) {
       window.open(
-        `https://shannon-explorer.somnia.network/tx/${certificate.blockchainHash}`,
+        `https://shannon-explorer.somnia.network/token/${certificate.nftContractAddress}/instance/${certificate.nftTokenId}`,
         "_blank"
       );
+      return;
+    }
+
+    // Fallback to transaction page
+    if (certificate.blockchainExplorerUrl) {
+      window.open(certificate.blockchainExplorerUrl, "_blank");
+      return;
+    }
+
+    // Last fallback - construct tx URL from hash
+    const txHash =
+      certificate.blockchainHash ||
+      certificate.nftTransactionHash ||
+      certificate.blockchainTransactionHash;
+
+    if (txHash) {
+      window.open(
+        `https://shannon-explorer.somnia.network/tx/${txHash}`,
+        "_blank"
+      );
+    } else {
+      console.error("❌ No blockchain information found");
+      alert("Blockchain information not available");
     }
   };
 
@@ -317,7 +339,7 @@ const CertificateVerificationPage = () => {
               className="w-full flex items-center justify-center space-x-2 px-4 py-3 border-2 border-primary-400 text-primary-400 rounded-lg font-medium hover:bg-primary-400 hover:text-black transition"
             >
               <ExternalLink className="w-5 h-5" />
-              <span>View on Somnia Explorer</span>
+              <span>View on Explorer</span>
             </button>
           </div>
         </div>
@@ -325,7 +347,7 @@ const CertificateVerificationPage = () => {
         {/* Footer */}
         <div className="text-center">
           <p className="text-sm text-gray-500 mb-4">
-            Issued by Lizard Academy • Verified on Somnia Blockchain
+            Issued by Lizard Academy • Verified on Blockchain
           </p>
           <button
             onClick={() => navigate("/")}

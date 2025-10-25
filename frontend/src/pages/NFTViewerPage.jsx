@@ -22,7 +22,7 @@ const NFTCertificateViewer = () => {
   const COLLECTIONS = {
     competency: {
       name: "Certificate of Competency",
-      address: "0x9094cff8a9980b817fe5fa04fd3c9b44663d3e23",
+      address: "0x79d339E3604F8fEb5eEB7A816C3181737f58fD2C",
       icon: <Award className="w-5 h-5" />,
       color: "blue",
     },

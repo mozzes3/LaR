@@ -4,14 +4,12 @@ const {
   getPaymentService,
 } = require("../modules/payment/services/blockchainService");
 const COMPETENCY_NFT_ABI = [
-  "function mintCertificate(address student, string certificateNumber, string metadataURI) external returns (uint256)",
-  "function batchMintCertificates(address[] students, string[] certificateNumbers, string[] metadataURIs) external",
-  "function getCertificateByNumber(string certificateNumber) external view returns (uint256 tokenId, address student, string metadataURI, uint256 mintedAt)",
-  "function getCertificatesByStudent(address student) external view returns (uint256[])",
-  "function certificateExists(string certificateNumber) external view returns (bool)",
-  "function totalSupply() external view returns (uint256)",
-  "function tokenURI(uint256 tokenId) external view returns (string)",
-  "event CertificateMinted(uint256 indexed tokenId, string certificateNumber, address indexed student, string metadataURI, uint256 mintedAt)",
+  "function mintNFT(address studentWallet, string certificateNumber, string metadataURI)",
+  "function certificateToTokenId(string) view returns (uint256)",
+  "function getCertificateByNumber(string certificateNumber) view returns (tuple(string certificateNumber, string certificateType, string studentName, address studentWallet, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate, uint256 recordedAt, bool revoked, string metadataURI))",
+  "function totalSupply() view returns (uint256)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function paused() view returns (bool)",
 ];
 
 // NEW: Same ABI for Completion certificates
@@ -187,46 +185,63 @@ class NFTBlockchainService {
       console.log(`⛽ Gas price: ${gasPriceGwei} gwei`);
 
       // Estimate gas
-      const gasEstimate =
-        await this.competencyContract.mintCertificate.estimateGas(
-          studentWallet,
-          certificateNumber,
-          metadataURI
-        );
-      console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
+      const gasEstimate = await this.competencyContract.mintNFT.estimateGas(
+        studentWallet,
+        certificateNumber,
+        metadataURI
+      );
 
-      // Mint NFT
-      const tx = await this.competencyContract.mintCertificate(
+      const tx = await this.competencyContract.mintNFT(
         studentWallet,
         certificateNumber,
         metadataURI,
         {
-          gasLimit: (gasEstimate * BigInt(120)) / BigInt(100), // 20% buffer
+          gasLimit: (gasEstimate * BigInt(120)) / BigInt(100),
           gasPrice: gasPrice,
         }
       );
-
       console.log(`📝 NFT mint transaction sent: ${tx.hash}`);
       console.log(`⏳ Waiting for confirmation...`);
 
       const receipt = await tx.wait();
       console.log(`✅ NFT minted in block ${receipt.blockNumber}`);
 
-      // Extract tokenId from event
-      const mintEvent = receipt.logs.find((log) => {
-        try {
-          const parsed = this.competencyContract.interface.parseLog(log);
-          return parsed.name === "CertificateMinted";
-        } catch {
-          return false;
-        }
-      });
-
+      // Get tokenId from contract (it was already reserved during recordCertificate)
+      console.log(`🔍 Querying tokenId for certificate: ${certificateNumber}`);
       let tokenId = null;
-      if (mintEvent) {
-        const parsed = this.competencyContract.interface.parseLog(mintEvent);
-        tokenId = parsed.args.tokenId.toString();
-        console.log(`🎫 Token ID: ${tokenId}`);
+
+      try {
+        const contractTokenId =
+          await this.competencyContract.certificateToTokenId(certificateNumber);
+        if (contractTokenId && contractTokenId.toString() !== "0") {
+          tokenId = contractTokenId.toString();
+          console.log(`🎫 Token ID: ${tokenId}`);
+        } else {
+          console.error(
+            `❌ TokenId is 0 or null for certificate ${certificateNumber}`
+          );
+        }
+      } catch (queryError) {
+        console.error(`❌ Failed to query tokenId:`, queryError.message);
+
+        // Fallback: Try to parse from events
+        console.log(`⚠️ Trying event parsing as fallback...`);
+        for (const log of receipt.logs) {
+          try {
+            const parsed = this.competencyContract.interface.parseLog(log);
+            if (parsed.name === "CertificateMinted" && parsed.args.tokenId) {
+              tokenId = parsed.args.tokenId.toString();
+              console.log(`✅ Token ID from event: ${tokenId}`);
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+
+      if (!tokenId) {
+        console.error(`❌ WARNING: Could not determine tokenId for NFT!`);
       }
 
       const explorerUrl = `https://shannon-explorer.somnia.network/tx/${tx.hash}`;

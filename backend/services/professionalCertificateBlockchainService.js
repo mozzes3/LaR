@@ -4,11 +4,14 @@ const fs = require("fs").promises;
 const path = require("path");
 
 const PROFESSIONAL_CERT_ABI = [
-  "function recordCertificate(string certificateNumber, string certificateType, string studentName, string studentWallet, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate) public returns (bytes32)",
-  "function verifyCertificate(string certificateNumber) public view returns (bool exists, string studentName, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate)",
-  "function isCertificateValid(string certificateNumber) public view returns (bool)",
-  "function getCertificateByNumber(string certificateNumber) public view returns (tuple(string certificateNumber, string certificateType, string studentName, string studentWallet, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate, uint256 recordedAt, bool exists))",
-  "event CertificateRecorded(bytes32 indexed certificateHash, string certificateNumber, string studentName, string certificationTitle, uint256 timestamp)",
+  "function recordCertificate(string certificateNumber, string certificateType, string studentName, address studentWallet, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate) returns (uint256)",
+  "function verifyCertificate(string certificateNumber) view returns (bool valid, string studentName, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate)",
+  "function getCertificateByNumber(string certificateNumber) view returns (tuple(string certificateNumber, string certificateType, string studentName, address studentWallet, string certificationTitle, string category, string grade, uint256 score, uint256 completedDate, uint256 issuedDate, uint256 recordedAt, bool revoked, string metadataURI))",
+  "function isCertificateValid(string certificateNumber) view returns (bool)",
+  "function certificateToTokenId(string) view returns (uint256)",
+  "function authorizedIssuers(address) view returns (bool)",
+  "function owner() view returns (address)",
+  "function paused() view returns (bool)",
 ];
 
 class ProfessionalCertificateBlockchainService {
@@ -116,7 +119,7 @@ class ProfessionalCertificateBlockchainService {
         certificateNumber,
         certificateType,
         studentName,
-        studentWallet || "Not Connected",
+        studentWallet,
         certificationTitle,
         category,
         grade,
@@ -133,7 +136,7 @@ class ProfessionalCertificateBlockchainService {
         certificateNumber,
         certificateType,
         studentName,
-        studentWallet || "Not Connected",
+        studentWallet,
         certificationTitle,
         category,
         grade,
@@ -150,6 +153,51 @@ class ProfessionalCertificateBlockchainService {
       const receipt = await tx.wait();
       console.log(`✅ Transaction confirmed in block ${receipt.blockNumber}`);
 
+      // EXTRACT TOKEN ID from event logs
+      console.log(`🔍 Parsing logs for tokenId...`);
+      console.log(`📋 Total logs: ${receipt.logs.length}`);
+
+      let tokenId = null;
+
+      // Try to parse logs
+      for (const log of receipt.logs) {
+        try {
+          const parsed = this.contract.interface.parseLog(log);
+          console.log(`📝 Found event: ${parsed.name}`);
+
+          if (parsed.name === "CertificateRecorded") {
+            tokenId = parsed.args.tokenId.toString();
+            console.log(`✅ Token ID extracted from event: ${tokenId}`);
+            break;
+          }
+        } catch (error) {
+          // Skip logs that can't be parsed (from other contracts)
+          continue;
+        }
+      }
+
+      // FALLBACK: Query contract directly if event parsing failed
+      if (!tokenId) {
+        console.log(`⚠️ Event parsing failed, querying contract directly...`);
+        try {
+          const contractTokenId = await this.contract.certificateToTokenId(
+            certificateNumber
+          );
+          if (contractTokenId && contractTokenId.toString() !== "0") {
+            tokenId = contractTokenId.toString();
+            console.log(`✅ Token ID from contract query: ${tokenId}`);
+          }
+        } catch (queryError) {
+          console.error(`❌ Failed to query tokenId:`, queryError.message);
+        }
+      }
+
+      if (!tokenId) {
+        console.error(`❌ WARNING: Could not extract tokenId!`);
+      } else {
+        console.log(`🎨 Final Token ID: ${tokenId}`);
+      }
+
       const explorerUrl = `https://shannon-explorer.somnia.network/tx/${tx.hash}`;
 
       return {
@@ -159,6 +207,8 @@ class ProfessionalCertificateBlockchainService {
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed.toString(),
         explorerUrl,
+        tokenId,
+        contractAddress: this.contractAddress,
         network: this.network,
       };
     } catch (error) {

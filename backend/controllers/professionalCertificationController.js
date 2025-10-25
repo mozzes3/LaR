@@ -15,6 +15,7 @@ const FormData = require("form-data");
 const { createCanvas, loadImage } = require("canvas");
 const path = require("path");
 const crypto = require("crypto");
+const { ethers } = require("ethers");
 const axios = require("axios");
 const sharp = require("sharp");
 
@@ -875,31 +876,33 @@ const purchaseCertificate = async (req, res) => {
 
     // Record on blockchain
     try {
-      console.log("📝 Recording certificate on blockchain...");
-      console.log(
-        "🔍 Type of import:",
-        typeof getProfessionalCertBlockchainService
-      );
-      console.log("🔍 Import value:", getProfessionalCertBlockchainService);
-
-      if (typeof getProfessionalCertBlockchainService !== "function") {
-        throw new Error(
-          "getProfessionalCertBlockchainService is not a function - import failed"
-        );
-      }
+      console.log("📝 Recording certificate data on blockchain...");
 
       const blockchainService = await getProfessionalCertBlockchainService();
-      console.log("🔍 Service instance:", blockchainService);
+
+      // Validate and convert wallet address
+      let walletAddress = certificate.studentWallet;
+
+      if (walletAddress === "N/A" || !walletAddress) {
+        walletAddress = "0x0000000000000000000000000000000000000000";
+      }
+
+      // CRITICAL: Ensure it's a valid checksummed address
+      if (!ethers.isAddress(walletAddress)) {
+        console.error(`❌ Invalid wallet address: ${walletAddress}`);
+        throw new Error(`Invalid wallet address format`);
+      }
+
+      // Convert to proper checksummed address
+      walletAddress = ethers.getAddress(walletAddress);
+      console.log(`✅ Validated wallet address: ${walletAddress}`);
 
       const blockchainTx =
         await blockchainService.recordProfessionalCertificate({
           certificateNumber: certificate.certificateNumber,
           certificateType: "Professional Competency",
           studentName: certificate.studentName,
-          studentWallet:
-            certificate.studentWallet === "N/A"
-              ? "0x0000000000000000000000000000000000000000"
-              : certificate.studentWallet,
+          studentWallet: walletAddress, // Now a proper address type
           certificationTitle: certificate.certificationTitle,
           category: certificate.category,
           score: certificate.score,
@@ -909,17 +912,28 @@ const purchaseCertificate = async (req, res) => {
         });
 
       certificate.blockchainVerified = true;
-      certificate.blockchainHash = blockchainTx.hash;
+      certificate.blockchainHash = blockchainTx.transactionHash;
       certificate.blockchainExplorerUrl = blockchainTx.explorerUrl;
       certificate.blockchainBlock = blockchainTx.blockNumber;
       certificate.blockchainNetwork = "Somnia";
-      certificate.blockchainVerifiedAt = new Date(); // Also set this
+      certificate.blockchainVerifiedAt = new Date();
+
+      // Save tokenId from recording
+      certificate.nftTokenId = blockchainTx.tokenId;
+      certificate.nftContractAddress = blockchainTx.contractAddress;
+
       await certificate.save();
 
-      console.log("✅ Certificate recorded on blockchain:", blockchainTx.hash);
+      console.log(
+        "✅ Certificate data recorded on blockchain:",
+        blockchainTx.transactionHash
+      );
+      if (blockchainTx.tokenId) {
+        console.log("🎨 Token ID reserved:", blockchainTx.tokenId);
+      }
     } catch (blockchainError) {
       console.error("❌ Blockchain recording failed:", blockchainError.message);
-      console.error("❌ Full error:", blockchainError);
+      console.error("Full error:", blockchainError);
     }
 
     // ===========================================
@@ -1006,7 +1020,13 @@ const purchaseCertificate = async (req, res) => {
         certificate.nftTransactionHash = nftResult.transactionHash;
         certificate.nftMintedAt = new Date();
         await certificate.save();
-
+        // ADD THESE LINES - Save NFT explorer URL as fallback
+        if (!certificate.blockchainExplorerUrl && nftResult.explorerUrl) {
+          certificate.blockchainExplorerUrl = nftResult.explorerUrl;
+        }
+        if (!certificate.blockchainHash && nftResult.transactionHash) {
+          certificate.blockchainHash = nftResult.transactionHash;
+        }
         console.log(`✅ NFT minted! Token ID: ${nftResult.tokenId}`);
         console.log(`🔗 Explorer: ${nftResult.explorerUrl}`);
       } else {
@@ -1110,7 +1130,6 @@ const verifyCertificate = async (req, res) => {
 
     const certificate = await ProfessionalCertificate.findOne({
       certificateNumber,
-      isValid: true,
       status: "active",
     })
       .populate("certificationId", "title category subcategories") // CORRECT
