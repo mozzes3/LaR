@@ -12,12 +12,14 @@ import {
   Crown,
 } from "lucide-react";
 import { adminApi } from "@services/api";
+import { useWallet } from "@contexts/WalletContext";
 import toast from "react-hot-toast";
 
 const AdminUsersPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const { user: currentUser } = useWallet();
   const [filters, setFilters] = useState({
     role: "",
     isInstructor: "",
@@ -317,37 +319,45 @@ const AdminUsersPage = () => {
                           </p>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center justify-end space-x-2">
+                          <div className="flex items-center space-x-2">
                             <Link
                               to={`/admin/users/${user._id}`}
                               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition"
                               title="Edit user"
                             >
-                              <Edit className="w-4 h-4 text-blue-500" />
+                              <Edit className="w-4 h-4 text-primary-500" />
                             </Link>
-                            <button
-                              onClick={() =>
-                                handleBanToggle(user._id, user.isBanned)
-                              }
-                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition"
-                              title={user.isBanned ? "Unban user" : "Ban user"}
-                            >
-                              <Ban
-                                className={`w-4 h-4 ${
-                                  user.isBanned
-                                    ? "text-green-500"
-                                    : "text-red-500"
-                                }`}
-                              />
-                            </button>
-                            {!user.isSuperAdmin && (
-                              <button
-                                onClick={() => handleMakeSuperAdmin(user._id)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition"
-                                title="Make super admin"
-                              >
-                                <Shield className="w-4 h-4 text-yellow-500" />
-                              </button>
+                            {currentUser?.isSuperAdmin && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleToggleBan(user._id, user.isBanned)
+                                  }
+                                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition"
+                                  title={
+                                    user.isBanned ? "Unban user" : "Ban user"
+                                  }
+                                >
+                                  <Ban
+                                    className={`w-4 h-4 ${
+                                      user.isBanned
+                                        ? "text-green-500"
+                                        : "text-red-500"
+                                    }`}
+                                  />
+                                </button>
+                                {!user.isSuperAdmin && (
+                                  <button
+                                    onClick={() =>
+                                      handleMakeSuperAdmin(user._id)
+                                    }
+                                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition"
+                                    title="Make super admin"
+                                  >
+                                    <Shield className="w-4 h-4 text-yellow-500" />
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>

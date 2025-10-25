@@ -57,6 +57,7 @@ router.get("/users/:userId", adminLimiter, adminController.getUserDetails);
 router.post(
   "/users/:userId/assign-role",
   adminLimiter,
+  isSuperAdmin,
   hasPermission("users", "update"),
   auditAdminAction("assign_role", "User"),
   adminController.assignRole
@@ -65,6 +66,7 @@ router.put(
   "/users/:userId/permissions",
   adminLimiter,
   hasPermission("users", "update"),
+  isSuperAdmin,
   auditAdminAction("update_user_permissions", "User"),
   adminController.updateUserPermissions
 );

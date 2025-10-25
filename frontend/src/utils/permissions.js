@@ -11,12 +11,12 @@ export const hasPermission = (user, resource, action) => {
   // SuperAdmin has all permissions
   if (user.isSuperAdmin) return true;
 
-  // Check role permissions
-  if (user.roleRef?.permissions) {
-    const hasRolePermission = user.roleRef.permissions.some(
+  // ✅ CHECK DENIED PERMISSIONS FIRST - This overrides everything
+  if (user.customPermissions?.deniedPermissions) {
+    const isDenied = user.customPermissions.deniedPermissions.some(
       (perm) => perm.resource === resource && perm.actions.includes(action)
     );
-    if (hasRolePermission) return true;
+    if (isDenied) return false;
   }
 
   // Check custom permissions (granted)
@@ -30,12 +30,12 @@ export const hasPermission = (user, resource, action) => {
     if (hasCustomPermission) return true;
   }
 
-  // Check if denied
-  if (user.customPermissions?.deniedPermissions) {
-    const isDenied = user.customPermissions.deniedPermissions.some(
+  // Check role permissions
+  if (user.roleRef?.permissions) {
+    const hasRolePermission = user.roleRef.permissions.some(
       (perm) => perm.resource === resource && perm.actions.includes(action)
     );
-    if (isDenied) return false;
+    if (hasRolePermission) return true;
   }
 
   // Legacy admin check
@@ -61,10 +61,14 @@ export const hasAnyPermission = (user, permissions) => {
  * @param {Object} user - Current user object
  * @returns {Object} - Object with visibility flags
  */
+/**
+ * Get visible stats cards based on user permissions
+ * @param {Object} user - Current user object
+ * @returns {Object} - Object with visibility flags
+ */
 export const getVisibleStats = (user) => {
   if (!user) return {};
 
-  // SuperAdmin sees everything
   if (user.isSuperAdmin) {
     return {
       totalUsers: true,
@@ -83,14 +87,14 @@ export const getVisibleStats = (user) => {
   return {
     totalUsers: hasPermission(user, "users", "read"),
     totalCourses: hasPermission(user, "courses", "read"),
-    totalPurchases: hasPermission(user, "payments", "read"),
-    totalRevenue: hasPermission(user, "payments", "read"),
+    totalPurchases: user.isSuperAdmin, // ✅ ONLY SUPER ADMIN
+    totalRevenue: user.isSuperAdmin, // ✅ ONLY SUPER ADMIN
     pendingApplications: hasPermission(user, "applications", "read"),
     pendingCourses: hasPermission(user, "courses", "approve"),
     pendingReviews: hasPermission(user, "reviews", "read"),
-    flaggedReviews: hasPermission(user, "reviews", "update"),
+    flaggedReviews: hasPermission(user, "reviews", "read"),
     totalCertifications: hasPermission(user, "certifications", "read"),
-    activeEscrows: hasPermission(user, "payments", "read"),
+    activeEscrows: user.isSuperAdmin, // ✅ ONLY SUPER ADMIN
   };
 };
 
@@ -121,9 +125,9 @@ export const getVisibleActions = (user) => {
     manageRoles: hasPermission(user, "roles", "read"),
     reviewApplications: hasPermission(user, "applications", "read"),
     manageCourses: hasPermission(user, "courses", "read"),
-    manageReviews: hasPermission(user, "reviews", "read"),
+    manageReviews: hasPermission(user, "reviews", "read"), // ✅ reviews:read
     manageCertifications: hasPermission(user, "certifications", "read"),
-    managePurchases: hasPermission(user, "payments", "read"),
-    manageEscrows: hasPermission(user, "payments", "read"),
+    managePurchases: hasPermission(user, "payments", "read"), // ✅ payments:read
+    manageEscrows: hasPermission(user, "payments", "read"), // ✅ payments:read
   };
 };

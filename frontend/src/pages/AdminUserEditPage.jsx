@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { adminApi } from "@services/api";
 import CourseAccessSection from "@components/admin/CourseAccessSection";
+import { useWallet } from "@contexts/WalletContext";
 import toast from "react-hot-toast";
 
 const AdminUserEditPage = () => {
@@ -30,7 +31,7 @@ const AdminUserEditPage = () => {
   const [deniedPermissions, setDeniedPermissions] = useState([]);
   const [notes, setNotes] = useState("");
   const [userPermissions, setUserPermissions] = useState([]);
-
+  const { user: currentUser } = useWallet();
   const [editMode, setEditMode] = useState(false);
   const [userDetails, setUserDetails] = useState({
     username: "",
@@ -185,7 +186,10 @@ const AdminUserEditPage = () => {
       });
 
       // ✅ LOAD CUSTOM PERMISSIONS
-      if (userData.customPermissions) {
+      if (
+        userData.customPermissions &&
+        userData.customPermissions.customPermissions?.length > 0
+      ) {
         setCustomPermissions(
           userData.customPermissions.customPermissions || []
         );
@@ -194,7 +198,7 @@ const AdminUserEditPage = () => {
         );
         setNotes(userData.customPermissions.notes || "");
       } else {
-        // ✅ INITIALIZE FROM ROLE PERMISSIONS IF NO CUSTOM PERMS
+        // ✅ INITIALIZE FROM ROLE PERMISSIONS IF NO CUSTOM PERMS OR EMPTY
         if (userData.roleRef?.permissions) {
           const rolePerms = userData.roleRef.permissions.map((perm) => ({
             resource: perm.resource,
@@ -202,6 +206,13 @@ const AdminUserEditPage = () => {
             granted: true,
           }));
           setCustomPermissions(rolePerms);
+        }
+        // Load denied permissions if they exist
+        if (userData.customPermissions?.deniedPermissions) {
+          setDeniedPermissions(userData.customPermissions.deniedPermissions);
+        }
+        if (userData.customPermissions?.notes) {
+          setNotes(userData.customPermissions.notes);
         }
       }
     } catch (error) {
@@ -282,8 +293,22 @@ const AdminUserEditPage = () => {
     try {
       setSaving(true);
       await adminApi.assignRole(userId, { roleId: selectedRole });
+
+      // ✅ LOAD THE NEWLY ASSIGNED ROLE'S PERMISSIONS INTO CUSTOM PERMISSIONS
+      const assignedRole = roles.find((r) => r._id === selectedRole);
+      if (assignedRole?.permissions) {
+        const rolePerms = assignedRole.permissions.map((perm) => ({
+          resource: perm.resource,
+          actions: [...perm.actions],
+          granted: true,
+        }));
+        setCustomPermissions(rolePerms);
+        setDeniedPermissions([]);
+        setNotes("");
+      }
+
       toast.success(
-        "Role assigned successfully. User should reconnect wallet to see changes."
+        "Role assigned successfully. Custom permissions updated. User should reconnect wallet to see changes."
       );
       loadUserDetails();
     } catch (error) {
@@ -314,9 +339,11 @@ const AdminUserEditPage = () => {
 
   const toggleCustomPermission = (resource, action) => {
     const existingPerm = customPermissions.find((p) => p.resource === resource);
+    const isFromRole = hasRolePermission(resource, action);
 
     if (existingPerm) {
       if (existingPerm.actions.includes(action)) {
+        // Removing from custom permissions
         existingPerm.actions = existingPerm.actions.filter((a) => a !== action);
         if (existingPerm.actions.length === 0) {
           setCustomPermissions(
@@ -325,15 +352,62 @@ const AdminUserEditPage = () => {
         } else {
           setCustomPermissions([...customPermissions]);
         }
+
+        // ✅ If this permission comes from role, add to denied
+        if (isFromRole) {
+          const deniedPerm = deniedPermissions.find(
+            (p) => p.resource === resource
+          );
+          if (deniedPerm) {
+            if (!deniedPerm.actions.includes(action)) {
+              deniedPerm.actions.push(action);
+              setDeniedPermissions([...deniedPermissions]);
+            }
+          } else {
+            setDeniedPermissions([
+              ...deniedPermissions,
+              { resource, actions: [action] },
+            ]);
+          }
+        }
       } else {
+        // Adding to custom permissions
         existingPerm.actions.push(action);
         setCustomPermissions([...customPermissions]);
+
+        // ✅ Remove from denied if it was there
+        const deniedPerm = deniedPermissions.find(
+          (p) => p.resource === resource
+        );
+        if (deniedPerm) {
+          deniedPerm.actions = deniedPerm.actions.filter((a) => a !== action);
+          if (deniedPerm.actions.length === 0) {
+            setDeniedPermissions(
+              deniedPermissions.filter((p) => p.resource !== resource)
+            );
+          } else {
+            setDeniedPermissions([...deniedPermissions]);
+          }
+        }
       }
     } else {
       setCustomPermissions([
         ...customPermissions,
         { resource, actions: [action], granted: true },
       ]);
+
+      // ✅ Remove from denied if it was there
+      const deniedPerm = deniedPermissions.find((p) => p.resource === resource);
+      if (deniedPerm) {
+        deniedPerm.actions = deniedPerm.actions.filter((a) => a !== action);
+        if (deniedPerm.actions.length === 0) {
+          setDeniedPermissions(
+            deniedPermissions.filter((p) => p.resource !== resource)
+          );
+        } else {
+          setDeniedPermissions([...deniedPermissions]);
+        }
+      }
     }
   };
 
@@ -834,54 +908,58 @@ const AdminUserEditPage = () => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-xl p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              Role Assignment
-            </h2>
+          {currentUser?.isSuperAdmin && (
+            <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-xl p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                Role Assignment
+              </h2>
 
-            <div className="mb-4">
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                Current Role
-              </label>
-              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                <p className="font-bold text-gray-900 dark:text-white">
-                  {user.roleRef?.displayName || user.role || "No role assigned"}
-                </p>
-                {user.roleRef?.description && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {user.roleRef.description}
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                  Current Role
+                </label>
+                <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {user.roleRef?.displayName ||
+                      user.role ||
+                      "No role assigned"}
                   </p>
-                )}
+                  {user.roleRef?.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      {user.roleRef.description}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                Assign New Role
-              </label>
-              <select
-                value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                  Assign New Role
+                </label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black"
+                >
+                  <option value="">Select a role...</option>
+                  {roles.map((role) => (
+                    <option key={role._id} value={role._id}>
+                      {role.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={handleAssignRole}
+                disabled={!selectedRole || saving}
+                className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl font-bold hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">Select a role...</option>
-                {roles.map((role) => (
-                  <option key={role._id} value={role._id}>
-                    {role.displayName}
-                  </option>
-                ))}
-              </select>
+                <Shield className="w-5 h-5" />
+                <span>{saving ? "Saving..." : "Assign Role"}</span>
+              </button>
             </div>
-
-            <button
-              onClick={handleAssignRole}
-              disabled={!selectedRole || saving}
-              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl font-bold hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Shield className="w-5 h-5" />
-              <span>{saving ? "Saving..." : "Assign Role"}</span>
-            </button>
-          </div>
+          )}
 
           <div className="bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-xl p-6">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
@@ -912,103 +990,104 @@ const AdminUserEditPage = () => {
             )}
           </div>
         </div>
+        {currentUser?.isSuperAdmin && (
+          <div className="mt-6 bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-xl p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Custom Permission Overrides
+            </h2>
 
-        <div className="mt-6 bg-white dark:bg-black border-2 border-gray-200 dark:border-gray-800 rounded-xl p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            Custom Permission Overrides
-          </h2>
+            <div className="mb-4 p-4 bg-blue-500/10 border-2 border-blue-500/20 rounded-xl">
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                <AlertCircle className="w-4 h-4 inline mr-2" />
+                Custom permissions override role permissions. Green = Grant, Red
+                = Deny
+              </p>
+            </div>
 
-          <div className="mb-4 p-4 bg-blue-500/10 border-2 border-blue-500/20 rounded-xl">
-            <p className="text-sm text-blue-600 dark:text-blue-400">
-              <AlertCircle className="w-4 h-4 inline mr-2" />
-              Custom permissions override role permissions. Green = Grant, Red =
-              Deny
-            </p>
-          </div>
-
-          <div className="space-y-4 mb-6">
-            {availableResources.map((resource) => (
-              <div
-                key={resource.name}
-                className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4"
-              >
-                <h3 className="font-bold text-gray-900 dark:text-white mb-3">
-                  {resource.label}
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                      Grant Permissions
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {resource.actions.map((action) => (
-                        <button
-                          key={action}
-                          onClick={() =>
-                            toggleCustomPermission(resource.name, action)
-                          }
-                          className={`px-3 py-1 rounded-lg text-sm font-bold transition ${
-                            hasCustomPermission(resource.name, action)
-                              ? "bg-green-500 text-white"
-                              : hasRolePermission(resource.name, action)
-                              ? "bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
-                              : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                          }`}
-                        >
-                          {action}
-                        </button>
-                      ))}
+            <div className="space-y-4 mb-6">
+              {availableResources.map((resource) => (
+                <div
+                  key={resource.name}
+                  className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4"
+                >
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-3">
+                    {resource.label}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                        Grant Permissions
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {resource.actions.map((action) => (
+                          <button
+                            key={action}
+                            onClick={() =>
+                              toggleCustomPermission(resource.name, action)
+                            }
+                            className={`px-3 py-1 rounded-lg text-sm font-bold transition ${
+                              hasCustomPermission(resource.name, action)
+                                ? "bg-green-500 text-white"
+                                : hasRolePermission(resource.name, action)
+                                ? "bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                                : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                            }`}
+                          >
+                            {action}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                      Deny Permissions
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {resource.actions.map((action) => (
-                        <button
-                          key={action}
-                          onClick={() =>
-                            toggleDeniedPermission(resource.name, action)
-                          }
-                          className={`px-3 py-1 rounded-lg text-sm font-bold transition ${
-                            isDeniedPermission(resource.name, action)
-                              ? "bg-red-500 text-white"
-                              : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                          }`}
-                        >
-                          {action}
-                        </button>
-                      ))}
+                    <div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                        Deny Permissions
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {resource.actions.map((action) => (
+                          <button
+                            key={action}
+                            onClick={() =>
+                              toggleDeniedPermission(resource.name, action)
+                            }
+                            className={`px-3 py-1 rounded-lg text-sm font-bold transition ${
+                              isDeniedPermission(resource.name, action)
+                                ? "bg-red-500 text-white"
+                                : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                            }`}
+                          >
+                            {action}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-              Admin Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes about these permission overrides..."
-              className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black resize-none"
-              rows={3}
-            />
-          </div>
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
+                Admin Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add notes about these permission overrides..."
+                className="w-full px-4 py-2 border-2 border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-black resize-none"
+                rows={3}
+              />
+            </div>
 
-          <button
-            onClick={handleUpdatePermissions}
-            disabled={saving}
-            className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl font-bold hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save className="w-5 h-5" />
-            <span>{saving ? "Saving..." : "Save Permissions"}</span>
-          </button>
-        </div>
+            <button
+              onClick={handleUpdatePermissions}
+              disabled={saving}
+              className="w-full flex items-center justify-center space-x-2 px-6 py-3 bg-primary-500 text-white rounded-xl font-bold hover:bg-primary-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Save className="w-5 h-5" />
+              <span>{saving ? "Saving..." : "Save Permissions"}</span>
+            </button>
+          </div>
+        )}
         <CourseAccessSection userId={userId} />
       </div>
     </div>

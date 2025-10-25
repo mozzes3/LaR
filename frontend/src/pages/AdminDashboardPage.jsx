@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getVisibleStats, getVisibleActions } from "@utils/permissions";
 import { useWallet } from "@contexts/WalletContext";
 import { Link } from "react-router-dom";
+import { hasPermission } from "@utils/permissions";
 import {
   Users,
   BookOpen,
@@ -58,7 +59,18 @@ const AdminDashboardPage = () => {
     }
   };
   const visibleStats = getVisibleStats(user);
-
+  // ✅ TEMPORARY DEBUG
+  console.log("🔍 DEBUG - Current User:", {
+    isSuperAdmin: user?.isSuperAdmin,
+    role: user?.role,
+    roleRef: user?.roleRef,
+    customPermissions: user?.customPermissions,
+  });
+  console.log("🔍 DEBUG - Visible Stats:", visibleStats);
+  console.log(
+    "🔍 DEBUG - Has payments:read?",
+    hasPermission(user, "payments", "read")
+  );
   const allStatCards = [
     {
       title: "Total Users",
